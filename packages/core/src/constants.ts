@@ -1,5 +1,6 @@
 import type {
   BookingStatus,
+  CreditSource,
   Gender,
   Level,
   PurchaseStatus,
@@ -11,8 +12,19 @@ import type {
 /** 1 EGP = 100 piastres. All money is integer piastres. */
 export const PIASTRES_PER_EGP = 100;
 
-/** Credits expire this many days after the purchase that created them. */
+/**
+ * Credits expire this many days after the batch is created — the SAME rule for
+ * purchased credits and for signup-grant trial credits. There is deliberately no
+ * second expiry rule.
+ */
 export const CREDIT_EXPIRY_DAYS = 30;
+
+/**
+ * Free trial credits granted once, on account creation. Single source of truth —
+ * this number is expected to change (the owner may cut it to 1), so nothing else
+ * may hardcode it. Consumed by @tpa/core's `buildSignupGrant`.
+ */
+export const SIGNUP_TRIAL_CREDITS = 2;
 
 /**
  * Free cancellation + credit refund is allowed up to this many hours before a
@@ -61,6 +73,11 @@ export const SLOT_STATUSES = ['published', 'cancelled'] as const satisfies reado
 
 export const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const satisfies readonly Weekday[];
 
+export const CREDIT_SOURCES = [
+  'purchase',
+  'signup_grant',
+] as const satisfies readonly CreditSource[];
+
 // --- Exhaustiveness guards: fail compilation if an array omits a union member ---
 type Covers<Arr extends readonly unknown[], U> = [Exclude<U, Arr[number]>] extends [never]
   ? true
@@ -88,3 +105,6 @@ export type _CoversSlotStatuses = Assert<Covers<typeof SLOT_STATUSES, SlotStatus
 // Exported so `noUnusedLocals` in consuming apps doesn't flag them; intentionally
 // NOT re-exported from index.ts, so they stay out of @tpa/core's public API.
 export type _CoversWeekdays = Assert<Covers<typeof WEEKDAYS, Weekday>>;
+// Exported so `noUnusedLocals` in consuming apps doesn't flag them; intentionally
+// NOT re-exported from index.ts, so they stay out of @tpa/core's public API.
+export type _CoversCreditSources = Assert<Covers<typeof CREDIT_SOURCES, CreditSource>>;

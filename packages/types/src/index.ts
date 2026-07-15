@@ -19,6 +19,7 @@ export type {
 export type { IsoInstant, LocalTime } from './temporal';
 export type {
   BookingStatus,
+  CreditSource,
   Gender,
   Level,
   PurchaseStatus,

@@ -6,7 +6,7 @@
  */
 export { MOCK_NOW, daysFromNow, egp } from './now';
 export { mockCoaches, mockCurrentPlayer, mockPlayers } from './people';
-export { ASSUMED_PACKAGE_IDS, mockPackages } from './catalog';
+export { mockPackages } from './catalog';
 export { mockSlots, mockTemplates } from './schedule';
 export { mockCreditBatches, mockPurchases } from './wallet';
 export { mockBookings } from './bookings';

@@ -1,6 +1,7 @@
 import type { CreditBatch, IsoInstant, Player, SessionSlot } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
+import { buildSignupGrant } from './credits';
 import {
   canBookSlot,
   isBatchUsable,
@@ -41,6 +42,7 @@ function batch(over: Partial<CreditBatch> = {}): CreditBatch {
   return {
     id: 'cb_1' as CreditBatch['id'],
     playerId: player.id,
+    source: 'purchase',
     purchaseId: 'pu_1' as CreditBatch['purchaseId'],
     trainingType: 'group',
     quantityTotal: 4,
@@ -109,5 +111,18 @@ describe('canBookSlot', () => {
   it('ignores another player’s credits', () => {
     const foreign = batch({ id: 'cb_foreign' as CreditBatch['id'], playerId: 'pl_other' as Player['id'] });
     expect(canBookSlot(slot(), player, [foreign], NOW)).toEqual({ ok: false, reason: 'no_usable_credit' });
+  });
+
+  it('a granted trial credit books a trial slot but no other format', () => {
+    const grant = buildSignupGrant(player.id, NOW);
+    const trialSlot = slot({ trainingType: 'trial', gender: null, level: null });
+    expect(canBookSlot(trialSlot, player, [grant], NOW)).toEqual({ ok: true, creditBatchId: grant.id });
+
+    // The typed-credit rule blocks the trial credit on every paid format — no
+    // purchase-vs-grant logic was needed; source is irrelevant to usability.
+    for (const trainingType of ['group', 'duo', 'individual'] as const) {
+      const paidSlot = slot({ trainingType, gender: null, level: null });
+      expect(canBookSlot(paidSlot, player, [grant], NOW)).toEqual({ ok: false, reason: 'no_usable_credit' });
+    }
   });
 });

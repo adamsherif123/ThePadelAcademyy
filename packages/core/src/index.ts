@@ -10,16 +10,20 @@ export {
   CAIRO_TZ,
   CANCELLATION_WINDOW_HOURS,
   CREDIT_EXPIRY_DAYS,
+  CREDIT_SOURCES,
   GENDERS,
   LEVELS,
   PIASTRES_PER_EGP,
   PURCHASE_STATUSES,
+  SIGNUP_TRIAL_CREDITS,
   SLOT_STATUSES,
   TRAINING_TYPES,
   WEEKDAYS,
 } from './constants';
 
 export { ID_PREFIXES, newId, type IdPrefix } from './ids';
+
+export { buildSignupGrant, isPurchaseBacked } from './credits';
 
 export {
   cairoCalendarDate,

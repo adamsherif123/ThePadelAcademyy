@@ -12,6 +12,7 @@ import type { Piastres } from './money';
 import type { IsoInstant, LocalTime } from './temporal';
 import type {
   BookingStatus,
+  CreditSource,
   Gender,
   Level,
   PurchaseStatus,
@@ -72,16 +73,28 @@ export interface Purchase {
 }
 
 /**
- * A typed wallet of credits, created when a Purchase succeeds. Credits are TYPED:
- * a batch of `trainingType` can only pay for a slot of the same `trainingType`
- * (a 350 EGP/session group credit must never book a 1000 EGP/session individual
- * slot). Credits expire — `expiresAt` lives on the batch (CREDIT_EXPIRY_DAYS
- * from purchase) so a refund can restore a credit with its original expiry.
+ * A typed wallet of credits. Credits are TYPED: a batch of `trainingType` can
+ * only pay for a slot of the same `trainingType` (a 350 EGP/session group credit
+ * must never book a 1000 EGP/session individual slot). Credits expire —
+ * `expiresAt` lives on the batch (CREDIT_EXPIRY_DAYS from creation) so a refund
+ * can restore a credit with its original expiry.
+ *
+ * A batch is created either by a succeeded Purchase or by the one-time free
+ * trial grant every new account receives on signup (see `source`).
+ *
+ * INVARIANT: `source === 'purchase'` ⟺ `purchaseId !== null`. Equivalently,
+ * `source === 'signup_grant'` batches always have `purchaseId === null`. This is
+ * deliberately NOT modelled as a discriminated union: the shape mirrors flat,
+ * nullable S5 columns, and the DB enforces the invariant with a CHECK constraint.
+ * @tpa/core's `isPurchaseBacked` guard is the runtime/type mirror (cf.
+ * `isGroupSlot`).
  */
 export interface CreditBatch {
   id: CreditBatchId;
   playerId: PlayerId;
-  purchaseId: PurchaseId;
+  source: CreditSource;
+  /** Non-null iff `source === 'purchase'`; null for signup grants. */
+  purchaseId: PurchaseId | null;
   trainingType: TrainingType;
   quantityTotal: number;
   quantityRemaining: number;

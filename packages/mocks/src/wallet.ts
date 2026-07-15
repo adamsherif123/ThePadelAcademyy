@@ -1,3 +1,4 @@
+import { buildSignupGrant } from '@tpa/core';
 import type {
   CreditBatch,
   CreditBatchId,
@@ -7,7 +8,7 @@ import type {
   PurchaseId,
 } from '@tpa/types';
 
-import { daysFromNow, egp } from './now';
+import { MOCK_NOW, daysFromNow, egp } from './now';
 
 /**
  * Purchases covering every PurchaseStatus. The four succeeded ones fund the
@@ -27,18 +28,42 @@ export const mockPurchases: Purchase[] = [
 ];
 
 /**
- * The current player's typed credit wallet. Deliberately includes one batch
- * expiring in 2 days and one already expired, so the expiry UI can be built and
- * tested. Expiries follow the 30-day rule (createdAt + 30d) except where the
- * relative anchor makes that explicit.
+ * Signup-grant trial batches, built through @tpa/core's `buildSignupGrant` so the
+ * fixtures exercise the real grant code path (source, null purchaseId, quantity,
+ * 30-day expiry). Only the deterministic id and the "how much is left / when"
+ * knobs are overridden, to stage the three states the trial UI must handle. The
+ * builder is called with the grant's own `now` (= account creation time) so its
+ * expiry math produces the right expiresAt for each case.
+ */
+const signupGrants: CreditBatch[] = [
+  // Fresh account: 2 unused trial credits, ~30 days of runway.
+  { ...buildSignupGrant('pl_omar' as PlayerId, MOCK_NOW), id: 'cb_grant_omar' as CreditBatchId },
+  // Used 1 of 2.
+  {
+    ...buildSignupGrant('pl_youssef' as PlayerId, daysFromNow(-5)),
+    id: 'cb_grant_youssef' as CreditBatchId,
+    quantityRemaining: 1,
+  },
+  // Granted 31 days ago, expired unused (created + 30d < now).
+  { ...buildSignupGrant('pl_nour' as PlayerId, daysFromNow(-31)), id: 'cb_grant_nour' as CreditBatchId },
+];
+
+/**
+ * The typed credit wallet. Purchased batches (`source: 'purchase'`, non-null
+ * purchaseId) plus the signup-grant trial batches above. Deliberately includes a
+ * batch expiring in 2 days and one already expired so the expiry UI can be built
+ * and tested. Purchased expiries follow the 30-day rule except where the relative
+ * anchor makes that explicit.
  */
 export const mockCreditBatches: CreditBatch[] = [
   // Healthy group credits, plenty of runway.
-  { id: 'cb_group_main' as CreditBatchId, playerId: 'pl_omar' as PlayerId, purchaseId: 'pu_omar_group8' as PurchaseId, trainingType: 'group', quantityTotal: 8, quantityRemaining: 5, createdAt: daysFromNow(-5), expiresAt: daysFromNow(25) },
+  { id: 'cb_group_main' as CreditBatchId, playerId: 'pl_omar' as PlayerId, source: 'purchase', purchaseId: 'pu_omar_group8' as PurchaseId, trainingType: 'group', quantityTotal: 8, quantityRemaining: 5, createdAt: daysFromNow(-5), expiresAt: daysFromNow(25) },
   // Expiring in 2 days — drives the "expires in 2 days" warning.
-  { id: 'cb_group_expiring' as CreditBatchId, playerId: 'pl_omar' as PlayerId, purchaseId: 'pu_omar_group4' as PurchaseId, trainingType: 'group', quantityTotal: 4, quantityRemaining: 2, createdAt: daysFromNow(-28), expiresAt: daysFromNow(2) },
+  { id: 'cb_group_expiring' as CreditBatchId, playerId: 'pl_omar' as PlayerId, source: 'purchase', purchaseId: 'pu_omar_group4' as PurchaseId, trainingType: 'group', quantityTotal: 4, quantityRemaining: 2, createdAt: daysFromNow(-28), expiresAt: daysFromNow(2) },
   // Already expired — drives the "expired" state; not usable.
-  { id: 'cb_duo_expired' as CreditBatchId, playerId: 'pl_omar' as PlayerId, purchaseId: 'pu_omar_duo4' as PurchaseId, trainingType: 'duo', quantityTotal: 4, quantityRemaining: 1, createdAt: daysFromNow(-33), expiresAt: daysFromNow(-3) },
+  { id: 'cb_duo_expired' as CreditBatchId, playerId: 'pl_omar' as PlayerId, source: 'purchase', purchaseId: 'pu_omar_duo4' as PurchaseId, trainingType: 'duo', quantityTotal: 4, quantityRemaining: 1, createdAt: daysFromNow(-33), expiresAt: daysFromNow(-3) },
   // Individual credits, full and fresh.
-  { id: 'cb_indiv_main' as CreditBatchId, playerId: 'pl_omar' as PlayerId, purchaseId: 'pu_omar_indiv4' as PurchaseId, trainingType: 'individual', quantityTotal: 4, quantityRemaining: 4, createdAt: daysFromNow(-10), expiresAt: daysFromNow(20) },
+  { id: 'cb_indiv_main' as CreditBatchId, playerId: 'pl_omar' as PlayerId, source: 'purchase', purchaseId: 'pu_omar_indiv4' as PurchaseId, trainingType: 'individual', quantityTotal: 4, quantityRemaining: 4, createdAt: daysFromNow(-10), expiresAt: daysFromNow(20) },
+
+  ...signupGrants,
 ];

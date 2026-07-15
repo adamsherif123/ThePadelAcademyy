@@ -23,6 +23,13 @@ export type BookingStatus = 'booked' | 'cancelled' | 'attended' | 'no_show';
 export type SlotStatus = 'published' | 'cancelled';
 
 /**
+ * How a CreditBatch came to exist. `purchase` = bought a package. `signup_grant`
+ * = the one-time free trial credits every new account receives on creation
+ * (never purchased). See the invariant documented on CreditBatch.
+ */
+export type CreditSource = 'purchase' | 'signup_grant';
+
+/**
  * 0 = Sunday ... 6 = Saturday — matches `Date.prototype.getUTCDay()`.
  * The academy's operating window is Sun–Wed (0–3).
  */

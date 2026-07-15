@@ -24,7 +24,10 @@ export const mockTemplates: AvailabilityTemplate[] = [
   { id: 'at_grp_lad_int_wed' as AvailabilityTemplateId, coachId: 'co_mariam' as CoachId, weekday: 3, startTime: '17:00' as LocalTime, endTime: '18:30' as LocalTime, trainingType: 'group', capacity: 4, gender: 'ladies', level: 'intermediate', isActive: true },
   { id: 'at_duo_tue' as AvailabilityTemplateId, coachId: 'co_karim' as CoachId, weekday: 2, startTime: '20:00' as LocalTime, endTime: '21:00' as LocalTime, trainingType: 'duo', capacity: 2, gender: null, level: null, isActive: true },
   { id: 'at_indiv_wed' as AvailabilityTemplateId, coachId: 'co_karim' as CoachId, weekday: 3, startTime: '21:00' as LocalTime, endTime: '22:00' as LocalTime, trainingType: 'individual', capacity: 1, gender: null, level: null, isActive: true },
+  // Trial slots on two evenings so the free signup-trial credits are actually
+  // spendable (trial credits with nowhere to go would be a dead fixture).
   { id: 'at_trial_sun' as AvailabilityTemplateId, coachId: 'co_hany' as CoachId, weekday: 0, startTime: '21:00' as LocalTime, endTime: '22:00' as LocalTime, trainingType: 'trial', capacity: 1, gender: null, level: null, isActive: true },
+  { id: 'at_trial_wed' as AvailabilityTemplateId, coachId: 'co_mariam' as CoachId, weekday: 3, startTime: '20:00' as LocalTime, endTime: '21:00' as LocalTime, trainingType: 'trial', capacity: 1, gender: null, level: null, isActive: true },
 ];
 
 // Start a few days before MOCK_NOW so there are past sessions for attended/
