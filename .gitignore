@@ -41,3 +41,6 @@ pnpm-debug.log*
 
 # zero-runtime guard emit dir (packages/types)
 .emitcheck/
+
+# generated design tokens (regenerated from @tpa/theme on dev/build)
+apps/admin/src/tokens.generated.css

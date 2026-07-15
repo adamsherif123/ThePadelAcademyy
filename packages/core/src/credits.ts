@@ -1,6 +1,6 @@
 import type { CreditBatch, IsoInstant, PlayerId, PurchaseId } from '@tpa/types';
 
-import { CREDIT_EXPIRY_DAYS, SIGNUP_TRIAL_CREDITS } from './constants';
+import { CREDIT_EXPIRY_DAYS, EXPIRING_SOON_DAYS, SIGNUP_TRIAL_CREDITS } from './constants';
 import { ID_PREFIXES, newId } from './ids';
 import { parseInstant, toInstant } from './time';
 
@@ -24,6 +24,21 @@ export function isPurchaseBacked(
  * purchase, so `purchaseId` is null), expiring CREDIT_EXPIRY_DAYS from `now` —
  * the same expiry rule as purchased credits.
  */
+/**
+ * Visual expiry state for a credit batch, the canonical union the wallet UI keys
+ * off (@tpa/theme maps each to a color). `expired` is exact to the instant;
+ * `expiring_soon` covers the EXPIRING_SOON_DAYS window before that.
+ */
+export type CreditExpiryState = 'ok' | 'expiring_soon' | 'expired';
+
+export function creditExpiryState(expiresAt: IsoInstant, now: IsoInstant): CreditExpiryState {
+  const expiresMs = parseInstant(expiresAt).getTime();
+  const nowMs = parseInstant(now).getTime();
+  if (expiresMs <= nowMs) return 'expired';
+  if (expiresMs - nowMs <= EXPIRING_SOON_DAYS * 86_400_000) return 'expiring_soon';
+  return 'ok';
+}
+
 export function buildSignupGrant(playerId: PlayerId, now: IsoInstant): CreditBatch {
   const expiresAt = toInstant(
     new Date(parseInstant(now).getTime() + CREDIT_EXPIRY_DAYS * 86_400_000),

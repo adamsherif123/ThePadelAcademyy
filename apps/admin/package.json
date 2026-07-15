@@ -4,11 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "pnpm generate:tokens && vite",
+    "build": "pnpm generate:tokens && tsc -b && vite build",
     "lint": "eslint .",
     "typecheck": "tsc -b",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate:tokens": "tsx scripts/generate-tokens.ts"
   },
   "dependencies": {
     "@tpa/core": "workspace:*",

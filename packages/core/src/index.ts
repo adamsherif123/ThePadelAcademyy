@@ -11,6 +11,7 @@ export {
   CANCELLATION_WINDOW_HOURS,
   CREDIT_EXPIRY_DAYS,
   CREDIT_SOURCES,
+  EXPIRING_SOON_DAYS,
   GENDERS,
   LEVELS,
   PIASTRES_PER_EGP,
@@ -23,7 +24,12 @@ export {
 
 export { ID_PREFIXES, newId, type IdPrefix } from './ids';
 
-export { buildSignupGrant, isPurchaseBacked } from './credits';
+export {
+  buildSignupGrant,
+  creditExpiryState,
+  isPurchaseBacked,
+  type CreditExpiryState,
+} from './credits';
 
 export {
   cairoCalendarDate,

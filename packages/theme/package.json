@@ -10,6 +10,10 @@
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@tpa/core": "workspace:*",
+    "@tpa/types": "workspace:*"
+  },
   "devDependencies": {
     "typescript": "~6.0.3"
   }

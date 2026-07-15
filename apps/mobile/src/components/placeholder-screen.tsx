@@ -1,14 +1,15 @@
-// eslint-disable-next-line no-restricted-imports -- S0 placeholder; replaced by the shared <Text> in S2.
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+
+import { Text } from '../ui/Text';
 
 /**
- * Session 0 scaffolding only. Renders a centered screen name and nothing else.
- * Deliberately no colors, tokens, or fonts.
+ * Placeholder screen for the tab shell — a centered screen name via the shared
+ * <Text>. (The S0 raw-<Text> escape hatch is gone as of S2.)
  */
 export function PlaceholderScreen({ name }: { name: string }) {
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{name}</Text>
+      <Text variant="h1">{name}</Text>
     </View>
   );
 }
@@ -18,8 +19,5 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  label: {
-    fontSize: 24,
   },
 });

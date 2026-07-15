@@ -27,6 +27,12 @@ export const CREDIT_EXPIRY_DAYS = 30;
 export const SIGNUP_TRIAL_CREDITS = 2;
 
 /**
+ * A still-valid credit batch within this many days of expiry is classified
+ * `expiring_soon` (drives the wallet's amber warning). See `creditExpiryState`.
+ */
+export const EXPIRING_SOON_DAYS = 7;
+
+/**
  * Free cancellation + credit refund is allowed up to this many hours before a
  * slot starts. Inside the window the credit is forfeited; a no-show forfeits too.
  */

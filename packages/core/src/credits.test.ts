@@ -1,11 +1,25 @@
 import type { CreditBatch, IsoInstant, PlayerId } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
-import { CREDIT_EXPIRY_DAYS, SIGNUP_TRIAL_CREDITS } from './constants';
-import { buildSignupGrant, isPurchaseBacked } from './credits';
+import { CREDIT_EXPIRY_DAYS, EXPIRING_SOON_DAYS, SIGNUP_TRIAL_CREDITS } from './constants';
+import { buildSignupGrant, creditExpiryState, isPurchaseBacked } from './credits';
 
 const NOW = '2026-07-15T09:00:00.000Z' as IsoInstant;
 const PLAYER = 'pl_test' as PlayerId;
+
+const daysFrom = (n: number) =>
+  new Date(new Date(NOW).getTime() + n * 86_400_000).toISOString() as IsoInstant;
+
+describe('creditExpiryState', () => {
+  it('classifies expired, expiring_soon, and ok by the EXPIRING_SOON_DAYS window', () => {
+    expect(creditExpiryState(daysFrom(-1), NOW)).toBe('expired');
+    expect(creditExpiryState(NOW, NOW)).toBe('expired'); // exact boundary is expired
+    expect(creditExpiryState(daysFrom(2), NOW)).toBe('expiring_soon');
+    expect(creditExpiryState(daysFrom(EXPIRING_SOON_DAYS), NOW)).toBe('expiring_soon');
+    expect(creditExpiryState(daysFrom(EXPIRING_SOON_DAYS + 1), NOW)).toBe('ok');
+    expect(creditExpiryState(daysFrom(30), NOW)).toBe('ok');
+  });
+});
 
 describe('buildSignupGrant', () => {
   const grant = buildSignupGrant(PLAYER, NOW);
