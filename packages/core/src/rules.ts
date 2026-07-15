@@ -1,0 +1,105 @@
+import type {
+  CreditBatch,
+  Gender,
+  IsoInstant,
+  Level,
+  Player,
+  SessionSlot,
+  TrainingType,
+} from '@tpa/types';
+
+import { CANCELLATION_WINDOW_HOURS } from './constants';
+import { parseInstant } from './time';
+
+/**
+ * Pure, side-effect-free previews of the booking rules. They take `now` as a
+ * parameter (never read the clock) so they are deterministic and testable. These
+ * are the CLIENT-SIDE preview only; the authoritative enforcement is the DB/RPC
+ * layer in S7. Keeping the logic here means the app can grey out a button before
+ * a round-trip, but it is never the source of truth.
+ */
+
+/** A group slot carries a required gender + level; other formats never do. */
+export function isGroupSlot(
+  slot: SessionSlot,
+): slot is SessionSlot & { gender: Gender; level: Level } {
+  return slot.trainingType === 'group';
+}
+
+/** Seats left on a slot. A cancelled slot has none. Never negative. */
+export function slotRemainingCapacity(slot: SessionSlot): number {
+  if (slot.status !== 'published') return 0;
+  return Math.max(0, slot.capacity - slot.bookedCount);
+}
+
+/**
+ * Can this credit batch pay for a slot of `trainingType` right now? Credits are
+ * typed (a group credit can't book an individual slot), must have quantity left,
+ * and must not have expired.
+ */
+export function isBatchUsable(
+  batch: CreditBatch,
+  trainingType: TrainingType,
+  now: IsoInstant,
+): boolean {
+  if (batch.trainingType !== trainingType) return false;
+  if (batch.quantityRemaining <= 0) return false;
+  return parseInstant(batch.expiresAt).getTime() > parseInstant(now).getTime();
+}
+
+/**
+ * Is the slot far enough in the future to cancel without forfeiting the credit?
+ * True only while more than CANCELLATION_WINDOW_HOURS remain before it starts.
+ */
+export function isCancellableWithoutForfeit(slot: SessionSlot, now: IsoInstant): boolean {
+  if (slot.status !== 'published') return false;
+  const msUntilStart = parseInstant(slot.startsAt).getTime() - parseInstant(now).getTime();
+  return msUntilStart > CANCELLATION_WINDOW_HOURS * 3_600_000;
+}
+
+export type BookBlockReason =
+  | 'slot_cancelled'
+  | 'slot_in_past'
+  | 'slot_full'
+  | 'gender_mismatch'
+  | 'level_mismatch'
+  | 'no_usable_credit';
+
+export type CanBookResult =
+  | { ok: true; creditBatchId: CreditBatch['id'] }
+  | { ok: false; reason: BookBlockReason };
+
+/**
+ * Whether `player` could book `slot` given their `creditBatches` at time `now`.
+ * On success, names the batch that would pay — the earliest-expiring usable one,
+ * so credits are consumed before they lapse. Returns a reason on failure so the
+ * UI can explain why a slot isn't bookable.
+ *
+ * Not a boolean by design: the client needs the reason and the chosen batch.
+ */
+export function canBookSlot(
+  slot: SessionSlot,
+  player: Player,
+  creditBatches: readonly CreditBatch[],
+  now: IsoInstant,
+): CanBookResult {
+  if (slot.status !== 'published') return { ok: false, reason: 'slot_cancelled' };
+  if (parseInstant(slot.startsAt).getTime() <= parseInstant(now).getTime()) {
+    return { ok: false, reason: 'slot_in_past' };
+  }
+  if (slotRemainingCapacity(slot) <= 0) return { ok: false, reason: 'slot_full' };
+  if (slot.gender !== null && slot.gender !== player.gender) {
+    return { ok: false, reason: 'gender_mismatch' };
+  }
+  if (slot.level !== null && slot.level !== player.level) {
+    return { ok: false, reason: 'level_mismatch' };
+  }
+
+  const usable = creditBatches
+    .filter((batch) => batch.playerId === player.id && isBatchUsable(batch, slot.trainingType, now))
+    .sort((a, b) => parseInstant(a.expiresAt).getTime() - parseInstant(b.expiresAt).getTime());
+
+  const batch = usable[0];
+  if (!batch) return { ok: false, reason: 'no_usable_credit' };
+  return { ok: true, creditBatchId: batch.id };
+}

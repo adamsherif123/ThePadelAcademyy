@@ -11,6 +11,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tpa/core": "workspace:*",
+    "@tpa/mocks": "workspace:*",
     "@tpa/theme": "workspace:*",
     "@tpa/types": "workspace:*",
     "react": "19.2.3",

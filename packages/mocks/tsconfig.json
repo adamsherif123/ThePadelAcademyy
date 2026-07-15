@@ -13,6 +13,5 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src"],
-  "exclude": ["src/**/*.test.ts", ".emitcheck"]
+  "include": ["src"]
 }

@@ -1,11 +1,9 @@
-import { THEME_PACKAGE_NAME } from '@tpa/theme';
-import { TYPES_PACKAGE_NAME, type PlaceholderId } from '@tpa/types';
-import { Stack } from 'expo-router';
+// Polyfill Web Crypto (crypto.getRandomValues) for Hermes, which ships none.
+// Must run before any code that calls @tpa/core's newId. Kept at the entry so
+// @tpa/core itself stays pure/runtime-agnostic.
+import 'react-native-get-random-values';
 
-// S0 shared-code proof: if Metro could not resolve the workspace packages,
-// this bundle would fail outright. Logged so it is visible in the Expo terminal.
-const proofId: PlaceholderId = 'shared-code-proof';
-console.log(`[${proofId}] mobile can import ${TYPES_PACKAGE_NAME} and ${THEME_PACKAGE_NAME}`);
+import { Stack } from 'expo-router';
 
 export default function RootLayout() {
   return (

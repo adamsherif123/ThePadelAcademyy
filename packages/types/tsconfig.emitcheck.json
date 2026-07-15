@@ -1,0 +1,15 @@
+{
+  // Used ONLY by the zero-runtime guard test: emit JS to a temp dir so the test
+  // can assert every emitted file is free of runtime code. Not used for builds.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": false,
+    "outDir": ".emitcheck",
+    "rootDir": "src",
+    "module": "ESNext",
+    "target": "ESNext"
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}

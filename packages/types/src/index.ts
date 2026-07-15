@@ -1,7 +1,38 @@
 /**
- * Placeholder export for Session 0.
- * Real domain types (Coach, Session, Booking, Player, ...) land in a later session.
+ * @tpa/types — the shared domain model. TYPE-ONLY: this package must emit ZERO
+ * JavaScript so a Deno Edge Function can import it directly with no build step.
+ * No `enum`, no `const`, no runtime code. A guard test (index.notruntime.test.ts)
+ * fails the build if any `.ts` here ever emits a runtime statement.
  */
-export const TYPES_PACKAGE_NAME = '@tpa/types' as const;
-
-export type PlaceholderId = string;
+export type { Brand } from './brand';
+export type { Piastres } from './money';
+export type {
+  AvailabilityTemplateId,
+  BookingId,
+  CoachId,
+  CreditBatchId,
+  PackageId,
+  PlayerId,
+  PurchaseId,
+  SlotId,
+} from './ids';
+export type { IsoInstant, LocalTime } from './temporal';
+export type {
+  BookingStatus,
+  Gender,
+  Level,
+  PurchaseStatus,
+  SlotStatus,
+  TrainingType,
+  Weekday,
+} from './unions';
+export type {
+  AvailabilityTemplate,
+  Booking,
+  Coach,
+  CreditBatch,
+  Package,
+  Player,
+  Purchase,
+  SessionSlot,
+} from './entities';

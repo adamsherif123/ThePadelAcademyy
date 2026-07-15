@@ -1,0 +1,7 @@
+{
+  // Use the workspace TypeScript (6.0.3, what Expo SDK 56 ships) instead of the
+  // version bundled with VS Code. Version skew here produces phantom errors in the
+  // editor that `tsc` never reports — e.g. on `extends: "expo/tsconfig.base"`.
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}

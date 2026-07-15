@@ -33,7 +33,11 @@ pnpm-debug.log*
 .idea/
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
 
 # caches
 .cache/
 .eslintcache
+
+# zero-runtime guard emit dir (packages/types)
+.emitcheck/

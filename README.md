@@ -4,15 +4,20 @@ Padel-academy management product.
 
 - `apps/mobile` — client app. Expo SDK 56, Expo Router (file-based), TypeScript strict.
 - `apps/admin` — admin web app. Vite + React, TypeScript strict.
-- `packages/types` — shared TS types (`@tpa/types`).
-- `packages/theme` — shared design tokens (`@tpa/theme`).
+- `packages/types` — shared domain types (`@tpa/types`). Type-only, emits zero JS.
+- `packages/core` — pure runtime: money/date/time formatting, DST-aware slot
+  materialization, booking rules, id generation (`@tpa/core`). No dependencies.
+- `packages/mocks` — deterministic fixtures both apps render against (`@tpa/mocks`).
+- `packages/theme` — shared design tokens (`@tpa/theme`), placeholder until S2.
 
 Shared packages are **source-only** TypeScript (no build step); each app's bundler
-compiles them directly.
+compiles them directly. `@tpa/core` and `@tpa/types` are written to run unchanged in
+Hermes (RN), the browser, and Deno (future Edge Functions).
 
 ## Requirements
 
-- Node >= 22.13 (Expo SDK 56 minimum)
+- Node 24 (pinned via `.nvmrc`; `fnm use` on entry). Install fnm and add to your
+  shell: `eval "$(fnm env --use-on-cd)"`.
 - pnpm 11+
 - Expo Go on a physical device (for mobile)
 
@@ -47,8 +52,9 @@ Then open http://localhost:5173.
 ## Checks
 
 ```bash
-pnpm typecheck                      # tsc across all 4 projects
+pnpm typecheck                      # tsc across all packages + apps
 pnpm lint                           # eslint across both apps
+pnpm test                           # vitest: core logic + zero-JS-emit guard
 pnpm --filter mobile exec expo-doctor
 ```
 

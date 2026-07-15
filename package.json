@@ -3,10 +3,17 @@
   "private": true,
   "version": "0.0.0",
   "packageManager": "pnpm@11.13.0",
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "mobile": "pnpm --filter mobile start",
     "admin": "pnpm --filter admin dev",
     "typecheck": "pnpm -r --no-bail typecheck",
-    "lint": "pnpm -r --no-bail lint"
+    "lint": "pnpm -r --no-bail lint",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "4.1.10"
   }
 }
