@@ -12,10 +12,12 @@
     "generate:tokens": "tsx scripts/generate-tokens.ts"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
     "@tpa/core": "workspace:*",
     "@tpa/mocks": "workspace:*",
     "@tpa/theme": "workspace:*",
     "@tpa/types": "workspace:*",
+    "lucide-react": "^1.24.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-router-dom": "^7.18.1"

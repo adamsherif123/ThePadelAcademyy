@@ -1,0 +1,70 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  /* Dim the page with the navy token, not a raw literal. */
+  background: color-mix(in srgb, var(--color-bg-inverse) 55%, transparent);
+}
+
+.modal {
+  width: 100%;
+  max-width: 540px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-xl);
+  border-block-end: 1px solid var(--color-border-subtle);
+}
+
+.eyebrow {
+  color: var(--color-text-label);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.title {
+  margin-block-start: var(--space-xs);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-bold);
+}
+
+.close {
+  display: inline-flex;
+  padding: var(--space-xs);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.close:hover {
+  background: var(--color-bg-canvas);
+}
+
+.body {
+  padding: var(--space-xl);
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  padding: var(--space-xl);
+  padding-block-start: 0;
+}

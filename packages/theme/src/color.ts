@@ -33,6 +33,8 @@ export const color = {
     pressed: p.ROYAL_2,
     /** Disabled action. DERIVED. */
     disabled: p.ACCENT_DISABLED,
+    /** Soft royal surface — tinted chips/badges on light (the site's `--ice`). */
+    soft: p.ICE,
   },
   border: {
     /** Hairline dividers / card borders on light. */

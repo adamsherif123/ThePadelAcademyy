@@ -1,0 +1,35 @@
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  user-select: none;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Stable tinted fallbacks derived from the name. */
+.avatar[data-variant='0'] {
+  background: var(--color-bg-inverse);
+  color: var(--color-text-inverse);
+}
+.avatar[data-variant='1'] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-default);
+}
+.avatar[data-variant='2'] {
+  background: var(--tint-individual-bg);
+  color: var(--tint-individual-fg);
+}
+.avatar[data-variant='3'] {
+  background: var(--tint-trial-bg);
+  color: var(--tint-trial-fg);
+}

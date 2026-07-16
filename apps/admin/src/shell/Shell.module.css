@@ -1,0 +1,16 @@
+.shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--color-bg-canvas);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+}
+
+.content {
+  max-width: 1200px;
+  padding-block: var(--space-xxl);
+  padding-inline: var(--space-xxl);
+}

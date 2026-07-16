@@ -1,0 +1,30 @@
+.section {
+  margin-block-end: var(--space-xxl);
+}
+
+.sectionTitle {
+  margin-block-end: var(--space-md);
+  color: var(--color-text-label);
+  font-size: var(--font-size-label);
+  font-weight: var(--font-weight-extrabold);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.tableCard {
+  width: 100%;
+  padding: var(--space-md);
+}
+
+.cellPlayer {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}

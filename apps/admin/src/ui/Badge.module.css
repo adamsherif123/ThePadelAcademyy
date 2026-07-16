@@ -1,0 +1,31 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding-block: 2px;
+  padding-inline: var(--space-sm);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.neutral {
+  background: var(--color-bg-canvas);
+  color: var(--color-text-secondary);
+}
+.info {
+  background: var(--color-accent-soft);
+  color: var(--color-accent-default);
+}
+.success {
+  background: var(--expiry-ok-bg);
+  color: var(--expiry-ok-fg);
+}
+.warning {
+  background: var(--expiry-expiring_soon-bg);
+  color: var(--expiry-expiring_soon-fg);
+}
+.danger {
+  background: var(--expiry-expired-bg);
+  color: var(--expiry-expired-fg);
+}

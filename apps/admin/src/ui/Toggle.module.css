@@ -1,0 +1,31 @@
+.track {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-border-strong);
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.track[data-on='true'] {
+  background: var(--color-accent-default);
+}
+
+.knob {
+  position: absolute;
+  inset-block-start: 3px;
+  inset-inline-start: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.14s ease;
+}
+
+.track[data-on='true'] .knob {
+  transform: translateX(18px);
+}

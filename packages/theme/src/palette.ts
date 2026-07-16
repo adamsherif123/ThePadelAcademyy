@@ -46,3 +46,4 @@ export const WARNING_FG = '#92600a'; //  amber; site has no warning role
 export const WARNING_BG = '#fbeccb'; //  amber tint
 export const TEXT_MUTED = '#9aa7bd'; //  lighter neutral than --muted; site has no 3rd text level
 export const ACCENT_DISABLED = '#aebfe8'; // desaturated royal for disabled actions
+export const TINT_DUO_BG = '#e6ebf4'; // soft slate: the admin's duo (navy) tint fill — the site has no navy-tint surface

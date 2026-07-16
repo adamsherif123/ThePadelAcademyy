@@ -7,7 +7,7 @@
  * Values trace to the academy's live site; see palette.ts for provenance.
  */
 import { color } from './color';
-import { creditExpiry } from './domain';
+import { creditExpiry, trainingTint } from './domain';
 import {
   elevation,
   fontSize,
@@ -21,6 +21,7 @@ import {
 export const tokens = {
   color,
   creditExpiry,
+  trainingTint,
   space,
   radius,
   elevation,
@@ -33,7 +34,7 @@ export const tokens = {
 export type Tokens = typeof tokens;
 
 export { color } from './color';
-export { creditExpiry, type TintPair } from './domain';
+export { creditExpiry, trainingTint, type TintPair } from './domain';
 export type { CreditExpiryState } from '@tpa/core';
 export {
   elevation,

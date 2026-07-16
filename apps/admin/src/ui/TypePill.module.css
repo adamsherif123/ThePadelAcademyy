@@ -1,0 +1,33 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding-block: 2px;
+  padding-inline: var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+}
+
+/* Training-type colour coding (admin-only trainingTint). */
+.dot[data-type='group'] {
+  background: var(--tint-group-fg);
+}
+.dot[data-type='duo'] {
+  background: var(--tint-duo-fg);
+}
+.dot[data-type='individual'] {
+  background: var(--tint-individual-fg);
+}
+.dot[data-type='trial'] {
+  background: var(--tint-trial-fg);
+}

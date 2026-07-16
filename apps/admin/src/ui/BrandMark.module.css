@@ -1,0 +1,35 @@
+.lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-default);
+  color: var(--color-text-inverse);
+}
+
+.wordmark {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.line1 {
+  color: var(--color-text-inverse);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-extrabold);
+  letter-spacing: 0.4px;
+}
+
+.line2 {
+  color: var(--color-text-label);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 2px;
+}

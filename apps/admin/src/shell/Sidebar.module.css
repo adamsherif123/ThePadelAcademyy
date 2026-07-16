@@ -1,0 +1,93 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 264px;
+  flex-shrink: 0;
+  height: 100vh;
+  position: sticky;
+  inset-block-start: 0;
+  padding: var(--space-lg);
+  background: var(--color-bg-inverse);
+  border-inline-end: 1px solid var(--color-border-onInverse);
+}
+
+.brand {
+  padding: var(--space-md);
+  margin-block-end: var(--space-lg);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding-block: var(--space-md);
+  padding-inline: var(--space-md);
+  border-radius: var(--radius-md);
+  color: var(--color-pillOnInverse-text);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+}
+
+.item:hover {
+  background: var(--color-pillOnInverse-bg);
+  color: var(--color-text-inverse);
+}
+
+.active,
+.active:hover {
+  background: var(--color-accent-default);
+  color: var(--color-text-inverse);
+  font-weight: var(--font-weight-bold);
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-block-start: auto;
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-onInverse);
+}
+
+.userInfo {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.userName {
+  color: var(--color-text-inverse);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.userRole {
+  color: var(--color-pillOnInverse-text);
+  font-size: var(--font-size-micro);
+}
+
+.signout {
+  display: inline-flex;
+  padding: var(--space-xs);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-pillOnInverse-text);
+  cursor: pointer;
+}
+.signout:hover {
+  background: var(--color-pillOnInverse-bg);
+  color: var(--color-text-inverse);
+}

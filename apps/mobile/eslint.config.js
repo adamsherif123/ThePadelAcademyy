@@ -60,6 +60,12 @@ module.exports = defineConfig([
               message:
                 'Do not import raw <Text> from react-native. Use the shared <Text> from src/ui/Text.',
             },
+            {
+              name: '@tpa/theme',
+              importNames: ['trainingTint'],
+              message:
+                'trainingTint is ADMIN-ONLY. In the client app colour communicates credit EXPIRY only — a CreditPill carries type + expiry and a second hue competes (individual amber collided with expiring_soon). Show training type with a labelled pill + icon instead.',
+            },
           ],
         },
       ],
