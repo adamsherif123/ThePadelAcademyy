@@ -3,18 +3,16 @@ import type { Package, Piastres } from '@tpa/types';
 import { StyleSheet, View } from 'react-native';
 
 import { Badge } from './Badge';
-import { BestValueBadge, isBestValuePackage } from './BestValueBadge';
 import { Card } from './Card';
 import { Money } from './Money';
 import { Text } from './Text';
 import { TRAINING_META } from './trainingMeta';
 
 /**
- * The Home top-up carousel card (the vertical counterpart to PackageRow). The
- * type pill and BEST VALUE badge share a header ROW — pill at the start, badge at
- * the end — so they can never overlap, at any label length or system font size.
- * The best-value rule + badge come from BestValueBadge (one implementation, also
- * used by PackageRow). Money via @tpa/core; the per-session unit is pure math.
+ * The Home top-up carousel card (a narrow teaser that routes to /buy-credits).
+ * Deliberately no BEST VALUE badge: the card is too narrow to fit it without
+ * clipping, and the real comparison happens on /buy-credits (see PackageRow,
+ * which keeps the badge). Money via @tpa/core; the per-session unit is pure math.
  */
 export function PackageCard({ pkg, onPress }: { pkg: Package; onPress?: () => void }) {
   const meta = TRAINING_META[pkg.trainingType];
@@ -23,11 +21,7 @@ export function PackageCard({ pkg, onPress }: { pkg: Package; onPress?: () => vo
 
   return (
     <Card style={styles.card} onPress={onPress}>
-      <View style={styles.header}>
-        <Badge label={meta.label} icon={meta.icon} />
-        {isBestValuePackage(pkg) ? <BestValueBadge /> : null}
-      </View>
-
+      <Badge label={meta.label} icon={meta.icon} />
       <Text variant="h2">{`${pkg.sessionCount} Sessions`}</Text>
       <Money amount={pkg.price} tone="accent" variant="h2" numberOfLines={1} />
       {isSingle ? (
@@ -48,6 +42,5 @@ export function PackageCard({ pkg, onPress }: { pkg: Package; onPress?: () => vo
 
 const styles = StyleSheet.create({
   card: { width: 200, gap: space.sm },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
   perSession: { flexDirection: 'row', alignItems: 'center' },
 });

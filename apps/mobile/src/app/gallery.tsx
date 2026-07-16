@@ -231,7 +231,7 @@ export default function GalleryScreen() {
           ))}
       </Section>
 
-      <Section title="PackageCard (home carousel — pill + BEST VALUE never overlap)">
+      <Section title="PackageCard (home carousel — teaser, no BEST VALUE badge)">
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cardScroll}>
           {mockPackages
             .filter((p) => p.trainingType === 'group')
