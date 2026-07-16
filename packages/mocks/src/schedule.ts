@@ -9,7 +9,7 @@ import type {
   SlotStatus,
 } from '@tpa/types';
 
-import { MOCK_NOW } from './now';
+import { MOCK_NOW, hoursFromNow } from './now';
 
 /**
  * Weekly availability rules in Cairo local time. Operating window is Sun–Wed
@@ -124,4 +124,45 @@ function isSameCairoDay(
   return c.year === day.year && c.month === day.month && c.day === day.day;
 }
 
-export const mockSlots: SessionSlot[] = generateSlots();
+/**
+ * Ad-hoc demo slots (templateId null) that don't come from the weekly schedule.
+ * They exist so the Sessions/cancellation UI has the two cases the generated
+ * grid can't produce against a fixed MOCK_NOW: a booking that starts INSIDE the
+ * 3-hour cancellation window (the forfeit path), and a future booking whose
+ * paying credit has since expired (the "refund but worthless" edge). Kept out of
+ * the index-based booking picks in bookings.ts (which filter to template slots),
+ * so adding them here doesn't shift the attended/no-show/cancelled fixtures.
+ */
+const adHocSlots: SessionSlot[] = [
+  // Starts ~2h from now → inside the 3-hour window → cancelling forfeits.
+  {
+    id: 'sl_soon_indiv_20260715' as SlotId,
+    coachId: 'co_karim' as CoachId,
+    startsAt: hoursFromNow(2),
+    endsAt: hoursFromNow(3),
+    trainingType: 'individual',
+    capacity: 1,
+    bookedCount: 1,
+    gender: null,
+    level: null,
+    status: 'published',
+    templateId: null,
+  },
+  // A duo session ~5 days out, paid from a batch that has since expired. Cancelling
+  // outside the window returns the credit to that batch — where it's already dead.
+  {
+    id: 'sl_future_duo_20260720' as SlotId,
+    coachId: 'co_karim' as CoachId,
+    startsAt: hoursFromNow(120),
+    endsAt: hoursFromNow(121),
+    trainingType: 'duo',
+    capacity: 2,
+    bookedCount: 1,
+    gender: null,
+    level: null,
+    status: 'published',
+    templateId: null,
+  },
+];
+
+export const mockSlots: SessionSlot[] = [...generateSlots(), ...adHocSlots];

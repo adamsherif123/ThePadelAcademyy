@@ -1,14 +1,17 @@
 import { cairoCalendarDate } from '@tpa/core';
-import type { Booking, BookingId, CreditBatchId, PlayerId, SessionSlot } from '@tpa/types';
+import type { Booking, BookingId, CreditBatchId, PlayerId, SessionSlot, SlotId } from '@tpa/types';
 
 import { MOCK_NOW, daysFromNow } from './now';
 import { mockSlots } from './schedule';
 
 const nowMs = new Date(MOCK_NOW).getTime();
 const today = cairoCalendarDate(MOCK_NOW);
-const past = mockSlots.filter((s) => new Date(s.startsAt).getTime() < nowMs);
+// Only the weekly-schedule slots (templateId !== null) feed the index-based picks
+// below, so the ad-hoc demo slots (referenced by id further down) can be added
+// without shifting which slot each historical booking lands on.
+const past = mockSlots.filter((s) => s.templateId !== null && new Date(s.startsAt).getTime() < nowMs);
 const future = mockSlots
-  .filter((s) => new Date(s.startsAt).getTime() > nowMs && s.status === 'published')
+  .filter((s) => s.templateId !== null && new Date(s.startsAt).getTime() > nowMs && s.status === 'published')
   .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
 
 // Fixtures assume the window yields past and future slots (it does; see schedule).
@@ -69,6 +72,28 @@ export const mockBookings: Booking[] = [
     creditBatchId: 'cb_group_main' as CreditBatchId,
     status: 'no_show',
     bookedAt: daysFromNow(-7),
+    cancelledAt: null,
+  },
+  // Upcoming, but starts inside the 3-hour window: cancelling forfeits the credit.
+  // Paid from the individual batch (cb_indiv_main).
+  {
+    id: 'bk_soon' as BookingId,
+    slotId: 'sl_soon_indiv_20260715' as SlotId,
+    playerId: 'pl_omar' as PlayerId,
+    creditBatchId: 'cb_indiv_main' as CreditBatchId,
+    status: 'booked',
+    bookedAt: daysFromNow(-1),
+    cancelledAt: null,
+  },
+  // Upcoming and outside the window (refundable), but the paying batch
+  // (cb_duo_expired) has already lapsed: the refund returns a dead credit.
+  {
+    id: 'bk_expired_refund' as BookingId,
+    slotId: 'sl_future_duo_20260720' as SlotId,
+    playerId: 'pl_omar' as PlayerId,
+    creditBatchId: 'cb_duo_expired' as CreditBatchId,
+    status: 'booked',
+    bookedAt: daysFromNow(-6),
     cancelledAt: null,
   },
 ];

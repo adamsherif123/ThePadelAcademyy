@@ -2,7 +2,9 @@ import {
   ID_PREFIXES,
   cairoCalendarDate,
   canBookSlot,
+  cancellationDeadline,
   creditExpiryState,
+  isCancellableWithoutForfeit,
   newId,
   type BookBlockReason,
 } from '@tpa/core';
@@ -21,7 +23,7 @@ import type {
   Weekday,
 } from '@tpa/types';
 
-import { commitBooking, getBatches, getBookings, getSlots } from './store';
+import { commitBooking, commitCancellation, getBatches, getBookings, getSlots } from './store';
 import { balanceByType } from './wallet';
 
 /**
@@ -245,4 +247,149 @@ export function bookSlot(player: Player, slotId: SlotId, now: IsoInstant): BookR
 
   commitBooking(booking, updatedBatch, updatedSlot);
   return { ok: true, booking, batch: updatedBatch };
+}
+
+/** A booking paired with its slot and coach, for the Sessions lists. */
+export interface SessionEntry {
+  booking: Booking;
+  slot: SessionSlot;
+  coach: Coach | undefined;
+}
+
+function sessionEntries(playerId: Player['id']): SessionEntry[] {
+  return getBookings()
+    .filter((b) => b.playerId === playerId)
+    .map((b) => {
+      const slot = slotById(b.slotId);
+      return slot ? { booking: b, slot, coach: coachById(slot.coachId) } : null;
+    })
+    .filter((e): e is SessionEntry => e !== null);
+}
+
+function hasStarted(slot: SessionSlot, now: IsoInstant): boolean {
+  return new Date(slot.startsAt).getTime() <= new Date(now).getTime();
+}
+
+/**
+ * "Upcoming" is genuine future court time: an ACTIVE (`booked`) booking whose slot
+ * has not started yet. The split is by the slot's startsAt, not booking status —
+ * EXCEPT that a cancelled booking is never upcoming even if its slot is still in
+ * the future (a cancelled seat is a record, not a plan). Soonest first.
+ */
+export function upcomingSessions(playerId: Player['id'], now: IsoInstant): SessionEntry[] {
+  return sessionEntries(playerId)
+    .filter((e) => e.booking.status === 'booked' && !hasStarted(e.slot, now))
+    .sort((a, b) => new Date(a.slot.startsAt).getTime() - new Date(b.slot.startsAt).getTime());
+}
+
+/**
+ * "Past" is everything else: sessions whose slot has started (attended / no_show /
+ * a booking never cancelled) AND any cancelled booking regardless of slot time.
+ * Most recent first.
+ */
+export function pastSessions(playerId: Player['id'], now: IsoInstant): SessionEntry[] {
+  return sessionEntries(playerId)
+    .filter((e) => !(e.booking.status === 'booked' && !hasStarted(e.slot, now)))
+    .sort((a, b) => new Date(b.slot.startsAt).getTime() - new Date(a.slot.startsAt).getTime());
+}
+
+/**
+ * Everything the cancel screen needs for one booking: the slot + coach, whether
+ * cancelling now refunds (isCancellableWithoutForfeit), the refund deadline, the
+ * batch the credit returns to, and whether that batch is ALREADY expired at `now`
+ * — so the sheet can promise a refund only when it's actually spendable.
+ */
+export interface CancelPreview {
+  booking: Booking;
+  slot: SessionSlot;
+  coach: Coach | undefined;
+  refundable: boolean;
+  deadline: IsoInstant;
+  batch: CreditBatch | undefined;
+  refundExpired: boolean;
+}
+
+export function cancelPreview(
+  player: Player,
+  bookingId: BookingId,
+  now: IsoInstant,
+): CancelPreview | null {
+  const booking = getBookings().find((b) => b.id === bookingId && b.playerId === player.id);
+  if (!booking) return null;
+  const slot = slotById(booking.slotId);
+  if (!slot) return null;
+  const batch = getBatches().find((b) => b.id === booking.creditBatchId);
+  const refundable = isCancellableWithoutForfeit(slot, now);
+  const refundExpired =
+    refundable && batch !== undefined && creditExpiryState(batch.expiresAt, now) === 'expired';
+  return {
+    booking,
+    slot,
+    coach: coachById(slot.coachId),
+    refundable,
+    deadline: cancellationDeadline(slot),
+    batch,
+    refundExpired,
+  };
+}
+
+/**
+ * THE CANCELLATION SEAM. The third money-equivalent mutation, mirroring bookSlot.
+ *
+ * Re-validates and never trusts the caller: rejects a booking that isn't the
+ * player's, isn't active, or whose slot has already started. `already_cancelled`
+ * is an explicit idempotency guard — the mirror of bookSlot's `already_booked`,
+ * and the thing that stops a double-refund (cancel twice → credit back twice).
+ *
+ * The seat is ALWAYS freed (bookedCount − 1) so someone else can book it, refund
+ * or not. The credit is refunded ONLY when @tpa/core's isCancellableWithoutForfeit
+ * says so (outside the 3-hour window), and it goes back to booking.creditBatchId —
+ * the exact batch that paid — with that batch's ORIGINAL expiry (we only bump
+ * quantityRemaining; we never mint a batch or extend expiry). If that batch has
+ * since expired, the credit still returns (the ledger tells the truth) and is
+ * simply unusable — isBatchUsable rejects it. All three writes commit atomically.
+ *
+ * MOCK (S3e): commits to the local store. S7 replaces THIS BODY with one atomic DB
+ * RPC that frees the seat and conditionally refunds under real concurrency, with a
+ * unique/status guard so a double-cancel can't double-refund. Screens are unchanged.
+ */
+export type CancelBlockReason =
+  | 'booking_missing'
+  | 'not_owner'
+  | 'already_cancelled'
+  | 'not_cancellable'
+  | 'slot_missing';
+
+export type CancelResult =
+  | { ok: true; refunded: boolean; booking: Booking; batch: CreditBatch | null }
+  | { ok: false; reason: CancelBlockReason };
+
+export function cancelBooking(player: Player, bookingId: BookingId, now: IsoInstant): CancelResult {
+  const booking = getBookings().find((b) => b.id === bookingId);
+  if (!booking) return { ok: false, reason: 'booking_missing' };
+  if (booking.playerId !== player.id) return { ok: false, reason: 'not_owner' };
+  // Idempotency — cancelling an already-cancelled booking must not refund again.
+  if (booking.status === 'cancelled') return { ok: false, reason: 'already_cancelled' };
+  // attended / no_show are the admin's terminal states, not cancellable.
+  if (booking.status !== 'booked') return { ok: false, reason: 'not_cancellable' };
+
+  const slot = getSlots().find((s) => s.id === booking.slotId);
+  if (!slot) return { ok: false, reason: 'slot_missing' };
+  // Can't cancel a session that has already started.
+  if (hasStarted(slot, now)) return { ok: false, reason: 'not_cancellable' };
+
+  const refundable = isCancellableWithoutForfeit(slot, now);
+  const cancelledBooking: Booking = { ...booking, status: 'cancelled', cancelledAt: now };
+  const freedSlot: SessionSlot = { ...slot, bookedCount: Math.max(0, slot.bookedCount - 1) };
+
+  let updatedBatch: CreditBatch | null = null;
+  if (refundable) {
+    const batch = getBatches().find((b) => b.id === booking.creditBatchId);
+    // Return the credit to its original batch, keeping that batch's expiry. If the
+    // batch has lapsed, it still returns — worthless — rather than being extended.
+    if (batch) updatedBatch = { ...batch, quantityRemaining: batch.quantityRemaining + 1 };
+  }
+
+  commitCancellation(cancelledBooking, freedSlot, updatedBatch ?? undefined);
+  return { ok: true, refunded: updatedBatch !== null, booking: cancelledBooking, batch: updatedBatch };
 }

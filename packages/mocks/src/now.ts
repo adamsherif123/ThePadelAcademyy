@@ -18,3 +18,8 @@ export const egp = (pounds: number): Piastres => (pounds * 100) as Piastres;
 export function daysFromNow(days: number): IsoInstant {
   return new Date(new Date(MOCK_NOW).getTime() + days * 86_400_000).toISOString() as IsoInstant;
 }
+
+/** MOCK_NOW shifted by hours, as an IsoInstant (for near-in-time fixtures). */
+export function hoursFromNow(hours: number): IsoInstant {
+  return new Date(new Date(MOCK_NOW).getTime() + hours * 3_600_000).toISOString() as IsoInstant;
+}

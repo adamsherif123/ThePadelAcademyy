@@ -65,6 +65,25 @@ export function commitBooking(
   emit();
 }
 
+/**
+ * Record a cancellation: replace the booking (now `cancelled`) and the slot (one
+ * seat freed) in place, and — only when the cancellation is refundable —
+ * replace the credited batch (one credit returned). The seat is ALWAYS freed;
+ * the refund is optional, so `updatedBatch` is omitted on a forfeit. Like
+ * commitBooking, this is a dumb atomic commit: the rules (and whether a refund
+ * happens at all) are decided by @tpa/core + the cancelBooking seam.
+ */
+export function commitCancellation(
+  booking: Booking,
+  updatedSlot: SessionSlot,
+  updatedBatch?: CreditBatch,
+): void {
+  bookings = bookings.map((b) => (b.id === booking.id ? booking : b));
+  slots = slots.map((s) => (s.id === updatedSlot.id ? updatedSlot : s));
+  if (updatedBatch) batches = batches.map((b) => (b.id === updatedBatch.id ? updatedBatch : b));
+  emit();
+}
+
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);

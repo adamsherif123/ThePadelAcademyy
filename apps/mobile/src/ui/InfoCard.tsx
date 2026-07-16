@@ -5,7 +5,7 @@ import { StyleSheet, View, type ViewStyle } from 'react-native';
 import { Text } from './Text';
 import type { IoniconName } from './trainingMeta';
 
-export type InfoCardVariant = 'navy' | 'amber' | 'royal' | 'neutral';
+export type InfoCardVariant = 'navy' | 'amber' | 'royal' | 'neutral' | 'success' | 'danger';
 
 interface VariantStyle {
   bg: string;
@@ -23,6 +23,10 @@ const VARIANT: Record<InfoCardVariant, VariantStyle> = {
   royal: { bg: color.bg.surface, border: color.accent.default, fg: color.accent.default, icon: 'ticket-outline' },
   // Subtle neutral note (profile-setup explainer).
   neutral: { bg: color.bg.surface, border: color.border.subtle, fg: color.text.secondary, icon: 'information-circle-outline' },
+  // Green "free cancellation" strip (ok creditExpiry tokens).
+  success: { bg: creditExpiry.ok.bg, border: creditExpiry.ok.bg, fg: creditExpiry.ok.fg, icon: 'checkmark-circle-outline' },
+  // Red forfeit warning (expired creditExpiry tokens).
+  danger: { bg: creditExpiry.expired.bg, border: creditExpiry.expired.bg, fg: creditExpiry.expired.fg, icon: 'alert-circle-outline' },
 };
 
 /**

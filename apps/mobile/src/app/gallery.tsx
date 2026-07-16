@@ -1,4 +1,4 @@
-import { TRAINING_TYPES } from '@tpa/core';
+import { TRAINING_TYPES, cancellationDeadline } from '@tpa/core';
 import { MOCK_NOW, daysFromNow, egp, mockCoaches, mockCreditBatches, mockPackages, mockSlots } from '@tpa/mocks';
 import { color, radius, space } from '@tpa/theme';
 import type { IsoInstant, SessionSlot } from '@tpa/types';
@@ -10,6 +10,7 @@ import {
   AcademyCard,
   Avatar,
   Badge,
+  BookingCard,
   Button,
   CapacityDots,
   Card,
@@ -167,6 +168,8 @@ export default function GalleryScreen() {
         <InfoCard variant="amber" text="2 Group credits — expires in 2 days." />
         <InfoCard variant="royal" text="Booking this session will use 1 Group credit." />
         <InfoCard variant="neutral" text="Men's and ladies' groups train separately, placed by level." />
+        <InfoCard variant="success" text="Free cancellation until 3:30 PM." />
+        <InfoCard variant="danger" text="Inside 3-hour window — cancelling now forfeits your credit." />
       </Section>
 
       <Section title="Inputs">
@@ -313,6 +316,33 @@ export default function GalleryScreen() {
               />
             ))
           : null}
+      </Section>
+
+      <Section title="Sessions — BookingCard (upcoming / past / detail)">
+        {DEMO_SLOT ? (
+          <>
+            <BookingCard
+              variant="upcoming"
+              slot={DEMO_SLOT}
+              coach={DEMO_COACH}
+              refundable
+              deadline={cancellationDeadline(DEMO_SLOT)}
+              onCancel={() => {}}
+            />
+            <BookingCard
+              variant="upcoming"
+              slot={DEMO_SLOT}
+              coach={DEMO_COACH}
+              refundable={false}
+              deadline={cancellationDeadline(DEMO_SLOT)}
+              onCancel={() => {}}
+            />
+            <BookingCard variant="past" slot={DEMO_SLOT} coach={DEMO_COACH} status="attended" />
+            <BookingCard variant="past" slot={DEMO_SLOT} coach={DEMO_COACH} status="cancelled" />
+            <BookingCard variant="past" slot={DEMO_SLOT} coach={DEMO_COACH} status="no_show" />
+            <BookingCard variant="detail" slot={DEMO_SLOT} coach={DEMO_COACH} />
+          </>
+        ) : null}
       </Section>
 
       <Section title="CheckList">

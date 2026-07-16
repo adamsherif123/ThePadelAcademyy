@@ -46,6 +46,7 @@ function RootNavigator() {
       <Stack.Screen name="purchase-success" />
       <Stack.Screen name="confirm-booking" />
       <Stack.Screen name="booked-success" />
+      <Stack.Screen name="cancel-booking" options={{ presentation: 'modal' }} />
       <Stack.Screen name="coaches" />
       <Stack.Screen name="purchase-history" />
       <Stack.Screen name="gallery" options={{ headerShown: true, title: 'Gallery (dev)', presentation: 'modal' }} />
