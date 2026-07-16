@@ -1,36 +1,33 @@
-import { TRAINING_TYPES, formatExpiry, formatInstantDate, formatInstantTime } from '@tpa/core';
+import { formatExpiry, formatInstantDate, formatInstantTime } from '@tpa/core';
 import { color, space } from '@tpa/theme';
 import type { Package, Piastres } from '@tpa/types';
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
+import { activePackages, perSessionPiastres } from '../../data/catalog';
+import { nextSession } from '../../data/schedule';
+import { useDataStore } from '../../data/store';
 import { balanceByType, soonestExpiringBatch, totalReadyToBook } from '../../data/wallet';
-import { nextSession, perSessionPiastres, topUpPackages } from '../../data/schedule';
 import { useSession } from '../../session/SessionProvider';
 import {
+  ACADEMY,
+  AcademyCard,
   Avatar,
   Badge,
   Button,
   Card,
+  CreditsSummaryCard,
   IconRow,
-  InfoCard,
   Money,
-  PillOnNavy,
   ScreenHeader,
   Text,
   TRAINING_META,
 } from '../../ui';
 
-const ACADEMY = {
-  name: 'Oro Plaza Hotel',
-  address: 'In front of Family Park, Rehab, Cairo',
-  hours: 'Sun – Wed · 5:00 PM – 11:00 PM',
-  hoursNote: 'Group training mainly 5 – 9 PM',
-} as const;
-
 export default function HomeScreen() {
   const router = useRouter();
   const { player, now } = useSession();
+  useDataStore(); // re-render when a purchase grants credits
   if (!player) return null;
 
   const firstName = player.name.split(' ')[0] ?? player.name;
@@ -38,7 +35,13 @@ export default function HomeScreen() {
   const balance = balanceByType(player.id, now);
   const expiring = soonestExpiringBatch(player.id, now);
   const next = nextSession(player.id, now);
-  const packages = topUpPackages();
+  const packages = activePackages();
+
+  const expiryText = expiring
+    ? `${expiring.quantityRemaining} ${TRAINING_META[expiring.trainingType].label} credit${
+        expiring.quantityRemaining === 1 ? '' : 's'
+      } — ${formatExpiry(expiring.expiresAt, now)}`
+    : undefined;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -48,49 +51,15 @@ export default function HomeScreen() {
         trailing={<Avatar name={player.name} />}
       />
 
-      {/* Navy hero credits card */}
-      <Card variant="inverse">
-        <View style={styles.heroTop}>
-          <Text variant="label">Your credits</Text>
-          <View style={styles.walletChip}>
-            <PillOnNavy label="Wallet" trailingIcon="arrow-forward" />
-          </View>
-        </View>
-
-        <View style={styles.heroCount}>
-          <Text variant="display" tone="inverse">
-            {String(total)}
-          </Text>
-          <Text variant="caption" tone="inverse" style={styles.heroCountLabel}>
-            {'credits\nready to book'}
-          </Text>
-        </View>
-
-        <View style={styles.balancePills}>
-          {TRAINING_TYPES.map((t) => (
-            <PillOnNavy
-              key={t}
-              icon={TRAINING_META[t].icon}
-              label={`${balance[t]} ${TRAINING_META[t].label}`}
-              dimmed={balance[t] === 0}
-            />
-          ))}
-        </View>
-
-        {expiring ? (
-          <InfoCard
-            variant="amber"
-            style={styles.expiryStrip}
-            text={`${expiring.quantityRemaining} ${TRAINING_META[expiring.trainingType].label} credit${
-              expiring.quantityRemaining === 1 ? '' : 's'
-            } — ${formatExpiry(expiring.expiresAt, now)}`}
-          />
-        ) : null}
-      </Card>
+      <CreditsSummaryCard
+        total={total}
+        balance={balance}
+        onWallet={() => router.push('/wallet')}
+        expiringText={expiryText}
+      />
 
       <Button label="Book a Session" onPress={() => router.push('/(tabs)/book')} />
 
-      {/* Next session */}
       {next ? (
         <View style={styles.section}>
           <Text variant="label">Next session</Text>
@@ -105,7 +74,10 @@ export default function HomeScreen() {
                   {next.coach ? `with ${next.coach.name}` : ''}
                 </Text>
               </View>
-              <Badge label={TRAINING_META[next.slot.trainingType].label} icon={TRAINING_META[next.slot.trainingType].icon} />
+              <Badge
+                label={TRAINING_META[next.slot.trainingType].label}
+                icon={TRAINING_META[next.slot.trainingType].icon}
+              />
             </View>
             <View style={styles.divider} />
             <IconRow icon="location-outline" title={`${ACADEMY.name} · Rehab`} />
@@ -113,33 +85,23 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
-      {/* Top up credits */}
       <View style={styles.section}>
         <View style={styles.sectionHead}>
           <Text variant="label">Top up credits</Text>
-          <Text variant="label" tone="accent" onPress={() => router.push('/wallet')}>
+          <Text variant="label" tone="accent" onPress={() => router.push('/buy-credits')}>
             See all
           </Text>
         </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.packageScroll}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.packageScroll}>
           {packages.map((pkg) => (
-            <PackageCard key={pkg.id} pkg={pkg} />
+            <PackageCard key={pkg.id} pkg={pkg} onPress={() => router.push(`/package/${pkg.id}`)} />
           ))}
         </ScrollView>
       </View>
 
-      {/* The academy */}
       <View style={styles.section}>
         <Text variant="label">The academy</Text>
-        <Card>
-          <IconRow icon="location-outline" title={ACADEMY.name} subtitle={ACADEMY.address} />
-          <View style={styles.divider} />
-          <IconRow icon="time-outline" title={ACADEMY.hours} subtitle={ACADEMY.hoursNote} />
-        </Card>
+        <AcademyCard />
       </View>
 
       <Text variant="caption" tone="muted" style={styles.devLink} onPress={() => router.push('/gallery')}>
@@ -149,11 +111,11 @@ export default function HomeScreen() {
   );
 }
 
-function PackageCard({ pkg }: { pkg: Package }) {
+function PackageCard({ pkg, onPress }: { pkg: Package; onPress: () => void }) {
   const meta = TRAINING_META[pkg.trainingType];
   const isBestValue = pkg.sessionCount === 8;
   return (
-    <Card style={styles.packageCard}>
+    <Card style={styles.packageCard} onPress={onPress}>
       {isBestValue ? (
         <View style={styles.bestValue}>
           <Badge label="Best value" tint={{ fg: color.text.inverse, bg: color.accent.default }} />
@@ -175,12 +137,6 @@ function PackageCard({ pkg }: { pkg: Package }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: color.bg.canvas },
   content: { padding: space.xl, gap: space.lg },
-  heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  walletChip: {},
-  heroCount: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.sm },
-  heroCountLabel: {},
-  balancePills: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.md },
-  expiryStrip: { marginTop: space.md },
   section: { gap: space.sm },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   nextRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },

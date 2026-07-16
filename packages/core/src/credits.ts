@@ -1,8 +1,13 @@
-import type { CreditBatch, IsoInstant, PlayerId, PurchaseId } from '@tpa/types';
+import type { CreditBatch, IsoInstant, Package, PlayerId, PurchaseId } from '@tpa/types';
 
 import { CREDIT_EXPIRY_DAYS, EXPIRING_SOON_DAYS, SIGNUP_TRIAL_CREDITS } from './constants';
 import { ID_PREFIXES, newId } from './ids';
 import { parseInstant, toInstant } from './time';
+
+/** CREDIT_EXPIRY_DAYS after `now`, as an instant. The one expiry rule for all credits. */
+function expiryFrom(now: IsoInstant): IsoInstant {
+  return toInstant(new Date(parseInstant(now).getTime() + CREDIT_EXPIRY_DAYS * 86_400_000));
+}
 
 /**
  * Runtime/type mirror of the CreditBatch source invariant (cf. `isGroupSlot`):
@@ -40,9 +45,6 @@ export function creditExpiryState(expiresAt: IsoInstant, now: IsoInstant): Credi
 }
 
 export function buildSignupGrant(playerId: PlayerId, now: IsoInstant): CreditBatch {
-  const expiresAt = toInstant(
-    new Date(parseInstant(now).getTime() + CREDIT_EXPIRY_DAYS * 86_400_000),
-  );
   return {
     id: newId(ID_PREFIXES.creditBatch) as CreditBatch['id'],
     playerId,
@@ -51,7 +53,36 @@ export function buildSignupGrant(playerId: PlayerId, now: IsoInstant): CreditBat
     trainingType: 'trial',
     quantityTotal: SIGNUP_TRIAL_CREDITS,
     quantityRemaining: SIGNUP_TRIAL_CREDITS,
-    expiresAt,
+    expiresAt: expiryFrom(now),
+    createdAt: now,
+  };
+}
+
+/**
+ * The exact CreditBatch to insert when a purchase succeeds — the one and only
+ * place the purchase-grant rule lives (mirrors `buildSignupGrant`). Pure: takes
+ * `now`, does no I/O. S6 calls this SERVER-SIDE after the Paymob webhook verifies
+ * payment — which is why it lives in @tpa/core, never in a screen.
+ *
+ * `source: 'purchase'` with a non-null `purchaseId` (the CreditBatch invariant);
+ * trainingType and quantity come from the purchased package; expiry is
+ * CREDIT_EXPIRY_DAYS from `now`, the same rule as signup grants.
+ */
+export function buildPurchaseCredits(
+  playerId: PlayerId,
+  purchaseId: PurchaseId,
+  pkg: Package,
+  now: IsoInstant,
+): CreditBatch {
+  return {
+    id: newId(ID_PREFIXES.creditBatch) as CreditBatch['id'],
+    playerId,
+    source: 'purchase',
+    purchaseId,
+    trainingType: pkg.trainingType,
+    quantityTotal: pkg.sessionCount,
+    quantityRemaining: pkg.sessionCount,
+    expiresAt: expiryFrom(now),
     createdAt: now,
   };
 }

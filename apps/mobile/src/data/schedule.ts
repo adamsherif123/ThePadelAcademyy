@@ -1,9 +1,9 @@
-import { mockBookings, mockCoaches, mockPackages, mockSlots } from '@tpa/mocks';
-import type { Coach, IsoInstant, Package, PlayerId, SessionSlot } from '@tpa/types';
+import { mockBookings, mockCoaches, mockSlots } from '@tpa/mocks';
+import type { Coach, IsoInstant, PlayerId, SessionSlot } from '@tpa/types';
 
 /**
- * Schedule / catalog selectors over @tpa/mocks. Pure; S9 swaps the bodies for
- * real queries. Screens render dates/money via @tpa/core.
+ * Schedule selectors over @tpa/mocks. Pure; S9 swaps the bodies for real queries.
+ * Screens render dates/money via @tpa/core. (Catalog helpers live in catalog.ts.)
  */
 
 export interface NextSession {
@@ -27,12 +27,7 @@ export function nextSession(playerId: PlayerId, now: IsoInstant): NextSession | 
   return { slot, coach: mockCoaches.find((c) => c.id === slot.coachId) };
 }
 
-/** Active purchasable packages (for the Home top-up scroll). */
-export function topUpPackages(): Package[] {
-  return mockPackages.filter((p) => p.isActive);
-}
-
-/** Per-session unit price in piastres (for "N EGP / session"). */
-export function perSessionPiastres(pkg: Package): number {
-  return Math.round(pkg.price / pkg.sessionCount);
+/** All coaches (for the Meet the Coaches screen). */
+export function allCoaches(): Coach[] {
+  return mockCoaches;
 }

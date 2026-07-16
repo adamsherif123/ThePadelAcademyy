@@ -25,6 +25,7 @@ export {
 export { ID_PREFIXES, newId, type IdPrefix } from './ids';
 
 export {
+  buildPurchaseCredits,
   buildSignupGrant,
   creditExpiryState,
   isPurchaseBacked,

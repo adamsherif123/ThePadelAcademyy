@@ -1,7 +1,9 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { color, radius, space } from '@tpa/theme';
 import { ActivityIndicator, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Text, type TextTone } from './Text';
+import type { IoniconName } from './trainingMeta';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
 
@@ -12,6 +14,7 @@ interface VariantColors {
   border?: string;
   label: TextTone;
   labelDisabled: TextTone;
+  labelColor: string;
 }
 
 const VARIANT: Record<ButtonVariant, VariantColors> = {
@@ -21,6 +24,7 @@ const VARIANT: Record<ButtonVariant, VariantColors> = {
     bgDisabled: color.accent.disabled,
     label: 'inverse',
     labelDisabled: 'inverse',
+    labelColor: color.text.inverse,
   },
   secondary: {
     bg: color.bg.surface,
@@ -29,6 +33,7 @@ const VARIANT: Record<ButtonVariant, VariantColors> = {
     border: color.border.strong,
     label: 'primary',
     labelDisabled: 'muted',
+    labelColor: color.text.primary,
   },
   ghost: {
     bg: 'transparent',
@@ -36,6 +41,7 @@ const VARIANT: Record<ButtonVariant, VariantColors> = {
     bgDisabled: 'transparent',
     label: 'accent',
     labelDisabled: 'muted',
+    labelColor: color.accent.default,
   },
 };
 
@@ -45,12 +51,17 @@ export interface ButtonProps {
   variant?: ButtonVariant;
   disabled?: boolean;
   loading?: boolean;
+  /** Optional leading icon, colored like the label. */
+  icon?: IoniconName;
+  /** Destructive action — colors the label/icon danger red (secondary/ghost). */
+  destructive?: boolean;
   style?: ViewStyle;
 }
 
 /**
- * Primary / secondary / ghost button with default, pressed, disabled and loading
- * states. RTL-safe (symmetric padding, no physical props).
+ * Primary / secondary / ghost full-pill button with default, pressed, disabled
+ * and loading states, an optional leading icon, and a destructive mode. RTL-safe
+ * (symmetric padding, no physical props).
  */
 export function Button({
   label,
@@ -58,10 +69,13 @@ export function Button({
   variant = 'primary',
   disabled = false,
   loading = false,
+  icon,
+  destructive = false,
   style,
 }: ButtonProps) {
   const v = VARIANT[variant];
   const isInert = disabled || loading;
+  const labelColor = destructive ? color.status.danger : v.labelColor;
 
   return (
     <Pressable
@@ -79,7 +93,13 @@ export function Button({
     >
       <View style={styles.content}>
         {loading ? <ActivityIndicator color={color.text.inverse} /> : null}
-        <Text variant="body" weight="bold" tone={disabled ? v.labelDisabled : v.label} style={styles.label}>
+        {icon && !loading ? <Ionicons name={icon} size={18} color={labelColor} /> : null}
+        <Text
+          variant="body"
+          weight="bold"
+          tone={disabled ? v.labelDisabled : v.label}
+          style={[styles.label, destructive ? { color: labelColor } : null]}
+        >
           {label}
         </Text>
       </View>

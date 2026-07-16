@@ -1,5 +1,5 @@
 import { TRAINING_TYPES } from '@tpa/core';
-import { MOCK_NOW, daysFromNow, egp } from '@tpa/mocks';
+import { MOCK_NOW, daysFromNow, egp, mockCreditBatches, mockPackages } from '@tpa/mocks';
 import { color, radius, space } from '@tpa/theme';
 import type { IsoInstant } from '@tpa/types';
 import type { ReactNode } from 'react';
@@ -7,19 +7,26 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import {
+  AcademyCard,
   Avatar,
   Badge,
   Button,
   Card,
+  CheckList,
+  CreditsSummaryCard,
+  EmptyState,
   IconRow,
   InfoCard,
   Input,
+  LinkRow,
   Money,
+  PackageRow,
   PillOnNavy,
   ProgressBar,
   ScreenHeader,
   SegmentedControl,
   StatusChip,
+  SuccessView,
   Text,
   TRAINING_META,
 } from '../ui';
@@ -199,8 +206,68 @@ export default function GalleryScreen() {
         <Money amount={egp(6000)} tone="accent" />
       </Section>
 
+      <Section title="CreditsSummaryCard">
+        <CreditsSummaryCard
+          total={13}
+          balance={{ trial: 2, group: 7, duo: 0, individual: 4 }}
+          onWallet={() => {}}
+          expiringText="2 Group credits — expires in 2 days"
+        />
+      </Section>
+
+      <Section title="LinkRow">
+        <LinkRow icon="wallet-outline" title="Wallet" subtitle="13 usable credits" onPress={() => {}} />
+        <LinkRow icon="receipt-outline" title="Purchase history" subtitle="6 purchases" onPress={() => {}} />
+      </Section>
+
+      <Section title="PackageRow (buy-credits row)">
+        {mockPackages
+          .filter((p) => p.trainingType === 'group')
+          .map((p) => (
+            <PackageRow key={p.id} pkg={p} onPress={() => {}} />
+          ))}
+      </Section>
+
+      <Section title="CheckList">
+        <Card>
+          <CheckList items={['4 × Duo training sessions', 'Certified academy coaches', '1 credit = 1 session']} />
+        </Card>
+      </Section>
+
+      <Section title="AcademyCard">
+        <AcademyCard />
+      </Section>
+
+      <Section title="Button — icon + destructive">
+        <Button label="Sign out" variant="secondary" destructive icon="log-out-outline" onPress={() => {}} />
+      </Section>
+
+      <Section title="SuccessView (booked / purchased pattern)">
+        <View style={styles.successBox}>
+          <SuccessView
+            eyebrow="Payment confirmed"
+            title="Credits added"
+            primary={{ label: 'Go to Wallet', onPress: () => {} }}
+            secondary={{ label: 'Done', onPress: () => {} }}
+          >
+            <Card>
+              <Text variant="body">8 Group credits added · expires in 30 days</Text>
+            </Card>
+          </SuccessView>
+        </View>
+      </Section>
+
+      <Section title="EmptyState">
+        <EmptyState
+          icon="receipt-outline"
+          title="No purchases yet"
+          message="When you buy a credit bundle, it'll show up here."
+          cta={{ label: 'Buy credits', onPress: () => {} }}
+        />
+      </Section>
+
       <View style={styles.footer}>
-        <Text variant="caption">End of gallery</Text>
+        <Text variant="caption">End of gallery — batches in mocks: {String(mockCreditBatches.length)}</Text>
       </View>
     </ScrollView>
   );
@@ -214,6 +281,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md, alignItems: 'center' },
   inlineRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.sm },
   navyBox: { backgroundColor: color.bg.inverse, borderRadius: radius.lg, padding: space.lg },
+  successBox: { height: 420 },
   swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
   swatchItem: { alignItems: 'center', gap: space.xs },
   swatch: {

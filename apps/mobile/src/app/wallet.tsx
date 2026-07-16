@@ -1,16 +1,17 @@
-import { CREDIT_EXPIRY_DAYS, TRAINING_TYPES, formatInstantDate } from '@tpa/core';
+import { CREDIT_EXPIRY_DAYS, formatInstantDate } from '@tpa/core';
 import { space } from '@tpa/theme';
 import type { CreditBatch } from '@tpa/types';
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
+import { useDataStore } from '../data/store';
 import { activeBatches, balanceByType, expiredBatches, totalReadyToBook } from '../data/wallet';
 import { useSession } from '../session/SessionProvider';
 import {
   Badge,
   Button,
   Card,
-  PillOnNavy,
+  CreditsSummaryCard,
   ProgressBar,
   Screen,
   ScreenHeader,
@@ -32,6 +33,7 @@ function batchOrigin(b: CreditBatch): string {
 export default function WalletScreen() {
   const router = useRouter();
   const { player, now } = useSession();
+  useDataStore(); // re-render when a purchase grants credits
   if (!player) return null;
 
   const total = totalReadyToBook(player.id, now);
@@ -44,27 +46,7 @@ export default function WalletScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <ScreenHeader eyebrow="Wallet" title="Your Credits" onBack={() => router.back()} />
 
-        {/* Navy summary */}
-        <Card variant="inverse">
-          <View style={styles.summaryTop}>
-            <Text variant="display" tone="inverse">
-              {String(total)}
-            </Text>
-            <Text variant="caption" tone="inverse" style={styles.summaryLabel}>
-              {'credits ready\nto book now'}
-            </Text>
-          </View>
-          <View style={styles.balancePills}>
-            {TRAINING_TYPES.map((t) => (
-              <PillOnNavy
-                key={t}
-                icon={TRAINING_META[t].icon}
-                label={`${balance[t]} ${TRAINING_META[t].label}`}
-                dimmed={balance[t] === 0}
-              />
-            ))}
-          </View>
-        </Card>
+        <CreditsSummaryCard total={total} balance={balance} caption={'credits ready\nto book now'} />
 
         {/* Active batches */}
         <Text variant="label">Active batches</Text>
@@ -84,7 +66,7 @@ export default function WalletScreen() {
           </>
         ) : null}
 
-        <Button label="Buy More Credits" onPress={() => router.push('/(tabs)/book')} />
+        <Button label="Buy More Credits" onPress={() => router.push('/buy-credits')} />
 
         <Text variant="caption" tone="muted" style={styles.footer}>
           {`Credits are typed — a Group credit books Group sessions only. Every batch expires ${CREDIT_EXPIRY_DAYS} days after purchase.`}
@@ -145,9 +127,6 @@ function BatchCard({
 
 const styles = StyleSheet.create({
   content: { padding: space.xl, gap: space.md },
-  summaryTop: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  summaryLabel: {},
-  balancePills: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.md },
   batchHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space.sm },
   batchBody: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: space.sm },
   batchInfo: { flex: 1, gap: 2 },

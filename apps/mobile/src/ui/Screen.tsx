@@ -13,7 +13,7 @@ export function Screen({
   edges = ['top', 'bottom', 'left', 'right'],
   style,
 }: {
-  children: ReactNode;
+  children?: ReactNode;
   padded?: boolean;
   edges?: readonly Edge[];
   style?: ViewStyle;

@@ -36,11 +36,17 @@ function useAuthGuard() {
 function RootNavigator() {
   useAuthGuard();
   return (
-    <Stack>
-      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="wallet" options={{ headerShown: false, presentation: 'card' }} />
-      <Stack.Screen name="gallery" options={{ title: 'Gallery (dev)', presentation: 'modal' }} />
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="wallet" />
+      <Stack.Screen name="buy-credits" />
+      <Stack.Screen name="package/[id]" />
+      <Stack.Screen name="checkout" />
+      <Stack.Screen name="purchase-success" />
+      <Stack.Screen name="coaches" />
+      <Stack.Screen name="purchase-history" />
+      <Stack.Screen name="gallery" options={{ headerShown: true, title: 'Gallery (dev)', presentation: 'modal' }} />
     </Stack>
   );
 }

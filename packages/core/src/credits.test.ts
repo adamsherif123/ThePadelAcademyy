@@ -1,11 +1,26 @@
-import type { CreditBatch, IsoInstant, PlayerId } from '@tpa/types';
+import type { CreditBatch, IsoInstant, Package, PackageId, PlayerId, PurchaseId } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
 import { CREDIT_EXPIRY_DAYS, EXPIRING_SOON_DAYS, SIGNUP_TRIAL_CREDITS } from './constants';
-import { buildSignupGrant, creditExpiryState, isPurchaseBacked } from './credits';
+import {
+  buildPurchaseCredits,
+  buildSignupGrant,
+  creditExpiryState,
+  isPurchaseBacked,
+} from './credits';
 
 const NOW = '2026-07-15T09:00:00.000Z' as IsoInstant;
 const PLAYER = 'pl_test' as PlayerId;
+
+const pkg = (over: Partial<Package> = {}): Package => ({
+  id: 'pk_group_8' as PackageId,
+  trainingType: 'group',
+  sessionCount: 8,
+  price: 280000 as Package['price'],
+  name: 'Group · 8 Sessions',
+  isActive: true,
+  ...over,
+});
 
 const daysFrom = (n: number) =>
   new Date(new Date(NOW).getTime() + n * 86_400_000).toISOString() as IsoInstant;
@@ -48,6 +63,36 @@ describe('buildSignupGrant', () => {
   it('assigns a prefixed credit-batch id and belongs to the player', () => {
     expect(grant.id.startsWith('cb_')).toBe(true);
     expect(grant.playerId).toBe(PLAYER);
+  });
+});
+
+describe('buildPurchaseCredits', () => {
+  const PURCHASE = 'pu_test' as PurchaseId;
+  const batch = buildPurchaseCredits(PLAYER, PURCHASE, pkg(), NOW);
+
+  it('takes trainingType and quantity from the package, unused', () => {
+    expect(batch.trainingType).toBe('group');
+    expect(batch.quantityTotal).toBe(8);
+    expect(batch.quantityRemaining).toBe(8);
+    expect(buildPurchaseCredits(PLAYER, PURCHASE, pkg({ trainingType: 'duo', sessionCount: 4 }), NOW).quantityTotal).toBe(4);
+  });
+
+  it('satisfies the source invariant: purchase-backed with a non-null purchaseId', () => {
+    expect(batch.source).toBe('purchase');
+    expect(batch.purchaseId).toBe(PURCHASE);
+    expect(batch.purchaseId).not.toBeNull();
+    expect(isPurchaseBacked(batch)).toBe(true);
+  });
+
+  it('expires exactly CREDIT_EXPIRY_DAYS after now (same rule as grants)', () => {
+    expect(batch.createdAt).toBe(NOW);
+    const expected = new Date(new Date(NOW).getTime() + CREDIT_EXPIRY_DAYS * 86_400_000).toISOString();
+    expect(batch.expiresAt).toBe(expected);
+  });
+
+  it('assigns a prefixed credit-batch id and belongs to the player', () => {
+    expect(batch.id.startsWith('cb_')).toBe(true);
+    expect(batch.playerId).toBe(PLAYER);
   });
 });
 

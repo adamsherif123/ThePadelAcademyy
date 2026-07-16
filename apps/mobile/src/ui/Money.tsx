@@ -1,4 +1,5 @@
 import { formatPiastres } from '@tpa/core';
+import type { FontWeightToken } from '@tpa/theme';
 import type { Piastres } from '@tpa/types';
 
 import { Text, type TextTone, type TextVariant } from './Text';
@@ -13,13 +14,15 @@ export function Money({
   amount,
   variant = 'body',
   tone,
+  weight,
 }: {
   amount: Piastres;
   variant?: TextVariant;
   tone?: TextTone;
+  weight?: FontWeightToken;
 }) {
   return (
-    <Text variant={variant} tone={tone}>
+    <Text variant={variant} tone={tone} weight={weight}>
       {formatPiastres(amount)}
     </Text>
   );

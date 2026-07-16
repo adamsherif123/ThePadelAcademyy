@@ -1,15 +1,17 @@
 import { TRAINING_TYPES, creditExpiryState, isBatchUsable } from '@tpa/core';
-import { mockCreditBatches } from '@tpa/mocks';
 import type { CreditBatch, IsoInstant, PlayerId, TrainingType } from '@tpa/types';
 
+import { getBatches } from './store';
+
 /**
- * Wallet selectors over @tpa/mocks. Pure functions of (playerId, now) — the whole
- * point is that S9 replaces these bodies with Supabase queries without any screen
- * changing. Nothing here formats; screens render via @tpa/core.
+ * Wallet selectors over the data store (seeded from @tpa/mocks, mutated by
+ * purchases). Pure functions of (playerId, now) — S9 replaces the store's
+ * internals with Supabase without any selector or screen changing. Nothing here
+ * formats; screens render via @tpa/core.
  */
 
 function batchesFor(playerId: PlayerId): CreditBatch[] {
-  return mockCreditBatches.filter((b) => b.playerId === playerId);
+  return getBatches().filter((b) => b.playerId === playerId);
 }
 
 /** Non-expired batches, soonest-expiry first (the "active batches" list). */

@@ -22,9 +22,10 @@ export const mockPurchases: Purchase[] = [
   { id: 'pu_omar_indiv4' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_indiv_4' as PackageId, status: 'succeeded', amount: egp(3200), createdAt: daysFromNow(-10), gatewayOrderId: 'pmob_ord_1004', gatewayTransactionId: 'pmob_txn_5004' },
 
   // pending: client created it, webhook hasn't confirmed — no transaction yet.
-  { id: 'pu_youssef_duo4' as PurchaseId, playerId: 'pl_youssef' as PlayerId, packageId: 'pk_duo_4' as PackageId, status: 'pending', amount: egp(2200), createdAt: daysFromNow(0), gatewayOrderId: 'pmob_ord_1005', gatewayTransactionId: null },
+  // (Belongs to the current player so purchase history shows every status.)
+  { id: 'pu_omar_duo4_pending' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_duo_4' as PackageId, status: 'pending', amount: egp(2200), createdAt: daysFromNow(0), gatewayOrderId: 'pmob_ord_1005', gatewayTransactionId: null },
   // failed: gateway declined the transaction.
-  { id: 'pu_tarek_indiv4' as PurchaseId, playerId: 'pl_tarek' as PlayerId, packageId: 'pk_indiv_4' as PackageId, status: 'failed', amount: egp(3200), createdAt: daysFromNow(-1), gatewayOrderId: 'pmob_ord_1006', gatewayTransactionId: 'pmob_txn_5006' },
+  { id: 'pu_omar_indiv4_failed' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_indiv_4' as PackageId, status: 'failed', amount: egp(3200), createdAt: daysFromNow(-1), gatewayOrderId: 'pmob_ord_1006', gatewayTransactionId: 'pmob_txn_5006' },
 ];
 
 /**
