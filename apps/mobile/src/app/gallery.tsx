@@ -281,13 +281,28 @@ export default function GalleryScreen() {
         <Money amount={egp(6000)} tone="accent" />
       </Section>
 
-      <Section title="CreditsSummaryCard">
+      <Section title="CreditsSummaryCard (Home: eyebrow + chip inline with total)">
         <CreditsSummaryCard
           total={13}
           balance={{ trial: 2, group: 7, duo: 0, individual: 4 }}
           eyebrow="Your credits"
           action={{ label: 'Wallet', trailingIcon: 'arrow-forward', onPress: () => {} }}
           expiringText="2 Group credits — expires in 2 days"
+        />
+      </Section>
+
+      <Section title="CreditsSummaryCard (Wallet: no eyebrow) + long-total stress">
+        <CreditsSummaryCard
+          total={13}
+          balance={{ trial: 2, group: 7, duo: 0, individual: 4 }}
+          caption={'credits ready\nto book now'}
+          action={{ label: 'Buy credits', icon: 'add', onPress: () => {} }}
+        />
+        <CreditsSummaryCard
+          total={128}
+          balance={{ trial: 20, group: 70, duo: 18, individual: 20 }}
+          caption={'credits ready\nto book now'}
+          action={{ label: 'Buy credits', icon: 'add', onPress: () => {} }}
         />
       </Section>
 

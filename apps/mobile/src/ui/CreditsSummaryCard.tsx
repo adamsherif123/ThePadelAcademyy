@@ -39,31 +39,35 @@ export function CreditsSummaryCard({
   action?: SummaryAction;
   expiringText?: string;
 }) {
-  const hasTopRow = Boolean(eyebrow || action);
-
   return (
     <Card variant="inverse">
-      {hasTopRow ? (
-        <View style={[styles.top, { justifyContent: eyebrow ? 'space-between' : 'flex-end' }]}>
-          {eyebrow ? <Text variant="label">{eyebrow}</Text> : null}
-          {action ? (
-            <PillOnNavy
-              label={action.label}
-              icon={action.icon}
-              trailingIcon={action.trailingIcon}
-              onPress={action.onPress}
-            />
-          ) : null}
-        </View>
+      {eyebrow ? (
+        <Text variant="label" style={styles.eyebrow}>
+          {eyebrow}
+        </Text>
       ) : null}
 
-      <View style={styles.count}>
-        <Text variant="display" tone="inverse">
-          {String(total)}
-        </Text>
-        <Text variant="caption" tone="inverse">
-          {caption}
-        </Text>
+      {/* Total + caption at the start, action chip at the end, vertically aligned.
+          The count block flexes so a big total keeps its room; the chip holds its
+          intrinsic size (never shrinks) and re-centers itself in the row. */}
+      <View style={styles.headRow}>
+        <View style={styles.count}>
+          <Text variant="display" tone="inverse">
+            {String(total)}
+          </Text>
+          <Text variant="caption" tone="inverse">
+            {caption}
+          </Text>
+        </View>
+        {action ? (
+          <PillOnNavy
+            label={action.label}
+            icon={action.icon}
+            trailingIcon={action.trailingIcon}
+            onPress={action.onPress}
+            style={styles.chip}
+          />
+        ) : null}
       </View>
 
       <View style={styles.pills}>
@@ -85,8 +89,13 @@ export function CreditsSummaryCard({
 }
 
 const styles = StyleSheet.create({
-  top: { flexDirection: 'row', alignItems: 'center' },
-  count: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.sm },
+  eyebrow: { marginBottom: space.sm },
+  headRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  // Flexes to claim the row's remaining width so the big total is never squeezed.
+  count: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.md },
+  // Overrides PillOnNavy's flex-start so the chip centres with the total; keeps
+  // its intrinsic size (RN children don't shrink by default) so the label can't clip.
+  chip: { alignSelf: 'center' },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.md },
   strip: { marginTop: space.md },
 });
