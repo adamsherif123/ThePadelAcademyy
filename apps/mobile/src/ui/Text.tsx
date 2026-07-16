@@ -42,12 +42,13 @@ interface VariantSpec {
 }
 
 const VARIANTS: Record<TextVariant, VariantSpec> = {
-  display: { size: fontSize.display, lineHeight: lineHeight.display, letterSpacing: letterSpacing.tight, family: fontFamilyForWeight.black, uppercase: true, defaultTone: 'primary' },
-  h1: { size: fontSize.h1, lineHeight: lineHeight.h1, letterSpacing: letterSpacing.tight, family: fontFamilyForWeight.extrabold, defaultTone: 'primary' },
+  // display/label were black(900) on the site; the app design reads extrabold(800).
+  display: { size: fontSize.display, lineHeight: lineHeight.display, letterSpacing: letterSpacing.tight, family: fontFamilyForWeight.extrabold, uppercase: true, defaultTone: 'primary' },
+  h1: { size: fontSize.h1, lineHeight: lineHeight.h1, letterSpacing: letterSpacing.tight, family: fontFamilyForWeight.bold, defaultTone: 'primary' },
   h2: { size: fontSize.h2, lineHeight: lineHeight.h2, letterSpacing: letterSpacing.normal, family: fontFamilyForWeight.bold, defaultTone: 'primary' },
   body: { size: fontSize.body, lineHeight: lineHeight.body, letterSpacing: letterSpacing.normal, family: fontFamilyForWeight.regular, defaultTone: 'primary' },
   bodySecondary: { size: fontSize.body, lineHeight: lineHeight.body, letterSpacing: letterSpacing.normal, family: fontFamilyForWeight.regular, defaultTone: 'secondary' },
-  label: { size: fontSize.label, lineHeight: lineHeight.label, letterSpacing: letterSpacing.label, family: fontFamilyForWeight.black, uppercase: true, defaultTone: 'label' },
+  label: { size: fontSize.label, lineHeight: lineHeight.label, letterSpacing: letterSpacing.label, family: fontFamilyForWeight.extrabold, uppercase: true, defaultTone: 'label' },
   caption: { size: fontSize.caption, lineHeight: lineHeight.caption, letterSpacing: letterSpacing.normal, family: fontFamilyForWeight.medium, defaultTone: 'muted' },
   micro: { size: fontSize.micro, lineHeight: lineHeight.micro, letterSpacing: letterSpacing.label, family: fontFamilyForWeight.bold, uppercase: true, defaultTone: 'muted' },
 };

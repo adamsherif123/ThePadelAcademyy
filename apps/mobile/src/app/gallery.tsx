@@ -92,15 +92,15 @@ export default function GalleryScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <ScreenHeader eyebrow="Dev only" title="Gallery" />
 
-      <Section title="Text variants">
-        <Text variant="display">Display</Text>
-        <Text variant="h1">Heading 1</Text>
-        <Text variant="h2">Heading 2</Text>
-        <Text variant="body">Body — the quick brown fox.</Text>
+      <Section title="Text variants (retuned to the app design, not the marketing site)">
+        <Text variant="display">Display 28 · 800</Text>
+        <Text variant="h1">Heading 1 — 24 · 700</Text>
+        <Text variant="h2">Heading 2 — 18 · 700</Text>
+        <Text variant="body">Body 15 · 400 — the quick brown fox.</Text>
         <Text variant="bodySecondary">Body secondary — supporting copy.</Text>
-        <Text variant="label">Label periwinkle</Text>
-        <Text variant="caption">Caption meta text</Text>
-        <Text variant="micro">Micro tile label</Text>
+        <Text variant="label">Label periwinkle 12 · 800</Text>
+        <Text variant="caption">Caption meta text — 12 · 500</Text>
+        <Text variant="micro">Micro tile label 10 · 700</Text>
       </Section>
 
       <Section title="Shape — radius scale (from the app design)">

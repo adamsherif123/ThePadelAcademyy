@@ -45,9 +45,12 @@ export function IconRow({
     return (
       <View style={styles.rowCentered}>
         {iconEl}
-        <Text variant="label" tone="secondary" style={styles.label}>
+        <Text variant="label" tone="secondary">
           {label}
         </Text>
+        {/* Value fills the rest and aligns to the end, so short values sit at the
+            card edge and long ones (location) wrap gracefully without shifting the
+            label. (textAlign 'right' → make writing-direction-aware in the RTL pass.) */}
         <Text variant="body" weight="bold" tone={isNavy ? 'inverse' : 'primary'} style={styles.value}>
           {value}
         </Text>
@@ -86,6 +89,5 @@ const styles = StyleSheet.create({
   },
   chipNavy: { backgroundColor: color.pillOnInverse.bg },
   col: { flex: 1, gap: 2 },
-  label: { minWidth: 72 },
-  value: { flex: 1 },
+  value: { flex: 1, textAlign: 'right' },
 });

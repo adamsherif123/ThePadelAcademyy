@@ -50,28 +50,35 @@ export const elevation = {
   lg: { y: 16, blur: 36, opacity: 0.14, elevation: 8 },
 } as const;
 
-/** Font sizes (dp / px). `micro` is for tiny uppercase tile labels (e.g. "SESSIONS"). */
+/**
+ * Font sizes (dp / px). TYPOGRAPHY derives from the approved app design
+ * (design/rork/*), NOT the marketing website — different sources of truth (colors
+ * come from the site, but shape/spacing/elevation/typography from the product
+ * design). The site's 34px/900 headings and 13px/900 eyebrows are desktop
+ * marketing weights; the phone design reads smaller and lighter. `micro` is for
+ * tiny uppercase tile labels (e.g. "SESSIONS").
+ */
 export const fontSize = {
   micro: 10,
   caption: 12,
-  label: 13,
+  label: 12,
   body: 15,
   bodyLarge: 17,
-  h2: 20,
-  h1: 26,
-  display: 34,
+  h2: 18,
+  h1: 24,
+  display: 28,
 } as const;
 
-/** Absolute line heights matched to fontSize (dp / px). */
+/** Absolute line heights matched to fontSize (dp / px). Retuned with the sizes above. */
 export const lineHeight = {
   micro: 12,
   caption: 16,
-  label: 18,
+  label: 16,
   body: 22,
   bodyLarge: 24,
-  h2: 26,
-  h1: 32,
-  display: 38,
+  h2: 24,
+  h1: 30,
+  display: 32,
 } as const;
 
 /** Letter spacing (dp / px). Site labels use ~0.08em; display is tight. */
