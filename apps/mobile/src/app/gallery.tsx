@@ -1,22 +1,34 @@
-import { TRAINING_TYPES, type CreditExpiryState } from '@tpa/core';
+import { TRAINING_TYPES } from '@tpa/core';
 import { MOCK_NOW, daysFromNow, egp } from '@tpa/mocks';
-import { color, space, trainingTint } from '@tpa/theme';
-import type { CreditBatch, TrainingType } from '@tpa/types';
+import { color, space } from '@tpa/theme';
+import type { IsoInstant } from '@tpa/types';
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
-import { Badge } from '../ui/Badge';
-import { Button } from '../ui/Button';
-import { Card } from '../ui/Card';
-import { CreditPill } from '../ui/CreditPill';
-import { Input } from '../ui/Input';
-import { Money } from '../ui/Money';
-import { Text } from '../ui/Text';
+import {
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  IconRow,
+  InfoCard,
+  Input,
+  Money,
+  PillOnNavy,
+  ProgressBar,
+  ScreenHeader,
+  SegmentedControl,
+  StatusChip,
+  Text,
+  TRAINING_META,
+} from '../ui';
 
 /**
  * DEV-ONLY design-system gallery — every primitive in every state. Not a product
- * screen; reachable from a "Dev · Gallery" link on Home. This is the S2 sign-off
- * surface to eyeball on a device.
+ * screen; reachable from a "Dev · Gallery" link on Home. S2 base primitives plus
+ * the S3a additions (ScreenHeader, NavyScreen split, Avatar, StatusChip,
+ * ProgressBar, InfoCard, IconRow, SegmentedControl, PillOnNavy).
  */
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -31,30 +43,18 @@ function Row({ children }: { children: ReactNode }) {
   return <View style={styles.row}>{children}</View>;
 }
 
-const EXPIRY_STATES: CreditExpiryState[] = ['ok', 'expiring_soon', 'expired'];
-
-function demoBatch(trainingType: TrainingType, state: CreditExpiryState): CreditBatch {
-  const expiresAt =
-    state === 'expired' ? daysFromNow(-2) : state === 'expiring_soon' ? daysFromNow(2) : daysFromNow(20);
-  const isTrial = trainingType === 'trial';
-  return {
-    id: `cb_${trainingType}_${state}` as CreditBatch['id'],
-    playerId: 'pl_demo' as CreditBatch['playerId'],
-    source: isTrial ? 'signup_grant' : 'purchase',
-    purchaseId: isTrial ? null : ('pu_demo' as CreditBatch['purchaseId']),
-    trainingType,
-    quantityTotal: 4,
-    quantityRemaining: state === 'expired' ? 4 : 2,
-    createdAt: MOCK_NOW,
-    expiresAt,
-  };
-}
+const EXPIRY_SAMPLES: { label: string; expiresAt: IsoInstant }[] = [
+  { label: 'ok', expiresAt: daysFromNow(20) },
+  { label: 'expiring_soon', expiresAt: daysFromNow(2) },
+  { label: 'expired', expiresAt: daysFromNow(-7) },
+];
 
 export default function GalleryScreen() {
+  const [segment, setSegment] = useState<'upcoming' | 'past'>('upcoming');
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text variant="display">Gallery</Text>
-      <Text variant="bodySecondary">Dev-only · every primitive & state</Text>
+      <ScreenHeader eyebrow="Dev only" title="Gallery" />
 
       <Section title="Text variants">
         <Text variant="display">Display</Text>
@@ -66,6 +66,13 @@ export default function GalleryScreen() {
         <Text variant="caption">Caption meta text</Text>
       </Section>
 
+      <Section title="ScreenHeader (light / navy / with back)">
+        <ScreenHeader eyebrow="Wallet" title="Your Credits" onBack={() => {}} />
+        <View style={styles.navyBox}>
+          <ScreenHeader eyebrow="Verification" title="Enter the Code" onBack={() => {}} tone="navy" />
+        </View>
+      </Section>
+
       <Section title="Buttons">
         <Row>
           <Button label="Primary" onPress={() => {}} />
@@ -75,7 +82,14 @@ export default function GalleryScreen() {
         <Row>
           <Button label="Disabled" disabled onPress={() => {}} />
           <Button label="Loading" loading onPress={() => {}} />
-          <Button label="Secondary off" variant="secondary" disabled onPress={() => {}} />
+        </Row>
+      </Section>
+
+      <Section title="Avatar">
+        <Row>
+          <Avatar name="Adam Sherif" />
+          <Avatar name="Mariam Fouad" size={56} />
+          <Avatar name="Coach" imageUrl="https://placehold.co/100x100" size={56} />
         </Row>
       </Section>
 
@@ -88,20 +102,62 @@ export default function GalleryScreen() {
           <Text variant="h2" tone="inverse">
             Inverse card
           </Text>
-          <Text variant="body" tone="inverse">
-            Deep navy — hero / balance surface.
-          </Text>
           <View style={styles.inlineRow}>
-            <Badge label="On navy" tone="onInverse" />
-            <Badge label="Members" tone="onInverse" />
+            {TRAINING_TYPES.map((t) => (
+              <PillOnNavy key={t} label={TRAINING_META[t].label} icon={TRAINING_META[t].icon} />
+            ))}
+          </View>
+          <View style={styles.inlineRow}>
+            <PillOnNavy label="0 Individual" icon="person-outline" dimmed />
+            <PillOnNavy label="Wallet" icon="wallet-outline" trailingIcon="arrow-forward" />
           </View>
         </Card>
+      </Section>
+
+      <Section title="InfoCard variants">
+        <InfoCard variant="navy" text="Informational note on a navy surface." />
+        <InfoCard variant="amber" text="2 Group credits — expires in 2 days." />
+        <InfoCard variant="royal" text="Booking this session will use 1 Group credit." />
+        <InfoCard variant="neutral" text="Men's and ladies' groups train separately, placed by level." />
       </Section>
 
       <Section title="Inputs">
         <Input label="Default" placeholder="Tap to focus…" />
         <Input label="Error" placeholder="Phone" error="Enter a valid number." defaultValue="12" />
         <Input label="Disabled" placeholder="Unavailable" disabled defaultValue="Locked" />
+      </Section>
+
+      <Section title="StatusChip (expiry states)">
+        <Row>
+          {EXPIRY_SAMPLES.map((s) => (
+            <StatusChip key={s.label} expiresAt={s.expiresAt} now={MOCK_NOW} />
+          ))}
+        </Row>
+      </Section>
+
+      <Section title="ProgressBar">
+        <ProgressBar value={0.25} />
+        <ProgressBar value={0.75} />
+        <ProgressBar value={0.5} tone="muted" />
+      </Section>
+
+      <Section title="SegmentedControl">
+        <SegmentedControl
+          options={[
+            { value: 'upcoming', label: 'Upcoming' },
+            { value: 'past', label: 'Past' },
+          ]}
+          value={segment}
+          onChange={setSegment}
+        />
+      </Section>
+
+      <Section title="IconRow">
+        <Card>
+          <IconRow icon="location-outline" title="Oro Plaza Hotel" subtitle="In front of Family Park, Rehab, Cairo" />
+          <View style={styles.spacer} />
+          <IconRow icon="time-outline" title="Sun – Wed · 5:00 PM – 11:00 PM" subtitle="Group training mainly 5 – 9 PM" />
+        </Card>
       </Section>
 
       <Section title="Badges">
@@ -113,7 +169,7 @@ export default function GalleryScreen() {
         </Row>
         <Row>
           {TRAINING_TYPES.map((t) => (
-            <Badge key={t} label={t} tint={trainingTint[t]} />
+            <Badge key={t} label={TRAINING_META[t].label} />
           ))}
         </Row>
       </Section>
@@ -122,16 +178,6 @@ export default function GalleryScreen() {
         <Money amount={egp(500)} variant="h2" />
         <Money amount={egp(1600)} />
         <Money amount={egp(6000)} tone="accent" />
-      </Section>
-
-      <Section title="CreditPill — 4 training types × 3 expiry states">
-        {TRAINING_TYPES.map((t) => (
-          <View key={t} style={styles.pillRow}>
-            {EXPIRY_STATES.map((state) => (
-              <CreditPill key={state} batch={demoBatch(t, state)} now={MOCK_NOW} />
-            ))}
-          </View>
-        ))}
       </Section>
 
       <View style={styles.footer}>
@@ -147,7 +193,8 @@ const styles = StyleSheet.create({
   section: { gap: space.md },
   sectionBody: { gap: space.md },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md, alignItems: 'center' },
-  inlineRow: { flexDirection: 'row', gap: space.sm, marginTop: space.sm },
-  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
+  inlineRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.sm },
+  navyBox: { backgroundColor: color.bg.inverse, borderRadius: 12, padding: space.lg },
+  spacer: { height: space.md },
   footer: { alignItems: 'center', paddingVertical: space.xl },
 });

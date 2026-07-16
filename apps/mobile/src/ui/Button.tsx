@@ -79,7 +79,7 @@ export function Button({
     >
       <View style={styles.content}>
         {loading ? <ActivityIndicator color={color.text.inverse} /> : null}
-        <Text variant="body" tone={disabled ? v.labelDisabled : v.label}>
+        <Text variant="body" weight="bold" tone={disabled ? v.labelDisabled : v.label} style={styles.label}>
           {label}
         </Text>
       </View>
@@ -96,5 +96,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   content: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  label: { textTransform: 'uppercase', letterSpacing: 0.5 },
   disabled: { opacity: 0.85 },
 });

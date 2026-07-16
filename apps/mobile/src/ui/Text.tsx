@@ -1,4 +1,4 @@
-import { color, fontSize, letterSpacing, lineHeight } from '@tpa/theme';
+import { color, fontSize, letterSpacing, lineHeight, type FontWeightToken } from '@tpa/theme';
 // eslint-disable-next-line no-restricted-imports -- THE one sanctioned react-native Text import: this is the shared wrapper every other file must use instead.
 import { Text as RNText, type TextProps as RNTextProps } from 'react-native';
 
@@ -54,16 +54,18 @@ export interface TextProps extends RNTextProps {
   variant?: TextVariant;
   /** Overrides the variant's default token color. Colors are token-only. */
   tone?: TextTone;
+  /** Overrides the variant's baked font family (still never emits fontWeight). */
+  weight?: FontWeightToken;
 }
 
-export function Text({ variant = 'body', tone, style, ...rest }: TextProps) {
+export function Text({ variant = 'body', tone, weight, style, ...rest }: TextProps) {
   const spec = VARIANTS[variant];
   return (
     <RNText
       {...rest}
       style={[
         {
-          fontFamily: spec.family,
+          fontFamily: weight ? fontFamilyForWeight[weight] : spec.family,
           fontSize: spec.size,
           lineHeight: spec.lineHeight,
           letterSpacing: spec.letterSpacing,

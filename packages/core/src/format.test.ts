@@ -47,9 +47,12 @@ describe('date/time formatting (Africa/Cairo)', () => {
 describe('formatExpiry', () => {
   const now = '2026-07-14T12:00:00.000Z' as IsoInstant;
 
-  it('reports expired for a past instant', () => {
-    expect(formatExpiry('2026-07-14T11:59:59.000Z' as IsoInstant, now)).toBe('expired');
-    expect(formatExpiry('2026-06-01T00:00:00.000Z' as IsoInstant, now)).toBe('expired');
+  it('reports how long ago a past instant expired, by Cairo calendar day', () => {
+    // Earlier same Cairo day (both 14 Jul in Cairo, +03).
+    expect(formatExpiry('2026-07-14T11:59:59.000Z' as IsoInstant, now)).toBe('expired today');
+    // 13 Jul vs 14 Jul in Cairo.
+    expect(formatExpiry('2026-07-13T09:00:00.000Z' as IsoInstant, now)).toBe('expired yesterday');
+    expect(formatExpiry('2026-06-01T00:00:00.000Z' as IsoInstant, now)).toBe('expired 43 days ago');
   });
 
   it('reports today / tomorrow / in n days by Cairo calendar day', () => {

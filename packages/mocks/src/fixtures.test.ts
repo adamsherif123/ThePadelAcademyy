@@ -53,7 +53,7 @@ describe('wallet expiry states (rendered via core against MOCK_NOW)', () => {
   it('includes a batch expiring in 2 days and one already expired', () => {
     const rendered = mockCreditBatches.map((b) => formatExpiry(b.expiresAt, MOCK_NOW));
     expect(rendered).toContain('expires in 2 days');
-    expect(rendered).toContain('expired');
+    expect(rendered.some((r) => r.startsWith('expired'))).toBe(true);
   });
 });
 

@@ -69,13 +69,19 @@ function cairoDayDiff(a: IsoInstant, b: IsoInstant): number {
  * day for the friendly countdown the client shows on the wallet.
  *
  *   past instant            -> "expired"
- *   same Cairo day as now    -> "expires today"
- *   next Cairo day           -> "expires tomorrow"
- *   n days out               -> "expires in n days"
+ *   past, same Cairo day   -> "expired today"
+ *   past, previous day     -> "expired yesterday"
+ *   past, n days ago       -> "expired n days ago"
+ *   same Cairo day as now  -> "expires today"
+ *   next Cairo day         -> "expires tomorrow"
+ *   n days out             -> "expires in n days"
  */
 export function formatExpiry(expiresAt: IsoInstant, now: IsoInstant): string {
   if (parseInstant(expiresAt).getTime() <= parseInstant(now).getTime()) {
-    return 'expired';
+    const daysAgo = cairoDayDiff(expiresAt, now);
+    if (daysAgo <= 0) return 'expired today';
+    if (daysAgo === 1) return 'expired yesterday';
+    return `expired ${daysAgo} days ago`;
   }
   const days = cairoDayDiff(now, expiresAt);
   if (days <= 0) return 'expires today';

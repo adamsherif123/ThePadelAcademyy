@@ -10,26 +10,31 @@ export interface InputProps extends Omit<TextInputProps, 'style' | 'editable'> {
   /** Presence switches the field to its error styling and shows the message. */
   error?: string;
   disabled?: boolean;
+  /** `navy` for dark auth surfaces (translucent field, light text). */
+  tone?: 'light' | 'navy';
 }
 
 /**
  * Text field with default / focused / error / disabled states. Border comes from
- * tokens (strong by default, accent when focused, danger on error). RTL-safe:
- * text aligns to `start`.
+ * tokens (strong by default, accent when focused, danger on error). `tone='navy'`
+ * adapts it for dark auth screens. RTL-safe: no physical text alignment.
  */
-export function Input({ label, error, disabled = false, ...rest }: InputProps) {
+export function Input({ label, error, disabled = false, tone = 'light', ...rest }: InputProps) {
   const [focused, setFocused] = useState(false);
+  const isNavy = tone === 'navy';
 
   const borderColor = error
     ? color.status.danger
     : focused
       ? color.accent.default
-      : color.border.strong;
+      : isNavy
+        ? color.border.onInverse
+        : color.border.strong;
 
   return (
     <View style={styles.wrap}>
       {label ? (
-        <Text variant="caption" tone="secondary">
+        <Text variant="caption" tone={isNavy ? 'inverse' : 'secondary'}>
           {label}
         </Text>
       ) : null}
@@ -47,6 +52,7 @@ export function Input({ label, error, disabled = false, ...rest }: InputProps) {
         placeholderTextColor={color.text.muted}
         style={[
           styles.input,
+          isNavy ? styles.inputNavy : styles.inputLight,
           { borderColor },
           disabled ? styles.disabled : null,
         ]}
@@ -67,12 +73,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.sm,
     paddingHorizontal: space.md,
-    backgroundColor: color.bg.surface,
-    color: color.text.primary,
     fontFamily: fontFamilyForWeight.regular,
     fontSize: fontSize.body,
     // No textAlign: RN aligns to the writing direction's start by default (RTL-safe).
   },
+  inputLight: { backgroundColor: color.bg.surface, color: color.text.primary },
+  inputNavy: { backgroundColor: color.pillOnInverse.bg, color: color.text.inverse },
   disabled: { backgroundColor: color.bg.canvas, opacity: 0.7 },
   error: { color: color.status.danger },
 });

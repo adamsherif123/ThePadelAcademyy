@@ -4,16 +4,48 @@
 import 'react-native-get-random-values';
 
 import { useFonts } from '@expo-google-fonts/inter';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
+import { SessionProvider, useSession } from '../session/SessionProvider';
 import { interFonts } from '../theme/fonts';
 
 SplashScreen.preventAutoHideAsync();
 
+/**
+ * Route guard on the mock session: signed-out users are held in the (auth) group;
+ * authed users are sent into the (tabs) app. Onboarding sub-steps navigate within
+ * (auth) themselves. S8 swaps the session source; this guard is unchanged.
+ */
+function useAuthGuard() {
+  const { isAuthed } = useSession();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    const inAuth = segments[0] === '(auth)';
+    if (!isAuthed && !inAuth) {
+      router.replace('/(auth)/sign-in');
+    } else if (isAuthed && inAuth) {
+      router.replace('/(tabs)');
+    }
+  }, [isAuthed, segments, router]);
+}
+
+function RootNavigator() {
+  useAuthGuard();
+  return (
+    <Stack>
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="wallet" options={{ headerShown: false, presentation: 'card' }} />
+      <Stack.Screen name="gallery" options={{ title: 'Gallery (dev)', presentation: 'modal' }} />
+    </Stack>
+  );
+}
+
 export default function RootLayout() {
-  // Load the Inter faces before rendering so the shared <Text> never falls back.
   const [fontsLoaded, fontError] = useFonts(interFonts);
 
   useEffect(() => {
@@ -27,9 +59,8 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="gallery" options={{ title: 'Gallery (dev)', presentation: 'modal' }} />
-    </Stack>
+    <SessionProvider>
+      <RootNavigator />
+    </SessionProvider>
   );
 }

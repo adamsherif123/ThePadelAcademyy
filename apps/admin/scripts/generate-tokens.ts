@@ -32,11 +32,7 @@ function walkColors(obj: Record<string, unknown>, prefix: string) {
 
 walkColors(tokens.color as unknown as Record<string, unknown>, 'color');
 
-// Domain tint pairs
-for (const [type, pair] of Object.entries(tokens.trainingTint)) {
-  push(`training-${type}-fg`, pair.fg);
-  push(`training-${type}-bg`, pair.bg);
-}
+// Credit-expiry tint pairs
 for (const [state, pair] of Object.entries(tokens.creditExpiry)) {
   push(`expiry-${state}-fg`, pair.fg);
   push(`expiry-${state}-bg`, pair.bg);
