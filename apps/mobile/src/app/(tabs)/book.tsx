@@ -1,4 +1,4 @@
-import { color, space } from '@tpa/theme';
+import { space } from '@tpa/theme';
 import type { Gender, Level, SessionSlot, TrainingType } from '@tpa/types';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -17,6 +17,7 @@ import { useSession } from '../../session/SessionProvider';
 import {
   DateChip,
   EmptyState,
+  Screen,
   ScreenHeader,
   SlotCard,
   type SlotCardState,
@@ -92,7 +93,7 @@ export default function BookScreen() {
   const dayLabel = isToday ? 'Today' : `${WEEKDAY_ABBR[selectedDay.weekday]} ${selectedDay.day}`;
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <Screen scroll tabBar contentContainerStyle={styles.content}>
       <ScreenHeader eyebrow="Spend your credits" title="Book a Session" />
 
       {/* Type selector 2×2 */}
@@ -149,7 +150,7 @@ export default function BookScreen() {
         onBuy={() => router.push('/buy-credits')}
         onSlot={(slot) => router.push({ pathname: '/confirm-booking', params: { slotId: slot.id } })}
       />
-    </ScrollView>
+    </Screen>
   );
 }
 
@@ -223,8 +224,7 @@ function BookBody({
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: color.bg.canvas },
-  content: { padding: space.xl, gap: space.lg },
+  content: { gap: space.lg },
   grid: { gap: space.md },
   gridRow: { flexDirection: 'row', gap: space.md },
   dateStrip: { gap: space.sm, paddingVertical: space.xs },

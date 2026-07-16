@@ -1,6 +1,6 @@
-import { color, space } from '@tpa/theme';
+import { space } from '@tpa/theme';
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { allCoaches } from '../../data/schedule';
 import { playerPurchases } from '../../data/purchases';
@@ -15,6 +15,7 @@ import {
   Card,
   CircleIconButton,
   LinkRow,
+  Screen,
   ScreenHeader,
   Text,
 } from '../../ui';
@@ -38,7 +39,7 @@ export default function ProfileScreen() {
   const coachCount = allCoaches().length;
 
   return (
-    <ScrollView contentContainerStyle={styles.content} style={styles.screen}>
+    <Screen scroll tabBar contentContainerStyle={styles.content}>
       <ScreenHeader eyebrow="Your account" title="Profile" />
 
       <Card>
@@ -75,13 +76,12 @@ export default function ProfileScreen() {
       </View>
 
       <Button label="Sign out" variant="secondary" destructive icon="log-out-outline" onPress={signOut} />
-    </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: color.bg.canvas },
-  content: { padding: space.xl, gap: space.lg },
+  content: { gap: space.lg },
   identity: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   identityText: { flex: 1, gap: 2 },
   tags: { flexDirection: 'row', gap: space.sm, marginTop: space.md },

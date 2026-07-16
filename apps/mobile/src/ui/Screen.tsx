@@ -12,14 +12,16 @@ export type ScreenTone = 'light' | 'navy';
  *    so the last item scrolls clear of the home indicator;
  *  - a sticky `footer` (e.g. a Buy CTA) sits at the bottom with the inset applied
  *    beneath it — no gap under the button.
- * Tab screens don't use this (the tab bar owns the bottom inset), so there's no
- * double-padding. `tone='navy'` powers NavyScreen. RTL-safe.
+ * `tabBar` marks a tab screen: the top inset is still applied, but the bottom
+ * inset is NOT (the tab bar already occupies it) — avoids double-padding.
+ * `tone='navy'` powers NavyScreen. RTL-safe.
  */
 export function Screen({
   children,
   tone = 'light',
   scroll = false,
   padded = true,
+  tabBar = false,
   contentContainerStyle,
   footer,
   style,
@@ -28,6 +30,7 @@ export function Screen({
   tone?: ScreenTone;
   scroll?: boolean;
   padded?: boolean;
+  tabBar?: boolean;
   contentContainerStyle?: ViewStyle;
   footer?: ReactNode;
   style?: ViewStyle;
@@ -37,8 +40,8 @@ export function Screen({
   const bg = isNavy ? color.bg.inverse : color.bg.canvas;
   // Top/sides from the safe area; bottom handled below as content/footer padding.
   const edges: readonly Edge[] = ['top', 'left', 'right'];
-  // If there's a sticky footer it owns the bottom inset; otherwise the content does.
-  const bottomPad = (footer ? 0 : insets.bottom) + space.xl;
+  // The footer or the tab bar owns the bottom inset; otherwise the content does.
+  const bottomPad = (footer || tabBar ? 0 : insets.bottom) + space.xl;
 
   const body = scroll ? (
     <ScrollView

@@ -18,6 +18,7 @@ import {
   CreditsSummaryCard,
   IconRow,
   PackageCard,
+  Screen,
   ScreenHeader,
   Text,
   TRAINING_META,
@@ -43,7 +44,7 @@ export default function HomeScreen() {
     : undefined;
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <Screen scroll tabBar contentContainerStyle={styles.content}>
       <ScreenHeader
         eyebrow="The Padel Academy"
         title={`Hey, ${firstName}`}
@@ -107,13 +108,12 @@ export default function HomeScreen() {
       <Text variant="caption" tone="muted" style={styles.devLink} onPress={() => router.push('/gallery')}>
         Dev · Component gallery
       </Text>
-    </ScrollView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: color.bg.canvas },
-  content: { padding: space.xl, gap: space.lg },
+  content: { gap: space.lg },
   section: { gap: space.sm },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   nextRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
