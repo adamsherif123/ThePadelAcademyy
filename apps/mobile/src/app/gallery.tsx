@@ -1,7 +1,7 @@
 import { TRAINING_TYPES } from '@tpa/core';
-import { MOCK_NOW, daysFromNow, egp, mockCreditBatches, mockPackages } from '@tpa/mocks';
+import { MOCK_NOW, daysFromNow, egp, mockCoaches, mockCreditBatches, mockPackages, mockSlots } from '@tpa/mocks';
 import { color, radius, space } from '@tpa/theme';
-import type { IsoInstant } from '@tpa/types';
+import type { IsoInstant, SessionSlot } from '@tpa/types';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -11,9 +11,11 @@ import {
   Avatar,
   Badge,
   Button,
+  CapacityDots,
   Card,
   CheckList,
   CreditsSummaryCard,
+  DateChip,
   EmptyState,
   IconRow,
   InfoCard,
@@ -26,11 +28,28 @@ import {
   ProgressBar,
   ScreenHeader,
   SegmentedControl,
+  SlotCard,
+  type SlotCardState,
   StatusChip,
   SuccessView,
   Text,
   TRAINING_META,
+  TypeCard,
 } from '../ui';
+
+const DEMO_SLOT: SessionSlot | undefined = mockSlots.find(
+  (s) => s.trainingType === 'group' && s.gender === 'men',
+);
+const DEMO_COACH = mockCoaches[0];
+const SLOT_STATES: { state: SlotCardState; note?: string; creditNote?: string }[] = [
+  { state: 'bookable', creditNote: 'Uses 1 Group credit' },
+  { state: 'full' },
+  { state: 'booked' },
+  { state: 'unavailable', note: 'Ladies only' },
+  { state: 'unavailable', note: 'Intermediate level' },
+  { state: 'unavailable', note: 'Credits expired' },
+  { state: 'unavailable', note: 'No credits' },
+];
 
 /**
  * DEV-ONLY design-system gallery — every primitive in every state. Not a product
@@ -241,6 +260,43 @@ export default function GalleryScreen() {
         </ScrollView>
       </Section>
 
+      <Section title="Book — TypeCard (selector grid)">
+        <View style={styles.typeRow}>
+          <TypeCard trainingType="group" subtitle="3–4 players" credits={6} selected onPress={() => {}} />
+          <TypeCard trainingType="individual" subtitle="1-on-1 coaching" credits={0} onPress={() => {}} />
+        </View>
+      </Section>
+
+      <Section title="Book — DateChip (open / selected / closed)">
+        <View style={styles.dateRow}>
+          <DateChip weekday={3} dayNumber={15} selected onPress={() => {}} />
+          <DateChip weekday={0} dayNumber={19} onPress={() => {}} />
+          <DateChip weekday={4} dayNumber={16} closed />
+        </View>
+      </Section>
+
+      <Section title="Book — CapacityDots">
+        <CapacityDots booked={1} capacity={4} />
+        <CapacityDots booked={4} capacity={4} muted />
+      </Section>
+
+      <Section title="Book — SlotCard (every availability state)">
+        {DEMO_SLOT
+          ? SLOT_STATES.map((s, i) => (
+              <SlotCard
+                key={i}
+                slot={DEMO_SLOT}
+                coach={DEMO_COACH}
+                now={MOCK_NOW}
+                state={s.state}
+                note={s.note}
+                creditNote={s.creditNote}
+                onPress={s.state === 'bookable' ? () => {} : undefined}
+              />
+            ))
+          : null}
+      </Section>
+
       <Section title="CheckList">
         <Card>
           <CheckList items={['4 × Duo training sessions', 'Certified academy coaches', '1 credit = 1 session']} />
@@ -296,6 +352,8 @@ const styles = StyleSheet.create({
   navyBox: { backgroundColor: color.bg.inverse, borderRadius: radius.lg, padding: space.lg },
   successBox: { height: 420 },
   cardScroll: { gap: space.md, paddingVertical: space.xs },
+  typeRow: { flexDirection: 'row', gap: space.md },
+  dateRow: { flexDirection: 'row', gap: space.sm },
   swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
   swatchItem: { alignItems: 'center', gap: space.xs },
   swatch: {

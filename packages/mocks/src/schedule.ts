@@ -22,6 +22,10 @@ export const mockTemplates: AvailabilityTemplate[] = [
   { id: 'at_grp_lad_beg_mon' as AvailabilityTemplateId, coachId: 'co_mariam' as CoachId, weekday: 1, startTime: '17:00' as LocalTime, endTime: '18:30' as LocalTime, trainingType: 'group', capacity: 4, gender: 'ladies', level: 'beginner', isActive: true },
   { id: 'at_grp_men_beg_tue' as AvailabilityTemplateId, coachId: 'co_hany' as CoachId, weekday: 2, startTime: '17:00' as LocalTime, endTime: '18:30' as LocalTime, trainingType: 'group', capacity: 4, gender: 'men', level: 'beginner', isActive: true },
   { id: 'at_grp_lad_int_wed' as AvailabilityTemplateId, coachId: 'co_mariam' as CoachId, weekday: 3, startTime: '17:00' as LocalTime, endTime: '18:30' as LocalTime, trainingType: 'group', capacity: 4, gender: 'ladies', level: 'intermediate', isActive: true },
+  // Men's beginner group on Wednesdays too, so the current player has group slots
+  // on the default (today) day of the Book screen — one full, one bookable.
+  { id: 'at_grp_men_beg_wed_a' as AvailabilityTemplateId, coachId: 'co_hany' as CoachId, weekday: 3, startTime: '17:00' as LocalTime, endTime: '18:30' as LocalTime, trainingType: 'group', capacity: 4, gender: 'men', level: 'beginner', isActive: true },
+  { id: 'at_grp_men_beg_wed_b' as AvailabilityTemplateId, coachId: 'co_hany' as CoachId, weekday: 3, startTime: '18:30' as LocalTime, endTime: '20:00' as LocalTime, trainingType: 'group', capacity: 4, gender: 'men', level: 'beginner', isActive: true },
   { id: 'at_duo_tue' as AvailabilityTemplateId, coachId: 'co_karim' as CoachId, weekday: 2, startTime: '20:00' as LocalTime, endTime: '21:00' as LocalTime, trainingType: 'duo', capacity: 2, gender: null, level: null, isActive: true },
   { id: 'at_indiv_wed' as AvailabilityTemplateId, coachId: 'co_karim' as CoachId, weekday: 3, startTime: '21:00' as LocalTime, endTime: '22:00' as LocalTime, trainingType: 'individual', capacity: 1, gender: null, level: null, isActive: true },
   // Trial slots on two evenings so the free signup-trial credits are actually
@@ -88,14 +92,36 @@ function generateSlots(): SessionSlot[] {
     }
   }
 
-  // Make one slot explicitly cancelled so the cancelled-slot UI has a case.
-  const toCancel = slots[3];
+  // Cancel one ladies slot (never in the current player's view) so the
+  // cancelled-slot UI has a case without disturbing the Book-screen fixtures.
+  const toCancel = slots.find((s) => s.gender === 'ladies');
   if (toCancel) {
     toCancel.status = 'cancelled';
     toCancel.bookedCount = 0;
   }
 
+  // Guarantee today's men's-beginner group has one FULL and one BOOKABLE slot,
+  // so the Book screen's slot card + FULL state are testable on the default day.
+  const today = cairoCalendarDate(MOCK_NOW);
+  const todaysMenBeginner = slots.filter(
+    (s) =>
+      s.trainingType === 'group' &&
+      s.gender === 'men' &&
+      s.level === 'beginner' &&
+      isSameCairoDay(s.startsAt, today),
+  );
+  if (todaysMenBeginner[0]) todaysMenBeginner[0].bookedCount = todaysMenBeginner[0].capacity;
+  if (todaysMenBeginner[1]) todaysMenBeginner[1].bookedCount = 1;
+
   return slots;
+}
+
+function isSameCairoDay(
+  instant: SessionSlot['startsAt'],
+  day: { year: number; month: number; day: number },
+): boolean {
+  const c = cairoCalendarDate(instant);
+  return c.year === day.year && c.month === day.month && c.day === day.day;
 }
 
 export const mockSlots: SessionSlot[] = generateSlots();

@@ -44,6 +44,7 @@ function RootNavigator() {
       <Stack.Screen name="package/[id]" />
       <Stack.Screen name="checkout" />
       <Stack.Screen name="purchase-success" />
+      <Stack.Screen name="confirm-booking" />
       <Stack.Screen name="coaches" />
       <Stack.Screen name="purchase-history" />
       <Stack.Screen name="gallery" options={{ headerShown: true, title: 'Gallery (dev)', presentation: 'modal' }} />
