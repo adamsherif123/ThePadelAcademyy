@@ -50,8 +50,9 @@ export const elevation = {
   lg: { y: 16, blur: 36, opacity: 0.14, elevation: 8 },
 } as const;
 
-/** Font sizes (dp / px). */
+/** Font sizes (dp / px). `micro` is for tiny uppercase tile labels (e.g. "SESSIONS"). */
 export const fontSize = {
+  micro: 10,
   caption: 12,
   label: 13,
   body: 15,
@@ -63,6 +64,7 @@ export const fontSize = {
 
 /** Absolute line heights matched to fontSize (dp / px). */
 export const lineHeight = {
+  micro: 12,
   caption: 16,
   label: 18,
   body: 22,

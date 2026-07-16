@@ -1,8 +1,8 @@
 import { formatPiastres } from '@tpa/core';
-import { color, space } from '@tpa/theme';
+import { space } from '@tpa/theme';
 import type { PackageId, Piastres } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { PLAYER_COUNT, packageById, packageIncludes, perSessionPiastres } from '../../data/catalog';
 import {
@@ -39,13 +39,21 @@ export default function PackageDetailScreen() {
   const perSession = perSessionPiastres(pkg) as Piastres;
 
   return (
-    <Screen padded={false}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <ScreenHeader
-          eyebrow={`${meta.label} training`}
-          title="Package Details"
-          onBack={() => router.back()}
+    <Screen
+      scroll
+      contentContainerStyle={styles.content}
+      footer={
+        <Button
+          label={`Buy for ${formatPiastres(pkg.price)}`}
+          onPress={() => router.push({ pathname: '/checkout', params: { packageId: pkg.id } })}
         />
+      }
+    >
+      <ScreenHeader
+        eyebrow={`${meta.label} training`}
+        title="Package Details"
+        onBack={() => router.back()}
+      />
 
         <Card variant="inverse">
           <PillOnNavy label={meta.label} icon={meta.icon} />
@@ -68,31 +76,17 @@ export default function PackageDetailScreen() {
           </Card>
         </View>
 
-        <InfoCard
-          variant="amber"
-          text="Credits are valid 30 days from purchase. Unused credits expire — plan your month."
-        />
-      </ScrollView>
-
-      <View style={styles.footer}>
-        <Button
-          label={`Buy for ${formatPiastres(pkg.price)}`}
-          onPress={() => router.push({ pathname: '/checkout', params: { packageId: pkg.id } })}
-        />
-      </View>
+      <InfoCard
+        variant="amber"
+        text="Credits are valid 30 days from purchase. Unused credits expire — plan your month."
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: space.xl, gap: space.lg },
+  content: { gap: space.lg },
   title: { marginTop: space.md },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginTop: space.md, flexWrap: 'wrap' },
   section: { gap: space.sm },
-  footer: {
-    padding: space.xl,
-    borderTopWidth: 1,
-    borderTopColor: color.border.subtle,
-    backgroundColor: color.bg.canvas,
-  },
 });

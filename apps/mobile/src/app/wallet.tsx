@@ -2,14 +2,13 @@ import { CREDIT_EXPIRY_DAYS, formatInstantDate } from '@tpa/core';
 import { space } from '@tpa/theme';
 import type { CreditBatch } from '@tpa/types';
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { useDataStore } from '../data/store';
 import { activeBatches, balanceByType, expiredBatches, totalReadyToBook } from '../data/wallet';
 import { useSession } from '../session/SessionProvider';
 import {
   Badge,
-  Button,
   Card,
   CreditsSummaryCard,
   ProgressBar,
@@ -42,11 +41,15 @@ export default function WalletScreen() {
   const expired = expiredBatches(player.id, now);
 
   return (
-    <Screen padded={false}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <ScreenHeader eyebrow="Wallet" title="Your Credits" onBack={() => router.back()} />
+    <Screen scroll contentContainerStyle={styles.content}>
+      <ScreenHeader eyebrow="Wallet" title="Your Credits" onBack={() => router.back()} />
 
-        <CreditsSummaryCard total={total} balance={balance} caption={'credits ready\nto book now'} />
+        <CreditsSummaryCard
+          total={total}
+          balance={balance}
+          caption={'credits ready\nto book now'}
+          action={{ label: 'Buy credits', icon: 'add', onPress: () => router.push('/buy-credits') }}
+        />
 
         {/* Active batches */}
         <Text variant="label">Active batches</Text>
@@ -66,12 +69,9 @@ export default function WalletScreen() {
           </>
         ) : null}
 
-        <Button label="Buy More Credits" onPress={() => router.push('/buy-credits')} />
-
         <Text variant="caption" tone="muted" style={styles.footer}>
           {`Credits are typed — a Group credit books Group sessions only. Every batch expires ${CREDIT_EXPIRY_DAYS} days after purchase.`}
-        </Text>
-      </ScrollView>
+      </Text>
     </Screen>
   );
 }
@@ -126,7 +126,7 @@ function BatchCard({
 }
 
 const styles = StyleSheet.create({
-  content: { padding: space.xl, gap: space.md },
+  content: { gap: space.md },
   batchHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space.sm },
   batchBody: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: space.sm },
   batchInfo: { flex: 1, gap: 2 },

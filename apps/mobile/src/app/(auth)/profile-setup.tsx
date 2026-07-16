@@ -3,7 +3,7 @@ import { color, radius, space } from '@tpa/theme';
 import type { Gender, Level } from '@tpa/types';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useSession } from '../../session/SessionProvider';
 import { Button, InfoCard, Input, Screen, ScreenHeader, Text } from '../../ui';
@@ -36,9 +36,8 @@ export default function ProfileSetupScreen() {
   };
 
   return (
-    <Screen padded={false}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <ScreenHeader eyebrow="Almost there" title="Set up your Profile" />
+    <Screen scroll contentContainerStyle={styles.content}>
+      <ScreenHeader eyebrow="Almost there" title="Set up your Profile" />
         <Text variant="bodySecondary">
           This takes 30 seconds and decides which group sessions you&apos;ll see.
         </Text>
@@ -105,17 +104,16 @@ export default function ProfileSetupScreen() {
 
         <Button label="Create my Profile" onPress={onCreate} disabled={!complete} />
         {!complete ? (
-          <Text variant="caption" tone="muted" style={styles.helper}>
-            Fill in all three fields to continue
-          </Text>
-        ) : null}
-      </ScrollView>
+        <Text variant="caption" tone="muted" style={styles.helper}>
+          Fill in all three fields to continue
+        </Text>
+      ) : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: space.xl, gap: space.lg },
+  content: { gap: space.lg },
   field: { gap: space.sm },
   genderRow: { flexDirection: 'row', gap: space.md },
   genderCard: {

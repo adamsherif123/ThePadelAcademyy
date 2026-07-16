@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { color, radius, space } from '@tpa/theme';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { useSession } from '../../session/SessionProvider';
 import { BrandMark, Button, Input, NavyScreen, PillOnNavy, Text } from '../../ui';
@@ -19,9 +19,8 @@ export default function SignInScreen() {
   };
 
   return (
-    <NavyScreen>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <BrandMark size={72} />
+    <NavyScreen scroll contentContainerStyle={styles.content}>
+      <BrandMark size={72} />
 
         <View style={styles.hero}>
           <Text variant="label">The Padel Academy · Cairo</Text>
@@ -66,13 +65,10 @@ export default function SignInScreen() {
             </View>
           </View>
           <Button label="Continue" onPress={onContinue} />
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <Text variant="caption" tone="muted" style={styles.helper}>
-              We&apos;ll text you a verification code. New players get 2 free trial sessions.
-            </Text>
-          </KeyboardAvoidingView>
+          <Text variant="caption" tone="muted" style={styles.helper}>
+            We&apos;ll text you a verification code. New players get 2 free trial sessions.
+          </Text>
         </View>
-      </ScrollView>
     </NavyScreen>
   );
 }

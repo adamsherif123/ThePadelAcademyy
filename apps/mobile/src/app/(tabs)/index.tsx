@@ -54,7 +54,8 @@ export default function HomeScreen() {
       <CreditsSummaryCard
         total={total}
         balance={balance}
-        onWallet={() => router.push('/wallet')}
+        eyebrow="Your credits"
+        action={{ label: 'Wallet', trailingIcon: 'arrow-forward', onPress: () => router.push('/wallet') }}
         expiringText={expiryText}
       />
 

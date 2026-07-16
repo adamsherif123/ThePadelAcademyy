@@ -1,34 +1,39 @@
-import { color, space } from '@tpa/theme';
 import type { ReactNode } from 'react';
-import { StyleSheet, View, type ViewStyle } from 'react-native';
-import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
+import type { ViewStyle } from 'react-native';
+
+import { Screen } from './Screen';
 
 /**
- * Full-bleed deep-navy screen — the auth / onboarding surface. The app proper
- * stays on the light canvas (see Screen); this dark-auth / light-app split
- * mirrors the academy's website. Text inside should use the `inverse` tone.
- * RTL-safe: symmetric padding only.
+ * Full-bleed deep-navy screen — the auth / onboarding surface (the app proper
+ * stays on the light canvas). A thin wrapper over Screen so both share the same
+ * safe-area handling (scroll content / sticky footer both clear the home
+ * indicator; no dead bottom gap). RTL-safe.
  */
 export function NavyScreen({
   children,
+  scroll = false,
   padded = true,
-  edges = ['top', 'bottom', 'left', 'right'],
+  contentContainerStyle,
+  footer,
   style,
 }: {
-  children: ReactNode;
+  children?: ReactNode;
+  scroll?: boolean;
   padded?: boolean;
-  edges?: readonly Edge[];
+  contentContainerStyle?: ViewStyle;
+  footer?: ReactNode;
   style?: ViewStyle;
 }) {
   return (
-    <SafeAreaView style={styles.safe} edges={edges}>
-      <View style={[styles.body, padded && styles.padded, style]}>{children}</View>
-    </SafeAreaView>
+    <Screen
+      tone="navy"
+      scroll={scroll}
+      padded={padded}
+      contentContainerStyle={contentContainerStyle}
+      footer={footer}
+      style={style}
+    >
+      {children}
+    </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: color.bg.inverse },
-  body: { flex: 1 },
-  padded: { padding: space.xl },
-});

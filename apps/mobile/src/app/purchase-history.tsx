@@ -2,7 +2,7 @@ import { formatInstantDate } from '@tpa/core';
 import { space } from '@tpa/theme';
 import type { Purchase, PurchaseStatus } from '@tpa/types';
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { packageForPurchase, playerPurchases } from '../data/purchases';
 import { useDataStore } from '../data/store';
@@ -37,8 +37,7 @@ export default function PurchaseHistoryScreen() {
   const purchases = playerPurchases(player.id);
 
   return (
-    <Screen padded={false}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <Screen scroll contentContainerStyle={styles.content}>
         <ScreenHeader eyebrow="Your account" title="Purchase History" onBack={() => router.back()} />
 
         {purchases.length === 0 ? (
@@ -51,7 +50,6 @@ export default function PurchaseHistoryScreen() {
         ) : (
           purchases.map((purchase) => <PurchaseRow key={purchase.id} purchase={purchase} />)
         )}
-      </ScrollView>
     </Screen>
   );
 }
@@ -78,7 +76,7 @@ function PurchaseRow({ purchase }: { purchase: Purchase }) {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: space.xl, gap: space.md },
+  content: { gap: space.md },
   rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.sm },
   rowBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: space.sm },
 });

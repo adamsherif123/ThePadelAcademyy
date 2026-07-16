@@ -79,6 +79,7 @@ export default function GalleryScreen() {
         <Text variant="bodySecondary">Body secondary — supporting copy.</Text>
         <Text variant="label">Label periwinkle</Text>
         <Text variant="caption">Caption meta text</Text>
+        <Text variant="micro">Micro tile label</Text>
       </Section>
 
       <Section title="Shape — radius scale (from the app design)">
@@ -210,7 +211,8 @@ export default function GalleryScreen() {
         <CreditsSummaryCard
           total={13}
           balance={{ trial: 2, group: 7, duo: 0, individual: 4 }}
-          onWallet={() => {}}
+          eyebrow="Your credits"
+          action={{ label: 'Wallet', trailingIcon: 'arrow-forward', onPress: () => {} }}
           expiringText="2 Group credits — expires in 2 days"
         />
       </Section>

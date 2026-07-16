@@ -15,14 +15,17 @@ export function Money({
   variant = 'body',
   tone,
   weight,
+  numberOfLines,
 }: {
   amount: Piastres;
   variant?: TextVariant;
   tone?: TextTone;
   weight?: FontWeightToken;
+  /** Prices are primary info; pass 1 so a tight row never wraps the amount. */
+  numberOfLines?: number;
 }) {
   return (
-    <Text variant={variant} tone={tone} weight={weight}>
+    <Text variant={variant} tone={tone} weight={weight} numberOfLines={numberOfLines}>
       {formatPiastres(amount)}
     </Text>
   );

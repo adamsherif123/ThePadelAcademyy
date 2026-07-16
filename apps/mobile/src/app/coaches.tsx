@@ -1,6 +1,6 @@
 import { space } from '@tpa/theme';
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { allCoaches } from '../data/schedule';
 import { Avatar, Badge, Card, Screen, ScreenHeader, Text } from '../ui';
@@ -14,8 +14,7 @@ export default function CoachesScreen() {
   const coaches = allCoaches();
 
   return (
-    <Screen padded={false}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <Screen scroll contentContainerStyle={styles.content}>
         <ScreenHeader eyebrow="The team" title="Meet the Coaches" onBack={() => router.back()} />
 
         {coaches.map((coach) => (
@@ -36,13 +35,12 @@ export default function CoachesScreen() {
             </View>
           </Card>
         ))}
-      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: space.xl, gap: space.md },
+  content: { gap: space.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   info: { flex: 1, gap: space.xs },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, flexWrap: 'wrap' },

@@ -18,7 +18,8 @@ export type TextVariant =
   | 'body'
   | 'bodySecondary'
   | 'label'
-  | 'caption';
+  | 'caption'
+  | 'micro';
 
 export type TextTone = 'primary' | 'secondary' | 'muted' | 'inverse' | 'label' | 'accent';
 
@@ -48,6 +49,7 @@ const VARIANTS: Record<TextVariant, VariantSpec> = {
   bodySecondary: { size: fontSize.body, lineHeight: lineHeight.body, letterSpacing: letterSpacing.normal, family: fontFamilyForWeight.regular, defaultTone: 'secondary' },
   label: { size: fontSize.label, lineHeight: lineHeight.label, letterSpacing: letterSpacing.label, family: fontFamilyForWeight.black, uppercase: true, defaultTone: 'label' },
   caption: { size: fontSize.caption, lineHeight: lineHeight.caption, letterSpacing: letterSpacing.normal, family: fontFamilyForWeight.medium, defaultTone: 'muted' },
+  micro: { size: fontSize.micro, lineHeight: lineHeight.micro, letterSpacing: letterSpacing.label, family: fontFamilyForWeight.bold, uppercase: true, defaultTone: 'muted' },
 };
 
 export interface TextProps extends RNTextProps {
