@@ -1,6 +1,7 @@
 export { AcademyCard, ACADEMY } from './AcademyCard';
 export { Avatar } from './Avatar';
 export { Badge, type BadgeTone } from './Badge';
+export { BestValueBadge, isBestValuePackage } from './BestValueBadge';
 export { BrandMark } from './BrandMark';
 export { Button, type ButtonProps, type ButtonVariant } from './Button';
 export { Card, type CardVariant } from './Card';
@@ -14,6 +15,7 @@ export { Input, type InputProps } from './Input';
 export { LinkRow } from './LinkRow';
 export { Money } from './Money';
 export { NavyScreen } from './NavyScreen';
+export { PackageCard } from './PackageCard';
 export { PackageRow } from './PackageRow';
 export { PillOnNavy } from './PillOnNavy';
 export { ProgressBar } from './ProgressBar';

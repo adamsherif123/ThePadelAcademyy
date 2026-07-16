@@ -2,19 +2,23 @@ import type { Coach, CoachId, Player, PlayerId } from '@tpa/types';
 
 import { MOCK_NOW } from './now';
 
+// photoUrl is null across the fixtures: mocks must not depend on a live external
+// image service (offline/dev reliability). The Avatar falls back to initials.
+// Production photos come from Supabase Storage (S9); Avatar's onError fallback
+// covers real failures there too.
 export const mockCoaches: Coach[] = [
   {
     id: 'co_hany' as CoachId,
     name: 'Hany Nasser',
     bio: 'Head coach. Ex-national squash player, PPA-certified padel coach.',
-    photoUrl: 'https://placehold.co/200x200?text=Hany',
+    photoUrl: null,
     isActive: true,
   },
   {
     id: 'co_mariam' as CoachId,
     name: 'Mariam Fouad',
     bio: 'Ladies group and beginner specialist.',
-    photoUrl: 'https://placehold.co/200x200?text=Mariam',
+    photoUrl: null,
     isActive: true,
   },
   {
@@ -28,7 +32,7 @@ export const mockCoaches: Coach[] = [
     id: 'co_laila' as CoachId,
     name: 'Laila Mostafa',
     bio: 'Junior development. Currently on leave.',
-    photoUrl: 'https://placehold.co/200x200?text=Laila',
+    photoUrl: null,
     isActive: false,
   },
 ];

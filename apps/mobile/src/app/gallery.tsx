@@ -20,6 +20,7 @@ import {
   Input,
   LinkRow,
   Money,
+  PackageCard,
   PackageRow,
   PillOnNavy,
   ProgressBar,
@@ -230,6 +231,16 @@ export default function GalleryScreen() {
           ))}
       </Section>
 
+      <Section title="PackageCard (home carousel — pill + BEST VALUE never overlap)">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cardScroll}>
+          {mockPackages
+            .filter((p) => p.trainingType === 'group')
+            .map((p) => (
+              <PackageCard key={p.id} pkg={p} onPress={() => {}} />
+            ))}
+        </ScrollView>
+      </Section>
+
       <Section title="CheckList">
         <Card>
           <CheckList items={['4 × Duo training sessions', 'Certified academy coaches', '1 credit = 1 session']} />
@@ -284,6 +295,7 @@ const styles = StyleSheet.create({
   inlineRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.sm },
   navyBox: { backgroundColor: color.bg.inverse, borderRadius: radius.lg, padding: space.lg },
   successBox: { height: 420 },
+  cardScroll: { gap: space.md, paddingVertical: space.xs },
   swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
   swatchItem: { alignItems: 'center', gap: space.xs },
   swatch: {

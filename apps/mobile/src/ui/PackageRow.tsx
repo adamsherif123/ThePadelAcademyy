@@ -3,7 +3,7 @@ import { color, radius, space } from '@tpa/theme';
 import type { Package, Piastres } from '@tpa/types';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Badge } from './Badge';
+import { BestValueBadge, isBestValuePackage } from './BestValueBadge';
 import { Money } from './Money';
 import { Text } from './Text';
 
@@ -20,7 +20,6 @@ import { Text } from './Text';
  */
 export function PackageRow({ pkg, onPress }: { pkg: Package; onPress?: () => void }) {
   const isSingle = pkg.sessionCount === 1;
-  const isBestValue = pkg.sessionCount === 8;
   const perSession = Math.round(pkg.price / pkg.sessionCount) as Piastres;
 
   return (
@@ -54,9 +53,9 @@ export function PackageRow({ pkg, onPress }: { pkg: Package; onPress?: () => voi
         )}
       </View>
 
-      {isBestValue ? (
+      {isBestValuePackage(pkg) ? (
         <View style={styles.badge}>
-          <Badge label="Best value" tint={{ fg: color.text.inverse, bg: color.accent.default }} />
+          <BestValueBadge />
         </View>
       ) : null}
       <Ionicons name="chevron-forward" size={20} color={color.text.muted} />

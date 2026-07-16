@@ -38,11 +38,6 @@ export function perSessionPiastres(pkg: Package): number {
   return Math.round(pkg.price / pkg.sessionCount);
 }
 
-/** The best-value marker in the design: 8-session bundles. */
-export function isBestValue(pkg: Package): boolean {
-  return pkg.sessionCount === 8;
-}
-
 const PLAYER_INCLUSION: Record<TrainingType, string> = {
   trial: '1-on-1 with a coach',
   group: '3–4 players per session',

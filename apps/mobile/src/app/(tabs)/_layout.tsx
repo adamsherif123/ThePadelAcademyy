@@ -1,26 +1,48 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { color, fontSize } from '@tpa/theme';
 import { Tabs } from 'expo-router';
 
+import { fontFamilyForWeight } from '../../theme/fonts';
+
 /**
- * Session 0: four-tab shell only. Icons are throwaway placeholders and
- * styling is intentionally the platform default — the design system lands later.
+ * The four-tab app shell. No native headers — each screen's ScreenHeader (the
+ * periwinkle eyebrow + display title) is the heading. The tab bar is branded from
+ * tokens: royal active, muted inactive, white surface, a hairline top border,
+ * Inter labels. Icons switch to their filled variant when focused.
  */
 export default function TabsLayout() {
   return (
-    <Tabs>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: color.accent.default,
+        tabBarInactiveTintColor: color.text.muted,
+        tabBarStyle: {
+          backgroundColor: color.bg.surface,
+          borderTopColor: color.border.subtle,
+          borderTopWidth: 1,
+        },
+        tabBarLabelStyle: {
+          fontFamily: fontFamilyForWeight.medium,
+          fontSize: fontSize.caption,
+        },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" color={color} size={size} />,
+          tabBarIcon: ({ color: c, size, focused }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} color={c} size={size} />
+          ),
         }}
       />
       <Tabs.Screen
         name="book"
         options={{
           title: 'Book',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar-outline" color={color} size={size} />
+          tabBarIcon: ({ color: c, size, focused }) => (
+            <Ionicons name={focused ? 'calendar' : 'calendar-outline'} color={c} size={size} />
           ),
         }}
       />
@@ -28,8 +50,8 @@ export default function TabsLayout() {
         name="sessions"
         options={{
           title: 'Sessions',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="tennisball-outline" color={color} size={size} />
+          tabBarIcon: ({ color: c, size, focused }) => (
+            <Ionicons name={focused ? 'list' : 'list-outline'} color={c} size={size} />
           ),
         }}
       />
@@ -37,8 +59,8 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" color={color} size={size} />
+          tabBarIcon: ({ color: c, size, focused }) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} color={c} size={size} />
           ),
         }}
       />

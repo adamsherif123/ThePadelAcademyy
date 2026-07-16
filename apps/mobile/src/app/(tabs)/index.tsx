@@ -1,10 +1,9 @@
 import { formatExpiry, formatInstantDate, formatInstantTime } from '@tpa/core';
 import { color, space } from '@tpa/theme';
-import type { Package, Piastres } from '@tpa/types';
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
-import { activePackages, perSessionPiastres } from '../../data/catalog';
+import { activePackages } from '../../data/catalog';
 import { nextSession } from '../../data/schedule';
 import { useDataStore } from '../../data/store';
 import { balanceByType, soonestExpiringBatch, totalReadyToBook } from '../../data/wallet';
@@ -18,7 +17,7 @@ import {
   Card,
   CreditsSummaryCard,
   IconRow,
-  Money,
+  PackageCard,
   ScreenHeader,
   Text,
   TRAINING_META,
@@ -112,29 +111,6 @@ export default function HomeScreen() {
   );
 }
 
-function PackageCard({ pkg, onPress }: { pkg: Package; onPress: () => void }) {
-  const meta = TRAINING_META[pkg.trainingType];
-  const isBestValue = pkg.sessionCount === 8;
-  return (
-    <Card style={styles.packageCard} onPress={onPress}>
-      {isBestValue ? (
-        <View style={styles.bestValue}>
-          <Badge label="Best value" tint={{ fg: color.text.inverse, bg: color.accent.default }} />
-        </View>
-      ) : null}
-      <Badge label={meta.label} icon={meta.icon} />
-      <Text variant="h2">{`${pkg.sessionCount} Sessions`}</Text>
-      <Money amount={pkg.price} tone="accent" variant="h2" />
-      <View style={styles.perSession}>
-        <Money amount={perSessionPiastres(pkg) as Piastres} variant="caption" tone="muted" />
-        <Text variant="caption" tone="muted">
-          {' / session'}
-        </Text>
-      </View>
-    </Card>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: color.bg.canvas },
   content: { padding: space.xl, gap: space.lg },
@@ -144,8 +120,5 @@ const styles = StyleSheet.create({
   nextInfo: { flex: 1, gap: 2 },
   divider: { height: 1, backgroundColor: color.border.subtle, marginVertical: space.md },
   packageScroll: { gap: space.md, paddingVertical: space.xs },
-  packageCard: { width: 190, gap: space.sm },
-  perSession: { flexDirection: 'row', alignItems: 'center' },
-  bestValue: { position: 'absolute', top: space.sm, insetInlineEnd: space.sm, zIndex: 1 },
   devLink: { textAlign: 'center', marginTop: space.md },
 });
