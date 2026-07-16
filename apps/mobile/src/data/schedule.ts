@@ -1,9 +1,12 @@
-import { mockBookings, mockCoaches, mockSlots } from '@tpa/mocks';
+import { mockCoaches } from '@tpa/mocks';
 import type { Coach, IsoInstant, PlayerId, SessionSlot } from '@tpa/types';
 
+import { getBookings, getSlots } from './store';
+
 /**
- * Schedule selectors over @tpa/mocks. Pure; S9 swaps the bodies for real queries.
- * Screens render dates/money via @tpa/core. (Catalog helpers live in catalog.ts.)
+ * Schedule selectors over the store (seeded from @tpa/mocks, mutated by bookings).
+ * Pure; S9 swaps the bodies for real queries. Screens render dates via @tpa/core.
+ * (Catalog helpers live in catalog.ts.)
  */
 
 export interface NextSession {
@@ -14,9 +17,9 @@ export interface NextSession {
 /** The player's soonest upcoming booked session, joined to its coach. */
 export function nextSession(playerId: PlayerId, now: IsoInstant): NextSession | null {
   const nowMs = new Date(now).getTime();
-  const slotById = new Map(mockSlots.map((s) => [s.id, s]));
+  const slotById = new Map(getSlots().map((s) => [s.id, s]));
 
-  const upcoming = mockBookings
+  const upcoming = getBookings()
     .filter((b) => b.playerId === playerId && b.status === 'booked')
     .map((b) => slotById.get(b.slotId))
     .filter((s): s is SessionSlot => !!s && new Date(s.startsAt).getTime() > nowMs)

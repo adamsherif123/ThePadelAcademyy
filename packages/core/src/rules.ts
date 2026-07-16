@@ -9,7 +9,7 @@ import type {
 } from '@tpa/types';
 
 import { CANCELLATION_WINDOW_HOURS } from './constants';
-import { parseInstant } from './time';
+import { parseInstant, toInstant } from './time';
 
 /**
  * Pure, side-effect-free previews of the booking rules. They take `now` as a
@@ -55,6 +55,16 @@ export function isCancellableWithoutForfeit(slot: SessionSlot, now: IsoInstant):
   if (slot.status !== 'published') return false;
   const msUntilStart = parseInstant(slot.startsAt).getTime() - parseInstant(now).getTime();
   return msUntilStart > CANCELLATION_WINDOW_HOURS * 3_600_000;
+}
+
+/**
+ * The instant up to which a slot can be cancelled for a full refund —
+ * CANCELLATION_WINDOW_HOURS before it starts. The one place the deadline is
+ * computed; screens render it via format.ts (e.g. "Free cancellation until …")
+ * rather than doing startsAt − 3h themselves.
+ */
+export function cancellationDeadline(slot: SessionSlot): IsoInstant {
+  return toInstant(new Date(parseInstant(slot.startsAt).getTime() - CANCELLATION_WINDOW_HOURS * 3_600_000));
 }
 
 export type BookBlockReason =

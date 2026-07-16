@@ -14,6 +14,7 @@ import {
   CapacityDots,
   Card,
   CheckList,
+  CreditCallout,
   CreditsSummaryCard,
   DateChip,
   EmptyState,
@@ -199,12 +200,29 @@ export default function GalleryScreen() {
         />
       </Section>
 
-      <Section title="IconRow">
+      <Section title="IconRow — title/subtitle and chip label/value">
         <Card>
           <IconRow icon="location-outline" title="Oro Plaza Hotel" subtitle="In front of Family Park, Rehab, Cairo" />
           <View style={styles.spacer} />
           <IconRow icon="time-outline" title="Sun – Wed · 5:00 PM – 11:00 PM" subtitle="Group training mainly 5 – 9 PM" />
         </Card>
+        <Card>
+          <IconRow chip icon="calendar-outline" label="Date" value="Wed 22 Jul" />
+          <View style={styles.spacer} />
+          <IconRow chip icon="time-outline" label="Time" value="6:30 PM – 8:00 PM" />
+          <View style={styles.spacer} />
+          <IconRow chip icon="location-outline" label="Location" value="Oro Plaza Hotel · Rehab, Cairo" />
+        </Card>
+      </Section>
+
+      <Section title="CreditCallout (confirm-screen credit spend)">
+        <CreditCallout
+          headline="This will use 1 Group credit"
+          detail="You'll have 5 Group credits left after booking."
+          source="Group 8-Pack"
+          expiresAt={daysFromNow(26)}
+          now={MOCK_NOW}
+        />
       </Section>
 
       <Section title="Badges">

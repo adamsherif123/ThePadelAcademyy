@@ -52,6 +52,7 @@ export {
 
 export {
   canBookSlot,
+  cancellationDeadline,
   isBatchUsable,
   isCancellableWithoutForfeit,
   isGroupSlot,

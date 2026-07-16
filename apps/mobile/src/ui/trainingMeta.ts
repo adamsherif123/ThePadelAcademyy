@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { TrainingType } from '@tpa/types';
+import type { CreditBatch, TrainingType } from '@tpa/types';
 import type { ComponentProps } from 'react';
 
 export type IoniconName = ComponentProps<typeof Ionicons>['name'];
@@ -16,3 +16,9 @@ export const TRAINING_META = {
   duo: { label: 'Duo', icon: 'person-add-outline' },
   individual: { label: 'Individual', icon: 'person-outline' },
 } as const satisfies Record<TrainingType, { label: string; icon: IoniconName }>;
+
+/** Human name for a credit batch — "Group 8-Pack" or "Welcome Trial Credits". */
+export function batchLabel(batch: CreditBatch): string {
+  if (batch.source === 'signup_grant') return 'Welcome Trial Credits';
+  return `${TRAINING_META[batch.trainingType].label} ${batch.quantityTotal}-Pack`;
+}
