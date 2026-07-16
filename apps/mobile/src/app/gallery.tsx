@@ -180,13 +180,29 @@ export default function GalleryScreen() {
         </Card>
       </Section>
 
-      <Section title="InfoCard variants">
+      <Section title="InfoCard — md (page-level block, on light)">
         <InfoCard variant="navy" text="Informational note on a navy surface." />
         <InfoCard variant="amber" text="2 Group credits — expires in 2 days." />
         <InfoCard variant="royal" text="Booking this session will use 1 Group credit." />
         <InfoCard variant="neutral" text="Men's and ladies' groups train separately, placed by level." />
         <InfoCard variant="success" text="Free cancellation until 3:30 PM." />
         <InfoCard variant="danger" text="Inside 3-hour window — cancelling now forfeits your credit." />
+      </Section>
+
+      <Section title="InfoCard — sm (inline status strip, on light)">
+        <InfoCard size="sm" variant="amber" text="2 Group credits — expires in 2 days." />
+        <InfoCard size="sm" variant="success" text="Free cancellation until 3:30 PM." />
+        <InfoCard size="sm" variant="danger" text="Inside 3-hour window — cancelling now forfeits your credit." />
+        <InfoCard size="sm" variant="neutral" text="Subtle inline note." />
+      </Section>
+
+      <Section title="InfoCard — sm on navy (same tint carries its own contrast)">
+        <View style={[styles.navyBox, styles.navyStack]}>
+          <InfoCard size="sm" variant="amber" text="2 Group credits — expires in 2 days." />
+          <InfoCard size="sm" variant="success" text="Free cancellation until 3:30 PM." />
+          <InfoCard size="sm" variant="danger" text="Inside 3-hour window — forfeits your credit." />
+          <InfoCard size="sm" variant="navy" text="Informational note." />
+        </View>
       </Section>
 
       <Section title="Inputs">
@@ -415,6 +431,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md, alignItems: 'center' },
   inlineRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.sm },
   navyBox: { backgroundColor: color.bg.inverse, borderRadius: radius.lg, padding: space.lg },
+  navyStack: { gap: space.sm },
   successBox: { height: 420 },
   cardScroll: { gap: space.md, paddingVertical: space.xs },
   typeRow: { flexDirection: 'row', gap: space.md },

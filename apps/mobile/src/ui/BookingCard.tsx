@@ -89,11 +89,13 @@ export function BookingCard(props: BookingCardProps) {
           {props.refundable ? (
             <InfoCard
               variant="success"
+              size="sm"
               text={`Free cancellation until ${formatInstantTime(props.deadline)}`}
             />
           ) : (
             <InfoCard
               variant="danger"
+              size="sm"
               text="Inside 3-hour window — cancelling now forfeits your credit"
             />
           )}

@@ -2,10 +2,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { color, creditExpiry, radius, space } from '@tpa/theme';
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 
-import { Text } from './Text';
+import { Text, type TextVariant } from './Text';
 import type { IoniconName } from './trainingMeta';
 
 export type InfoCardVariant = 'navy' | 'amber' | 'royal' | 'neutral' | 'success' | 'danger';
+export type InfoCardSize = 'md' | 'sm';
 
 interface VariantStyle {
   bg: string;
@@ -29,26 +30,70 @@ const VARIANT: Record<InfoCardVariant, VariantStyle> = {
   danger: { bg: creditExpiry.expired.bg, border: creditExpiry.expired.bg, fg: creditExpiry.expired.fg, icon: 'alert-circle-outline' },
 };
 
+interface SizeSpec {
+  padV: number;
+  padH: number;
+  gap: number;
+  text: TextVariant;
+  icon: number;
+  radius: number;
+  border: number;
+  align: 'center' | 'flex-start';
+  iconTop: number;
+}
+
+const SIZE: Record<InfoCardSize, SizeSpec> = {
+  // Page-level block: earns its weight — body copy, generous padding, full border.
+  md: { padV: space.md, padH: space.md, gap: space.sm, text: 'body', icon: 18, radius: radius.md, border: 1, align: 'flex-start', iconTop: 1 },
+  // Inline status strip living inside another card: a slim tinted bar — caption
+  // copy, tight padding, small icon, hairline edge, centered on one line.
+  sm: { padV: space.xs, padH: space.sm, gap: space.xs, text: 'caption', icon: 14, radius: radius.sm, border: StyleSheet.hairlineWidth, align: 'center', iconTop: 0 },
+};
+
 /**
- * Informational card in one of four brand variants. Icon + text row; the text
- * color matches the variant. RTL-safe (leading icon via row + gap).
+ * A notice in one of six brand variants and two sizes. `md` (default) is a
+ * page-level block; `sm` is a slim inline status strip for notices that live
+ * INSIDE another card (Home's expiry strip, BookingCard's cancellation strips).
+ *
+ * Severity is carried by the variant's fg/bg TINT PAIR, not by the surface behind
+ * it — so the same treatment reads correctly on both the navy hero and white cards
+ * (the light-bg/dark-fg chip brings its own contrast). Icon + text row, text
+ * colored to the variant. RTL-safe (leading icon via row + gap).
  */
 export function InfoCard({
   text,
   variant = 'neutral',
+  size = 'md',
   icon,
   style,
 }: {
   text: string;
   variant?: InfoCardVariant;
+  size?: InfoCardSize;
   icon?: IoniconName;
   style?: ViewStyle;
 }) {
   const v = VARIANT[variant];
+  const s = SIZE[size];
   return (
-    <View style={[styles.base, { backgroundColor: v.bg, borderColor: v.border }, style]}>
-      <Ionicons name={icon ?? v.icon} size={18} color={v.fg} style={styles.icon} />
-      <Text variant="body" style={[styles.text, { color: v.fg }]}>
+    <View
+      style={[
+        styles.base,
+        {
+          paddingVertical: s.padV,
+          paddingHorizontal: s.padH,
+          gap: s.gap,
+          alignItems: s.align,
+          borderRadius: s.radius,
+          borderWidth: s.border,
+          backgroundColor: v.bg,
+          borderColor: v.border,
+        },
+        style,
+      ]}
+    >
+      <Ionicons name={icon ?? v.icon} size={s.icon} color={v.fg} style={{ marginTop: s.iconTop }} />
+      <Text variant={s.text} style={[styles.text, { color: v.fg }]}>
         {text}
       </Text>
     </View>
@@ -56,13 +101,6 @@ export function InfoCard({
 }
 
 const styles = StyleSheet.create({
-  base: {
-    flexDirection: 'row',
-    gap: space.sm,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: space.md,
-  },
-  icon: { marginTop: 1 },
+  base: { flexDirection: 'row' },
   text: { flex: 1 },
 });

@@ -77,7 +77,9 @@ export function CreditsSummaryCard({
         ))}
       </View>
 
-      {expiringText ? <InfoCard variant="amber" style={styles.strip} text={expiringText} /> : null}
+      {expiringText ? (
+        <InfoCard variant="amber" size="sm" style={styles.strip} text={expiringText} />
+      ) : null}
     </Card>
   );
 }

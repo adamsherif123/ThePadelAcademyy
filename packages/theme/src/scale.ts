@@ -91,6 +91,10 @@ export const letterSpacing = {
  * system uses. The mobile <Text> maps each to a specific baked font family
  * (e.g. Inter_700Bold) and never emits a `fontWeight` alongside it (Android
  * clips glyphs when both a weight-baked family and fontWeight are set).
+ *
+ * The ramp stops at extrabold (800): the design reads at 800 max since S3d.1
+ * retuned display/label off the marketing site's 900. black(900) was removed so
+ * nothing can reach for a weight (and load a font face) the app never renders.
  */
 export const fontWeight = {
   regular: 400,
@@ -98,7 +102,6 @@ export const fontWeight = {
   semibold: 600,
   bold: 700,
   extrabold: 800,
-  black: 900,
 } as const;
 
 export type FontWeightToken = keyof typeof fontWeight;

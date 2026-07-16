@@ -3,7 +3,7 @@
 // @tpa/core itself stays pure/runtime-agnostic.
 import 'react-native-get-random-values';
 
-import { useFonts } from '@expo-google-fonts/inter';
+import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
