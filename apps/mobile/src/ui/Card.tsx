@@ -7,9 +7,10 @@ import { shadow } from '../theme/shadow';
 export type CardVariant = 'surface' | 'inverse';
 
 /**
- * A rounded, elevated surface. `surface` = white card on canvas; `inverse` = deep
- * navy (hero / balance cards). Text placed inside an inverse card should use the
- * `inverse` tone. RTL-safe.
+ * A rounded, near-flat surface. `surface` = white card on canvas (radius.lg);
+ * `inverse` = deep navy hero/summary card, which reads rounder (radius.xl). A
+ * hairline border does the work; the shadow is only a whisper (elevation `card`).
+ * Text inside an inverse card should use the `inverse` tone. RTL-safe.
  */
 export function Card({
   children,
@@ -25,8 +26,9 @@ export function Card({
     <View
       style={[
         styles.base,
-        shadow('md'),
+        shadow('card'),
         {
+          borderRadius: isInverse ? radius.xl : radius.lg,
           backgroundColor: isInverse ? color.bg.inverse : color.bg.surface,
           borderColor: isInverse ? color.border.onInverse : color.border.subtle,
         },
@@ -40,7 +42,6 @@ export function Card({
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: radius.md,
     borderWidth: 1,
     padding: space.xl,
   },

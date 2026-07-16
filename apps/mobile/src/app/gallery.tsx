@@ -1,6 +1,6 @@
 import { TRAINING_TYPES } from '@tpa/core';
 import { MOCK_NOW, daysFromNow, egp } from '@tpa/mocks';
-import { color, space } from '@tpa/theme';
+import { color, radius, space } from '@tpa/theme';
 import type { IsoInstant } from '@tpa/types';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
@@ -49,6 +49,14 @@ const EXPIRY_SAMPLES: { label: string; expiresAt: IsoInstant }[] = [
   { label: 'expired', expiresAt: daysFromNow(-7) },
 ];
 
+const RADII = [
+  { key: 'sm', value: radius.sm },
+  { key: 'md', value: radius.md },
+  { key: 'lg', value: radius.lg },
+  { key: 'xl', value: radius.xl },
+  { key: 'pill', value: radius.pill },
+] as const;
+
 export default function GalleryScreen() {
   const [segment, setSegment] = useState<'upcoming' | 'past'>('upcoming');
 
@@ -64,6 +72,17 @@ export default function GalleryScreen() {
         <Text variant="bodySecondary">Body secondary — supporting copy.</Text>
         <Text variant="label">Label periwinkle</Text>
         <Text variant="caption">Caption meta text</Text>
+      </Section>
+
+      <Section title="Shape — radius scale (from the app design)">
+        <View style={styles.swatchRow}>
+          {RADII.map((r) => (
+            <View key={r.key} style={styles.swatchItem}>
+              <View style={[styles.swatch, { borderRadius: r.value }]} />
+              <Text variant="caption" tone="muted">{`${r.key} ${r.value === radius.pill ? 'pill' : r.value}`}</Text>
+            </View>
+          ))}
+        </View>
       </Section>
 
       <Section title="ScreenHeader (light / navy / with back)">
@@ -194,7 +213,16 @@ const styles = StyleSheet.create({
   sectionBody: { gap: space.md },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md, alignItems: 'center' },
   inlineRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.sm },
-  navyBox: { backgroundColor: color.bg.inverse, borderRadius: 12, padding: space.lg },
+  navyBox: { backgroundColor: color.bg.inverse, borderRadius: radius.lg, padding: space.lg },
+  swatchRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
+  swatchItem: { alignItems: 'center', gap: space.xs },
+  swatch: {
+    width: 56,
+    height: 56,
+    backgroundColor: color.bg.inverse,
+    borderWidth: 1,
+    borderColor: color.border.subtle,
+  },
   spacer: { height: space.md },
   footer: { alignItems: 'center', paddingVertical: space.xl },
 });

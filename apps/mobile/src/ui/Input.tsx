@@ -69,10 +69,10 @@ export function Input({ label, error, disabled = false, tone = 'light', ...rest 
 const styles = StyleSheet.create({
   wrap: { gap: space.xs },
   input: {
-    minHeight: 48,
+    minHeight: 54,
     borderWidth: 1,
-    borderRadius: radius.sm,
-    paddingHorizontal: space.md,
+    borderRadius: radius.md,
+    paddingHorizontal: space.lg,
     fontFamily: fontFamilyForWeight.regular,
     fontSize: fontSize.body,
     // No textAlign: RN aligns to the writing direction's start by default (RTL-safe).

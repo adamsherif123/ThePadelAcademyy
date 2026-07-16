@@ -16,22 +16,35 @@ export const space = {
   xxxl: 48,
 } as const;
 
-/** Corner radii. Site uses 8px controls/cards and 999px pills. */
+/**
+ * Corner radii. SHAPE derives from the approved app design (design/rork/*), NOT
+ * the marketing website — those are different sources of truth (colors come from
+ * the site, shape/spacing/elevation from the product design). The mobile design
+ * is soft and generously rounded: controls/inputs ~14, cards ~18, the navy
+ * hero/summary cards rounder still ~24, and every button/chip/progress bar a
+ * full pill.
+ */
 export const radius = {
   none: 0,
-  sm: 8,
-  md: 12,
-  lg: 16,
-  pill: 9999,
+  sm: 10, // inner tiles / tight rounded rects
+  md: 14, // inputs, choice buttons, info & level cards, OTP boxes
+  lg: 18, // standard white cards
+  xl: 24, // navy hero / summary cards (read rounder)
+  pill: 9999, // buttons, chips, status pills, progress bars, avatars
 } as const;
 
 /**
  * Elevation scale as platform-agnostic primitives: vertical offset + blur +
  * opacity for iOS/web shadows, plus an Android `elevation` step. The shadow color
  * is applied by each app (mobile <Card> maps these to RN shadow props).
+ *
+ * The app design reads nearly FLAT — a hairline border does the work and the
+ * shadow is only a whisper. `card` is the soft, diffuse, very-low-opacity ambient
+ * used by <Card>; `md`/`lg` remain for anything that genuinely needs to float.
  */
 export const elevation = {
   none: { y: 0, blur: 0, opacity: 0, elevation: 0 },
+  card: { y: 2, blur: 12, opacity: 0.05, elevation: 1 },
   sm: { y: 1, blur: 3, opacity: 0.06, elevation: 1 },
   md: { y: 8, blur: 24, opacity: 0.1, elevation: 4 },
   lg: { y: 16, blur: 36, opacity: 0.14, elevation: 8 },

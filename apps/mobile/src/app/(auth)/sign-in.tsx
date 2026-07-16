@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color, space } from '@tpa/theme';
+import { color, radius, space } from '@tpa/theme';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
   countryChip: {
     justifyContent: 'center',
     paddingHorizontal: space.md,
-    borderRadius: 8,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: color.border.onInverse,
     backgroundColor: color.pillOnInverse.bg,
