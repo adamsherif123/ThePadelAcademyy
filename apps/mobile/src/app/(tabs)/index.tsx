@@ -1,12 +1,14 @@
 import { formatExpiry, formatInstantDate, formatInstantTime } from '@tpa/core';
 import { color, space } from '@tpa/theme';
+import type { CreditBatchId } from '@tpa/types';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { activePackages } from '../../data/catalog';
 import { nextSession } from '../../data/schedule';
 import { useDataStore } from '../../data/store';
-import { balanceByType, soonestExpiringBatch, totalReadyToBook } from '../../data/wallet';
+import { soonestExpiringBatch, totalReadyToBook } from '../../data/wallet';
 import { useSession } from '../../session/SessionProvider';
 import {
   ACADEMY,
@@ -17,6 +19,7 @@ import {
   Card,
   CreditsSummaryCard,
   IconRow,
+  InfoCard,
   PackageCard,
   Screen,
   ScreenHeader,
@@ -28,11 +31,15 @@ export default function HomeScreen() {
   const router = useRouter();
   const { player, now } = useSession();
   useDataStore(); // re-render when a purchase grants credits
+  // Session-scoped, in-memory dismissals, keyed by batch id — a nag by design:
+  // this is pure view state (S9 replaces the data selectors, never this), it
+  // resets on relaunch, and keying by id means dismissing one batch's notice
+  // doesn't suppress a different batch's later.
+  const [dismissed, setDismissed] = useState<Set<CreditBatchId>>(() => new Set());
   if (!player) return null;
 
   const firstName = player.name.split(' ')[0] ?? player.name;
   const total = totalReadyToBook(player.id, now);
-  const balance = balanceByType(player.id, now);
   const expiring = soonestExpiringBatch(player.id, now);
   const next = nextSession(player.id, now);
   const packages = activePackages();
@@ -53,11 +60,18 @@ export default function HomeScreen() {
 
       <CreditsSummaryCard
         total={total}
-        balance={balance}
         eyebrow="Your credits"
         action={{ label: 'Wallet', trailingIcon: 'arrow-forward', onPress: () => router.push('/wallet') }}
-        expiringText={expiryText}
-      />
+      >
+        {expiring && expiryText && !dismissed.has(expiring.id) ? (
+          <InfoCard
+            size="sm"
+            variant="amber"
+            text={expiryText}
+            onDismiss={() => setDismissed((prev) => new Set(prev).add(expiring.id))}
+          />
+        ) : null}
+      </CreditsSummaryCard>
 
       <Button label="Book a Session" onPress={() => router.push('/(tabs)/book')} />
 
@@ -88,7 +102,7 @@ export default function HomeScreen() {
 
       <View style={styles.section}>
         <View style={styles.sectionHead}>
-          <Text variant="label">Top up credits</Text>
+          <Text variant="label">Add credits</Text>
           <Text variant="label" tone="accent" onPress={() => router.push('/buy-credits')}>
             See all
           </Text>

@@ -10,6 +10,7 @@ import {
   AcademyCard,
   Avatar,
   Badge,
+  BalancePills,
   BookingCard,
   Button,
   CapacityDots,
@@ -281,29 +282,36 @@ export default function GalleryScreen() {
         <Money amount={egp(6000)} tone="accent" />
       </Section>
 
-      <Section title="CreditsSummaryCard (Home: eyebrow + chip inline with total)">
+      <Section title="CreditsSummaryCard — Home (eyebrow, no pills, dismissible notice)">
         <CreditsSummaryCard
           total={13}
-          balance={{ trial: 2, group: 7, duo: 0, individual: 4 }}
           eyebrow="Your credits"
           action={{ label: 'Wallet', trailingIcon: 'arrow-forward', onPress: () => {} }}
-          expiringText="2 Group credits — expires in 2 days"
-        />
+        >
+          <InfoCard
+            size="sm"
+            variant="amber"
+            text="2 Group credits — expires in 2 days."
+            onDismiss={() => {}}
+          />
+        </CreditsSummaryCard>
       </Section>
 
-      <Section title="CreditsSummaryCard (Wallet: no eyebrow) + long-total stress">
+      <Section title="CreditsSummaryCard — Wallet (no eyebrow, balance pills) + long-total stress">
         <CreditsSummaryCard
           total={13}
-          balance={{ trial: 2, group: 7, duo: 0, individual: 4 }}
           caption={'credits ready\nto book now'}
           action={{ label: 'Buy credits', icon: 'add', onPress: () => {} }}
-        />
+        >
+          <BalancePills balance={{ trial: 2, group: 7, duo: 0, individual: 4 }} />
+        </CreditsSummaryCard>
         <CreditsSummaryCard
           total={128}
-          balance={{ trial: 20, group: 70, duo: 18, individual: 20 }}
           caption={'credits ready\nto book now'}
           action={{ label: 'Buy credits', icon: 'add', onPress: () => {} }}
-        />
+        >
+          <BalancePills balance={{ trial: 20, group: 70, duo: 18, individual: 20 }} />
+        </CreditsSummaryCard>
       </Section>
 
       <Section title="LinkRow">

@@ -26,10 +26,14 @@ const daysFrom = (n: number) =>
   new Date(new Date(NOW).getTime() + n * 86_400_000).toISOString() as IsoInstant;
 
 describe('creditExpiryState', () => {
-  it('classifies expired, expiring_soon, and ok by the EXPIRING_SOON_DAYS window', () => {
+  it('classifies expired, expiring_soon, and ok by the EXPIRING_SOON_DAYS (3-day) window', () => {
+    expect(EXPIRING_SOON_DAYS).toBe(3); // the client's threshold — locks the value
     expect(creditExpiryState(daysFrom(-1), NOW)).toBe('expired');
     expect(creditExpiryState(NOW, NOW)).toBe('expired'); // exact boundary is expired
     expect(creditExpiryState(daysFrom(2), NOW)).toBe('expiring_soon');
+    expect(creditExpiryState(daysFrom(3), NOW)).toBe('expiring_soon'); // at the boundary
+    expect(creditExpiryState(daysFrom(4), NOW)).toBe('ok'); // just past → ok (was amber under 7)
+    // Symbolic guard: the boundary tracks the constant, whatever it is set to.
     expect(creditExpiryState(daysFrom(EXPIRING_SOON_DAYS), NOW)).toBe('expiring_soon');
     expect(creditExpiryState(daysFrom(EXPIRING_SOON_DAYS + 1), NOW)).toBe('ok');
     expect(creditExpiryState(daysFrom(30), NOW)).toBe('ok');

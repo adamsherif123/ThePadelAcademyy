@@ -9,6 +9,7 @@ import { activeBatches, balanceByType, expiredBatches, totalReadyToBook } from '
 import { useSession } from '../session/SessionProvider';
 import {
   Badge,
+  BalancePills,
   Card,
   CreditsSummaryCard,
   ProgressBar,
@@ -46,10 +47,11 @@ export default function WalletScreen() {
 
         <CreditsSummaryCard
           total={total}
-          balance={balance}
           caption={'credits ready\nto book now'}
           action={{ label: 'Buy credits', icon: 'add', onPress: () => router.push('/buy-credits') }}
-        />
+        >
+          <BalancePills balance={balance} />
+        </CreditsSummaryCard>
 
         {/* Active batches */}
         <Text variant="label">Active batches</Text>

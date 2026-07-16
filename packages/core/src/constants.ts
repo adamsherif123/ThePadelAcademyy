@@ -28,9 +28,12 @@ export const SIGNUP_TRIAL_CREDITS = 2;
 
 /**
  * A still-valid credit batch within this many days of expiry is classified
- * `expiring_soon` (drives the wallet's amber warning). See `creditExpiryState`.
+ * `expiring_soon` (drives the wallet's amber StatusChip and Home's expiry notice).
+ * Set to 3 (down from 7) so "expiring soon" has ONE meaning that matches the
+ * Home nag; a batch 4+ days out reads green, and its chip still states the real
+ * day count. See `creditExpiryState`.
  */
-export const EXPIRING_SOON_DAYS = 7;
+export const EXPIRING_SOON_DAYS = 3;
 
 /**
  * Free cancellation + credit refund is allowed up to this many hours before a

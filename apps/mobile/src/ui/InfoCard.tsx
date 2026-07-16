@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { color, creditExpiry, radius, space } from '@tpa/theme';
-import { StyleSheet, View, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Text, type TextVariant } from './Text';
 import type { IoniconName } from './trainingMeta';
@@ -65,12 +65,15 @@ export function InfoCard({
   variant = 'neutral',
   size = 'md',
   icon,
+  onDismiss,
   style,
 }: {
   text: string;
   variant?: InfoCardVariant;
   size?: InfoCardSize;
   icon?: IoniconName;
+  /** When set, renders a labelled dismiss (X) at the end with a 44pt tap target. */
+  onDismiss?: () => void;
   style?: ViewStyle;
 }) {
   const v = VARIANT[variant];
@@ -96,6 +99,16 @@ export function InfoCard({
       <Text variant={s.text} style={[styles.text, { color: v.fg }]}>
         {text}
       </Text>
+      {onDismiss ? (
+        <Pressable
+          onPress={onDismiss}
+          hitSlop={14}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss notice"
+        >
+          <Ionicons name="close" size={16} color={v.fg} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }

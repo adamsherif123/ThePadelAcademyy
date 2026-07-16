@@ -1,6 +1,7 @@
 export { AcademyCard, ACADEMY } from './AcademyCard';
 export { Avatar } from './Avatar';
 export { Badge, type BadgeTone } from './Badge';
+export { BalancePills } from './BalancePills';
 export { BookingCard } from './BookingCard';
 export { BestValueBadge, isBestValuePackage } from './BestValueBadge';
 export { BrandMark } from './BrandMark';

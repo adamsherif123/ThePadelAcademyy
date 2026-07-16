@@ -1,15 +1,13 @@
-import { TRAINING_TYPES } from '@tpa/core';
 import { space } from '@tpa/theme';
-import type { TrainingType } from '@tpa/types';
+import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Card } from './Card';
-import { InfoCard } from './InfoCard';
 import { PillOnNavy } from './PillOnNavy';
 import { Text } from './Text';
-import { TRAINING_META, type IoniconName } from './trainingMeta';
+import type { IoniconName } from './trainingMeta';
 
-/** Top-right action chip (Home: "Wallet →"; Wallet: "+ Buy credits"). */
+/** Top-end action chip (Home: "Wallet →"; Wallet: "+ Buy credits"). */
 export interface SummaryAction {
   label: string;
   icon?: IoniconName;
@@ -19,25 +17,25 @@ export interface SummaryAction {
 
 /**
  * The navy credits summary — the app's signature wallet element, shared by Home
- * and the Wallet screen. The eyebrow is OPT-IN (`eyebrow` prop): Home shows one,
- * the Wallet screen omits it to avoid repeating its "YOUR CREDITS" page title.
- * The top-right `action` chip slot carries Home's Wallet link and Wallet's Buy
- * chip. Balance pills dim at zero. Composition only; screens pass computed numbers.
+ * and the Wallet screen. A SHELL: it owns only what both screens share — the navy
+ * card, the optional eyebrow, and the head row (big total + caption at the start,
+ * the action chip at the end). Everything that diverges is `children`: Wallet
+ * passes <BalancePills>, Home passes its dismissible expiry notice. Keeping the
+ * head row here means the signature can't drift between the two screens, while the
+ * children slot keeps each screen's intent explicit instead of behind flags.
  */
 export function CreditsSummaryCard({
   total,
-  balance,
   caption = 'credits\nready to book',
   eyebrow,
   action,
-  expiringText,
+  children,
 }: {
   total: number;
-  balance: Record<TrainingType, number>;
   caption?: string;
   eyebrow?: string;
   action?: SummaryAction;
-  expiringText?: string;
+  children?: ReactNode;
 }) {
   return (
     <Card variant="inverse">
@@ -70,20 +68,7 @@ export function CreditsSummaryCard({
         ) : null}
       </View>
 
-      <View style={styles.pills}>
-        {TRAINING_TYPES.map((t) => (
-          <PillOnNavy
-            key={t}
-            icon={TRAINING_META[t].icon}
-            label={`${balance[t]} ${TRAINING_META[t].label}`}
-            dimmed={balance[t] === 0}
-          />
-        ))}
-      </View>
-
-      {expiringText ? (
-        <InfoCard variant="amber" size="sm" style={styles.strip} text={expiringText} />
-      ) : null}
+      {children ? <View style={styles.below}>{children}</View> : null}
     </Card>
   );
 }
@@ -96,6 +81,5 @@ const styles = StyleSheet.create({
   // Overrides PillOnNavy's flex-start so the chip centres with the total; keeps
   // its intrinsic size (RN children don't shrink by default) so the label can't clip.
   chip: { alignSelf: 'center' },
-  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.md },
-  strip: { marginTop: space.md },
+  below: { marginTop: space.md },
 });
