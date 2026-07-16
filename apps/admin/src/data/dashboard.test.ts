@@ -77,16 +77,27 @@ describe('creditLiability', () => {
     expect(withExpired).toBeGreaterThan(creditLiability(now));
   });
 
-  it('excludes signup grants (no money changed hands)', () => {
-    // A usable grant exists (cb_grant_omar); liability must equal the purchase-only
-    // reference, i.e. grants add nothing.
-    const grants = getBatches().filter((b) => b.source === 'signup_grant' && b.quantityRemaining > 0);
-    expect(grants.length).toBeGreaterThan(0);
-    const purchaseOnly = getBatches().some(
-      (b) => b.source === 'purchase' && b.quantityRemaining > 0 && ms(b.expiresAt) > ms(now),
-    );
-    expect(purchaseOnly).toBe(true);
-    // (creditLiability's source filter is the guarantee; this asserts the setup is real.)
+  it('excludes signup AND admin grants (no money changed hands)', () => {
+    // Usable non-purchase grants exist (a signup grant + the admin comp), so the
+    // source filter is doing real work — yet liability equals the purchase-only sum.
+    const usableGrant = (source: string) =>
+      getBatches().some(
+        (b) => b.source === source && b.quantityRemaining > 0 && ms(b.expiresAt) > ms(now),
+      );
+    expect(usableGrant('signup_grant')).toBe(true);
+    expect(usableGrant('admin_grant')).toBe(true); // the cb_admin_comp fixture
+
+    const pkgById = new Map(getPackages().map((p) => [p.id, p]));
+    const purchaseById = new Map(getPurchases().map((p) => [p.id, p]));
+    let purchaseOnly = 0;
+    for (const b of getBatches()) {
+      if (b.source !== 'purchase' || b.quantityRemaining <= 0) continue;
+      if (ms(b.expiresAt) <= ms(now)) continue;
+      const pkg = b.purchaseId ? pkgById.get(purchaseById.get(b.purchaseId)!.packageId) : undefined;
+      if (!pkg) continue;
+      purchaseOnly += batchLiability(pkg.price, pkg.sessionCount, b.quantityRemaining);
+    }
+    expect(creditLiability(now)).toBe(purchaseOnly);
   });
 });
 

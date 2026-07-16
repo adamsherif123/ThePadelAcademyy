@@ -25,6 +25,7 @@ export {
 export { ID_PREFIXES, newId, type IdPrefix } from './ids';
 
 export {
+  buildAdminGrant,
   buildPurchaseCredits,
   buildSignupGrant,
   creditExpiryState,
@@ -48,6 +49,7 @@ export {
   formatExpiry,
   formatInstantDate,
   formatInstantTime,
+  formatMonthDay,
   formatPiastres,
   formatSessionTimeRange,
 } from './format';

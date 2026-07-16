@@ -51,6 +51,17 @@ const TIME_FMT = new Intl.DateTimeFormat('en-US', {
   hour12: true,
 });
 
+const MONTH_DAY_FMT = new Intl.DateTimeFormat('en-US', {
+  timeZone: CAIRO_TZ,
+  month: 'short',
+  day: 'numeric',
+});
+
+/** e.g. "Jul 19" in Cairo time — for the calendar's week-range header. */
+export function formatMonthDay(instant: IsoInstant): string {
+  return MONTH_DAY_FMT.format(parseInstant(instant));
+}
+
 /** e.g. "Tue, 14 Jul" in Cairo time. */
 export function formatInstantDate(instant: IsoInstant): string {
   return DATE_FMT.format(parseInstant(instant));

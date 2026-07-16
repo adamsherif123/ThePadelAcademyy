@@ -61,6 +61,32 @@ export const getPackages = (): Package[] => packages;
 export const getPurchases = (): Purchase[] => purchases;
 export const getBatches = (): CreditBatch[] => batches;
 
+/**
+ * Commit an academy session cancellation atomically: the slot flips to cancelled,
+ * every affected booking flips to cancelled, and the refunded batches are replaced
+ * in place. Callers (the cancelSession seam) compute the next-state objects; this
+ * stays a dumb, atomic write — the rules live in the seam. S10 replaces the seam
+ * body with one DB RPC; this commit disappears with the in-memory store.
+ */
+export function commitSessionCancellation(
+  cancelledSlot: SessionSlot,
+  cancelledBookings: Booking[],
+  updatedBatches: CreditBatch[],
+): void {
+  const bookingById = new Map(cancelledBookings.map((b) => [b.id, b]));
+  const batchById = new Map(updatedBatches.map((b) => [b.id, b]));
+  slots = slots.map((s) => (s.id === cancelledSlot.id ? cancelledSlot : s));
+  bookings = bookings.map((b) => bookingById.get(b.id) ?? b);
+  batches = batches.map((b) => batchById.get(b.id) ?? b);
+  emit();
+}
+
+/** Commit an edited slot (coach / capacity) in place. */
+export function commitSlotUpdate(updatedSlot: SessionSlot): void {
+  slots = slots.map((s) => (s.id === updatedSlot.id ? updatedSlot : s));
+  emit();
+}
+
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);

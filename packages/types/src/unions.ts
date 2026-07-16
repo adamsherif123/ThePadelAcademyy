@@ -24,10 +24,13 @@ export type SlotStatus = 'published' | 'cancelled';
 
 /**
  * How a CreditBatch came to exist. `purchase` = bought a package. `signup_grant`
- * = the one-time free trial credits every new account receives on creation
- * (never purchased). See the invariant documented on CreditBatch.
+ * = the one-time free trial credits every new account receives on creation.
+ * `admin_grant` = the owner deliberately comped a player (a rained-out session,
+ * goodwill) — a visible free grant, NOT phantom revenue. Only `purchase` batches
+ * involve money, so only they carry a `purchaseId` and count as credit liability;
+ * both grants have a null purchaseId. See the invariant documented on CreditBatch.
  */
-export type CreditSource = 'purchase' | 'signup_grant';
+export type CreditSource = 'purchase' | 'signup_grant' | 'admin_grant';
 
 /**
  * 0 = Sunday ... 6 = Saturday — matches `Date.prototype.getUTCDay()`.

@@ -1,0 +1,102 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-canvas);
+}
+.summaryIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-surface);
+  color: var(--color-accent-default);
+  flex-shrink: 0;
+}
+.summaryTitle {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+.summarySub {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.pills {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-lg);
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--expiry-expired-fg);
+  background: var(--expiry-expired-bg);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-caption);
+}
+
+.warn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--expiry-expiring_soon-fg);
+  background: var(--expiry-expiring_soon-bg);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-caption);
+}
+
+/* Push the destructive button to the start; Close/Save stay at the end. */
+.cancelBtn {
+  margin-inline-end: auto;
+}
+
+/* Cancel confirmation */
+.confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-sm);
+  padding-block: var(--space-md);
+}
+.confirmIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-pill);
+  background: var(--expiry-expired-bg);
+  color: var(--expiry-expired-fg);
+}
+.confirmTitle {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-bold);
+}
+.confirmBody {
+  max-width: 42ch;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body);
+}

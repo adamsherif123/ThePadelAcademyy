@@ -100,6 +100,12 @@ export interface CreditBatch {
   quantityRemaining: number;
   expiresAt: IsoInstant;
   createdAt: IsoInstant;
+  /**
+   * Free-text reason, set only for `admin_grant` — WHY the owner comped this
+   * player (so it's explicable in an audit six months later). Null for purchases
+   * and signup grants.
+   */
+  note: string | null;
 }
 
 /**

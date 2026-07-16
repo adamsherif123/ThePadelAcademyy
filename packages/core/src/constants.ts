@@ -85,6 +85,7 @@ export const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6] as const satisfies readonly Weekda
 export const CREDIT_SOURCES = [
   'purchase',
   'signup_grant',
+  'admin_grant',
 ] as const satisfies readonly CreditSource[];
 
 // --- Exhaustiveness guards: fail compilation if an array omits a union member ---

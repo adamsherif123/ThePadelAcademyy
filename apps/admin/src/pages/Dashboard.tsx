@@ -43,12 +43,16 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-/** Donut colours — a revenue-blue scale per the v0 design (not the calendar tint). */
+/**
+ * Donut colours = trainingTint, so training type has ONE colour meaning across
+ * the admin (the calendar uses the same). The owner shouldn't relearn the
+ * encoding per screen. (v0's blue-scale here was aesthetic; ours is semantic.)
+ */
 const DONUT_COLOR: Record<TrainingType, string> = {
   group: 'var(--tint-group-fg)',
   duo: 'var(--tint-duo-fg)',
-  individual: 'var(--color-text-label)',
-  trial: 'var(--color-text-muted)',
+  individual: 'var(--tint-individual-fg)',
+  trial: 'var(--tint-trial-fg)',
 };
 
 /** "expires in 2 days" → "In 2 days" for the compact urgency chip. */

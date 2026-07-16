@@ -62,13 +62,13 @@ const signupGrants: CreditBatch[] = [
  */
 const handBatches: CreditBatch[] = [
   // Healthy group credits, plenty of runway.
-  { id: 'cb_group_main' as CreditBatchId, playerId: 'pl_omar' as PlayerId, source: 'purchase', purchaseId: 'pu_omar_group8' as PurchaseId, trainingType: 'group', quantityTotal: 8, quantityRemaining: 5, createdAt: daysFromNow(-5), expiresAt: daysFromNow(25) },
+  { id: 'cb_group_main' as CreditBatchId, playerId: 'pl_omar' as PlayerId, source: 'purchase', purchaseId: 'pu_omar_group8' as PurchaseId, trainingType: 'group', quantityTotal: 8, quantityRemaining: 5, createdAt: daysFromNow(-5), expiresAt: daysFromNow(25), note: null },
   // Expiring in 2 days — drives the "expires in 2 days" warning.
-  { id: 'cb_group_expiring' as CreditBatchId, playerId: 'pl_omar' as PlayerId, source: 'purchase', purchaseId: 'pu_omar_group4' as PurchaseId, trainingType: 'group', quantityTotal: 4, quantityRemaining: 2, createdAt: daysFromNow(-28), expiresAt: daysFromNow(2) },
+  { id: 'cb_group_expiring' as CreditBatchId, playerId: 'pl_omar' as PlayerId, source: 'purchase', purchaseId: 'pu_omar_group4' as PurchaseId, trainingType: 'group', quantityTotal: 4, quantityRemaining: 2, createdAt: daysFromNow(-28), expiresAt: daysFromNow(2), note: null },
   // Already expired — drives the "expired" state; not usable.
-  { id: 'cb_duo_expired' as CreditBatchId, playerId: 'pl_omar' as PlayerId, source: 'purchase', purchaseId: 'pu_omar_duo4' as PurchaseId, trainingType: 'duo', quantityTotal: 4, quantityRemaining: 1, createdAt: daysFromNow(-33), expiresAt: daysFromNow(-3) },
+  { id: 'cb_duo_expired' as CreditBatchId, playerId: 'pl_omar' as PlayerId, source: 'purchase', purchaseId: 'pu_omar_duo4' as PurchaseId, trainingType: 'duo', quantityTotal: 4, quantityRemaining: 1, createdAt: daysFromNow(-33), expiresAt: daysFromNow(-3), note: null },
   // Individual credits, full and fresh.
-  { id: 'cb_indiv_main' as CreditBatchId, playerId: 'pl_omar' as PlayerId, source: 'purchase', purchaseId: 'pu_omar_indiv4' as PurchaseId, trainingType: 'individual', quantityTotal: 4, quantityRemaining: 4, createdAt: daysFromNow(-10), expiresAt: daysFromNow(20) },
+  { id: 'cb_indiv_main' as CreditBatchId, playerId: 'pl_omar' as PlayerId, source: 'purchase', purchaseId: 'pu_omar_indiv4' as PurchaseId, trainingType: 'individual', quantityTotal: 4, quantityRemaining: 4, createdAt: daysFromNow(-10), expiresAt: daysFromNow(20), note: null },
 
   ...signupGrants,
 ];

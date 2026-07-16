@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { CREDIT_EXPIRY_DAYS, EXPIRING_SOON_DAYS, SIGNUP_TRIAL_CREDITS } from './constants';
 import {
+  buildAdminGrant,
   buildPurchaseCredits,
   buildSignupGrant,
   creditExpiryState,
@@ -100,14 +101,46 @@ describe('buildPurchaseCredits', () => {
   });
 });
 
+describe('buildAdminGrant', () => {
+  const grant = buildAdminGrant(PLAYER, 'group', 3, NOW, 'Rained-out session on 12 Jul');
+
+  it('is an admin grant with no purchase — never revenue or liability', () => {
+    expect(grant.source).toBe('admin_grant');
+    expect(grant.purchaseId).toBeNull();
+    expect(isPurchaseBacked(grant)).toBe(false);
+  });
+
+  it("grants the owner's chosen type and quantity, unused", () => {
+    expect(grant.trainingType).toBe('group');
+    expect(grant.quantityTotal).toBe(3);
+    expect(grant.quantityRemaining).toBe(3);
+  });
+
+  it('carries the reason on the batch, and defaults it to null', () => {
+    expect(grant.note).toBe('Rained-out session on 12 Jul');
+    expect(buildAdminGrant(PLAYER, 'duo', 1, NOW).note).toBeNull();
+  });
+
+  it('expires CREDIT_EXPIRY_DAYS after now — a comp does not buy extra time', () => {
+    const expected = new Date(new Date(NOW).getTime() + CREDIT_EXPIRY_DAYS * 86_400_000).toISOString();
+    expect(grant.expiresAt).toBe(expected);
+    expect(grant.createdAt).toBe(NOW);
+  });
+
+  it('assigns a prefixed credit-batch id for the player', () => {
+    expect(grant.id.startsWith('cb_')).toBe(true);
+    expect(grant.playerId).toBe(PLAYER);
+  });
+});
+
 describe('isPurchaseBacked', () => {
   it('narrows purchase-backed batches only', () => {
     const purchased = {
       source: 'purchase',
       purchaseId: 'pu_1',
     } as unknown as CreditBatch;
-    const granted = buildSignupGrant(PLAYER, NOW);
     expect(isPurchaseBacked(purchased)).toBe(true);
-    expect(isPurchaseBacked(granted)).toBe(false);
+    expect(isPurchaseBacked(buildSignupGrant(PLAYER, NOW))).toBe(false);
+    expect(isPurchaseBacked(buildAdminGrant(PLAYER, 'group', 1, NOW))).toBe(false);
   });
 });

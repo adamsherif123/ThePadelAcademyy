@@ -7,6 +7,7 @@ import {
   formatExpiry,
   formatInstantDate,
   formatInstantTime,
+  formatMonthDay,
   formatPiastres,
   formatSessionTimeRange,
 } from './format';
@@ -20,6 +21,14 @@ describe('formatCompactEgp', () => {
     expect(formatCompactEgp(egp(1_200_000))).toBe('1.2M');
     expect(formatCompactEgp(egp(750))).toBe('750');
     expect(formatCompactEgp(egp(0))).toBe('0');
+  });
+});
+
+describe('formatMonthDay', () => {
+  it('renders compact Cairo "Mon D"', () => {
+    expect(formatMonthDay('2026-07-19T09:00:00.000Z' as IsoInstant)).toBe('Jul 19');
+    // Cairo rollover: 22:00Z on 30 Jun is 01:00 Cairo on 1 Jul.
+    expect(formatMonthDay('2026-06-30T22:00:00.000Z' as IsoInstant)).toBe('Jul 1');
   });
 });
 

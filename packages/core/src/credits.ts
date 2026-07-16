@@ -1,4 +1,11 @@
-import type { CreditBatch, IsoInstant, Package, PlayerId, PurchaseId } from '@tpa/types';
+import type {
+  CreditBatch,
+  IsoInstant,
+  Package,
+  PlayerId,
+  PurchaseId,
+  TrainingType,
+} from '@tpa/types';
 
 import { CREDIT_EXPIRY_DAYS, EXPIRING_SOON_DAYS, SIGNUP_TRIAL_CREDITS } from './constants';
 import { ID_PREFIXES, newId } from './ids';
@@ -55,6 +62,40 @@ export function buildSignupGrant(playerId: PlayerId, now: IsoInstant): CreditBat
     quantityRemaining: SIGNUP_TRIAL_CREDITS,
     expiresAt: expiryFrom(now),
     createdAt: now,
+    note: null,
+  };
+}
+
+/**
+ * The exact CreditBatch to insert when the OWNER comps a player — the escape
+ * hatch that keeps strict expiry honest (mirrors `buildSignupGrant`). Pure: takes
+ * `now`, does no I/O. S4f's Players UI calls this; S10 runs it server-side.
+ *
+ * `source: 'admin_grant'` with a null `purchaseId` — no money changed hands, so
+ * it NEVER counts as revenue or credit liability (unlike a faked purchase, the
+ * workaround this replaces). `trainingType` and `quantity` are the owner's choice;
+ * expiry is CREDIT_EXPIRY_DAYS from `now`, the SAME 30-day rule as every other
+ * credit (a comp doesn't buy extra time). `reason` is carried on the batch so the
+ * grant is explicable later; omit it and it's null.
+ */
+export function buildAdminGrant(
+  playerId: PlayerId,
+  trainingType: TrainingType,
+  quantity: number,
+  now: IsoInstant,
+  reason?: string,
+): CreditBatch {
+  return {
+    id: newId(ID_PREFIXES.creditBatch) as CreditBatch['id'],
+    playerId,
+    source: 'admin_grant',
+    purchaseId: null,
+    trainingType,
+    quantityTotal: quantity,
+    quantityRemaining: quantity,
+    expiresAt: expiryFrom(now),
+    createdAt: now,
+    note: reason ?? null,
   };
 }
 
@@ -84,5 +125,6 @@ export function buildPurchaseCredits(
     quantityRemaining: pkg.sessionCount,
     expiresAt: expiryFrom(now),
     createdAt: now,
+    note: null,
   };
 }

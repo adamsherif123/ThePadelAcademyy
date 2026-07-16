@@ -1,10 +1,11 @@
-import { CREDIT_EXPIRY_DAYS } from '@tpa/core';
+import { CREDIT_EXPIRY_DAYS, buildAdminGrant } from '@tpa/core';
 import type {
   Booking,
   BookingId,
   BookingStatus,
   CreditBatch,
   CreditBatchId,
+  IsoInstant,
   Level,
   Package,
   Player,
@@ -166,12 +167,22 @@ for (let dayOffset = WINDOW_DAYS; dayOffset >= 1; dayOffset -= 1) {
       quantityRemaining: remaining,
       createdAt,
       expiresAt,
+      note: null,
     });
     const list = batchesByPlayer.get(player.id) ?? [];
     list.push(batchId);
     batchesByPlayer.set(player.id, list);
   }
 }
+
+// One admin_grant (the owner comped a player) so the new source is exercised
+// end-to-end: it must satisfy the source invariant (null purchaseId) and count as
+// NEITHER revenue NOR credit liability.
+const compedPlayer = generatedPlayers[0]!;
+generatedBatches.push({
+  ...buildAdminGrant(compedPlayer.id, 'group', 2, instantDaysAgo(3) as IsoInstant, 'Comped: rained-out session'),
+  id: 'cb_admin_comp' as CreditBatchId,
+});
 
 // --- Bookings: spread generated players across real slots, with attendance ---
 const publishedSlots = mockSlots.filter((s) => s.status === 'published');
