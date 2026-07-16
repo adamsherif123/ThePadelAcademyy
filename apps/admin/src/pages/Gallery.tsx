@@ -1,4 +1,5 @@
-import { Plus } from 'lucide-react';
+import type { Piastres } from '@tpa/types';
+import { DollarSign, Gauge, Plus, Users } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 import { allCoaches, allPlayers } from '../data/selectors';
@@ -7,20 +8,27 @@ import {
   Badge,
   Button,
   Card,
+  Donut,
   EmptyState,
   Input,
+  LineChart,
   Modal,
   PageHeader,
+  Panel,
   SearchInput,
   SegmentedTabs,
   Select,
+  StatCard,
   StatusChip,
   Table,
   Toggle,
   TypePill,
   type Column,
+  type DonutSegment,
 } from '../ui';
 import styles from './Gallery.module.css';
+
+const egp = (n: number) => (n * 100) as Piastres;
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -170,6 +178,53 @@ export function Gallery() {
           />
         </Card>
       </Section>
+
+      <Section title="StatCard (KPI)">
+        <StatCard eyebrow="Revenue · July" icon={DollarSign} iconTone="accent" value="113,700 EGP" delta={-43} caption="vs last month" />
+        <StatCard eyebrow="Active players" icon={Users} value="101" caption="with credits or bookings" />
+        <StatCard eyebrow="Slot fill rate" icon={Gauge} value="48%" delta={12} caption="capacity booked this week" />
+      </Section>
+
+      <Section title="LineChart (revenue over time)">
+        <Panel eyebrow="Last 8 weeks" title="Revenue over time">
+          <LineChart
+            data={[
+              { label: '31/5', value: egp(0) },
+              { label: '7/6', value: egp(48000) },
+              { label: '14/6', value: egp(63000) },
+              { label: '21/6', value: egp(48000) },
+              { label: '28/6', value: egp(60000) },
+              { label: '5/7', value: egp(43000) },
+              { label: '12/7', value: egp(45000) },
+              { label: '19/7', value: egp(6000) },
+            ]}
+          />
+        </Panel>
+      </Section>
+
+      <Section title="Donut — realistic, and STRESS at 6-digit figures (legend must fit)">
+        <div className={styles.donutGrid}>
+          <Panel eyebrow="What earns" title="Revenue by training type">
+            <Donut segments={DONUT_REALISTIC} total={egp(313800)} />
+          </Panel>
+          <Panel eyebrow="Stress test" title="Largest plausible figures">
+            <Donut segments={DONUT_STRESS} total={egp(2799997)} />
+          </Panel>
+        </div>
+      </Section>
     </div>
   );
 }
+
+const DONUT_REALISTIC: DonutSegment[] = [
+  { key: 'group', label: 'Group', value: egp(86000), color: 'var(--tint-group-fg)' },
+  { key: 'duo', label: 'Duo', value: egp(139000), color: 'var(--tint-duo-fg)' },
+  { key: 'individual', label: 'Individual', value: egp(88800), color: 'var(--color-text-label)' },
+];
+
+// Six-digit EGP + percentages: the case v0's legend overflowed on.
+const DONUT_STRESS: DonutSegment[] = [
+  { key: 'group', label: 'Group', value: egp(999999), color: 'var(--tint-group-fg)' },
+  { key: 'duo', label: 'Duo', value: egp(899999), color: 'var(--tint-duo-fg)' },
+  { key: 'individual', label: 'Individual', value: egp(899999), color: 'var(--color-text-label)' },
+];

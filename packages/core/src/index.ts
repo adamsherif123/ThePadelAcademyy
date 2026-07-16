@@ -43,6 +43,8 @@ export {
 } from './time';
 
 export {
+  formatCompactEgp,
+  formatDayMonth,
   formatExpiry,
   formatInstantDate,
   formatInstantTime,

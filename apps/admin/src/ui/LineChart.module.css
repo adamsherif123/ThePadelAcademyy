@@ -1,0 +1,36 @@
+.svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.grid {
+  stroke: var(--color-border-subtle);
+  stroke-width: 1;
+}
+
+.axisLabel {
+  fill: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.line {
+  stroke: var(--color-accent-default);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.dot {
+  fill: var(--color-accent-default);
+}
+
+.fillTop {
+  stop-color: var(--color-accent-default);
+  stop-opacity: 0.22;
+}
+
+.fillBottom {
+  stop-color: var(--color-accent-default);
+  stop-opacity: 0;
+}

@@ -1,13 +1,7 @@
 import type { TrainingType } from '@tpa/types';
 
 import styles from './TypePill.module.css';
-
-const LABEL: Record<TrainingType, string> = {
-  trial: 'Trial',
-  group: 'Group',
-  duo: 'Duo',
-  individual: 'Individual',
-};
+import { TRAINING_LABEL as LABEL } from './trainingLabel';
 
 /**
  * A neutral pill with a training-type-coloured dot + label (the calendar / table

@@ -1,6 +1,7 @@
 import { cairoCalendarDate } from '@tpa/core';
 import type { Booking, BookingId, CreditBatchId, PlayerId, SessionSlot, SlotId } from '@tpa/types';
 
+import { generatedBookings } from './generated';
 import { MOCK_NOW, daysFromNow } from './now';
 import { mockSlots } from './schedule';
 
@@ -37,7 +38,7 @@ const bookedGroupSlot =
  * upcoming ones. `creditBatchId` records which batch paid, so a refund knows
  * where to return the credit with its original expiry.
  */
-export const mockBookings: Booking[] = [
+const handBookings: Booking[] = [
   {
     id: 'bk_booked' as BookingId,
     slotId: bookedGroupSlot.id,
@@ -97,3 +98,6 @@ export const mockBookings: Booking[] = [
     cancelledAt: null,
   },
 ];
+
+/** Hand-tuned core bookings (pl_omar, one per status) + academy-scale generated ones. */
+export const mockBookings: Booking[] = [...handBookings, ...generatedBookings];

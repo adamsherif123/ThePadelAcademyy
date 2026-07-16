@@ -2,6 +2,8 @@ import type { IsoInstant, Piastres } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
 import {
+  formatCompactEgp,
+  formatDayMonth,
   formatExpiry,
   formatInstantDate,
   formatInstantTime,
@@ -10,6 +12,24 @@ import {
 } from './format';
 
 const egp = (n: number) => (n * 100) as Piastres;
+
+describe('formatCompactEgp', () => {
+  it('drops the decimal for whole thousands and keeps one otherwise', () => {
+    expect(formatCompactEgp(egp(80000))).toBe('80k'); // 80,000 EGP
+    expect(formatCompactEgp(egp(512700))).toBe('512.7k');
+    expect(formatCompactEgp(egp(1_200_000))).toBe('1.2M');
+    expect(formatCompactEgp(egp(750))).toBe('750');
+    expect(formatCompactEgp(egp(0))).toBe('0');
+  });
+});
+
+describe('formatDayMonth', () => {
+  it('renders compact Cairo day/month without leading zeros', () => {
+    // 2026-05-30T22:00Z is 2026-05-31 01:00 Cairo (+03) → "31/5", not "30/5".
+    expect(formatDayMonth('2026-05-30T22:00:00.000Z' as IsoInstant)).toBe('31/5');
+    expect(formatDayMonth('2026-07-05T09:00:00.000Z' as IsoInstant)).toBe('5/7');
+  });
+});
 
 describe('formatPiastres', () => {
   it('formats whole pounds with grouping and no decimals', () => {

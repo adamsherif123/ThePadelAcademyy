@@ -22,6 +22,21 @@ export function formatPiastres(amount: Piastres): string {
   return `${number} EGP`;
 }
 
+/**
+ * Compact EGP for dense chart labels — axis ticks and the donut hole — where the
+ * full "512,700 EGP" is too wide. Whole thousands drop the decimal ("80k"),
+ * others keep one ("512.7k"); millions use "M". No "EGP" suffix (the chart states
+ * the unit once). Precise money still renders via formatPiastres.
+ */
+export function formatCompactEgp(amount: Piastres): string {
+  const egp = amount / PIASTRES_PER_EGP;
+  const compact = (n: number, suffix: string) =>
+    `${Number.isInteger(n) ? String(n) : n.toFixed(1)}${suffix}`;
+  if (Math.abs(egp) >= 1_000_000) return compact(egp / 1_000_000, 'M');
+  if (Math.abs(egp) >= 1_000) return compact(egp / 1_000, 'k');
+  return String(Math.round(egp));
+}
+
 const DATE_FMT = new Intl.DateTimeFormat('en-GB', {
   timeZone: CAIRO_TZ,
   weekday: 'short',
@@ -44,6 +59,15 @@ export function formatInstantDate(instant: IsoInstant): string {
 /** e.g. "6:00 PM" in Cairo time. */
 export function formatInstantTime(instant: IsoInstant): string {
   return TIME_FMT.format(parseInstant(instant));
+}
+
+/**
+ * Compact Cairo day/month with no leading zeros, e.g. "31/5" — for dense chart
+ * axes where the full "Sat, 31 May" is too wide. Cairo calendar day, not UTC.
+ */
+export function formatDayMonth(instant: IsoInstant): string {
+  const c = cairoCalendarDate(instant);
+  return `${c.day}/${c.month}`;
 }
 
 /**

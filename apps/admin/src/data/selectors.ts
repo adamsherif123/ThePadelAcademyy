@@ -4,6 +4,7 @@ import type {
   Coach,
   CoachId,
   Package,
+  PackageId,
   Player,
   PlayerId,
   SessionSlot,
@@ -52,3 +53,5 @@ export const bookingsForPlayer = (playerId: PlayerId): Booking[] =>
 // Packages
 export const allPackages = (): Package[] => getPackages();
 export const activePackages = (): Package[] => getPackages().filter((p) => p.isActive);
+export const packageById = (id: PackageId): Package | undefined =>
+  getPackages().find((p) => p.id === id);

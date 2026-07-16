@@ -1,0 +1,90 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.chart {
+  position: relative;
+  width: 168px;
+  height: 168px;
+}
+
+.svg {
+  width: 100%;
+  height: 100%;
+}
+
+.track {
+  stroke: var(--color-bg-canvas);
+}
+
+.center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+}
+
+.centerLabel {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+}
+
+.centerValue {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-bold);
+}
+
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* Full-width row: dot · label (flexes) · amount · percent. Can't overflow. */
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+
+.legendLabel {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.legendValue {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+.legendPct {
+  width: 40px;
+  text-align: end;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  flex-shrink: 0;
+}

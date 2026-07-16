@@ -1,5 +1,6 @@
 import type { Coach, CoachId, Player, PlayerId } from '@tpa/types';
 
+import { generatedPlayers } from './generated';
 import { MOCK_NOW } from './now';
 
 // photoUrl is null across the fixtures: mocks must not depend on a live external
@@ -37,8 +38,12 @@ export const mockCoaches: Coach[] = [
   },
 ];
 
-/** ~8 players spread across levels and both genders. */
-export const mockPlayers: Player[] = [
+/**
+ * The hand-tuned core players (client-app fixtures center on pl_omar at index 0).
+ * The academy-scale generated players are APPENDED after these — never before —
+ * so pl_omar stays index 0 and mockCurrentPlayer is unchanged.
+ */
+const handPlayers: Player[] = [
   { id: 'pl_omar' as PlayerId, phone: '+201001112221', name: 'Omar Sherif', gender: 'men', level: 'beginner', createdAt: MOCK_NOW },
   { id: 'pl_youssef' as PlayerId, phone: '+201001112222', name: 'Youssef Ali', gender: 'men', level: 'adv_beginner', createdAt: MOCK_NOW },
   { id: 'pl_tarek' as PlayerId, phone: '+201001112223', name: 'Tarek Hassan', gender: 'men', level: 'intermediate', createdAt: MOCK_NOW },
@@ -48,6 +53,9 @@ export const mockPlayers: Player[] = [
   { id: 'pl_dina' as PlayerId, phone: '+201001112227', name: 'Dina Kamal', gender: 'ladies', level: 'intermediate', createdAt: MOCK_NOW },
   { id: 'pl_hana' as PlayerId, phone: '+201001112228', name: 'Hana Sabry', gender: 'ladies', level: 'beginner', createdAt: MOCK_NOW },
 ];
+
+/** ~104 players: the hand-tuned core + academy-scale generated ones. */
+export const mockPlayers: Player[] = [...handPlayers, ...generatedPlayers];
 
 /** The player whose wallet/bookings the client-app fixtures center on. */
 export const mockCurrentPlayer: Player = mockPlayers[0]!;
