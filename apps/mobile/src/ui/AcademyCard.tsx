@@ -8,6 +8,8 @@ import { IconRow } from './IconRow';
 export const ACADEMY = {
   name: 'Oro Plaza Hotel',
   address: 'In front of Family Park, Rehab, Cairo',
+  /** The canonical one-line location shown on session cards — the ONE source. */
+  locationLine: 'Oro Plaza Hotel · Rehab, Cairo',
   hours: 'Sun – Wed · 5:00 PM – 11:00 PM',
   hoursNote: 'Group training mainly 5 – 9 PM',
 } as const;

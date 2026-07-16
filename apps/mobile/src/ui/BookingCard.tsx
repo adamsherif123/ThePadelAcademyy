@@ -10,14 +10,7 @@ import { Badge, type BadgeTone } from './Badge';
 import { Button } from './Button';
 import { InfoCard } from './InfoCard';
 import { Text } from './Text';
-import { TRAINING_META } from './trainingMeta';
-
-const GENDER_LABEL: Record<Gender, string> = { men: 'Men', ladies: 'Ladies' };
-const LEVEL_LABEL: Record<Level, string> = {
-  beginner: 'Beginner',
-  adv_beginner: 'Adv. Beginner',
-  intermediate: 'Intermediate',
-};
+import { GENDER_LABEL, LEVEL_LABEL, TRAINING_META } from './trainingMeta';
 
 /** Past-status pill copy + tone. `booked` only appears if a past slot was never marked. */
 const PAST_STATUS: Record<BookingStatus, { label: string; tone: BadgeTone }> = {
@@ -87,7 +80,7 @@ export function BookingCard(props: BookingCardProps) {
       <View style={styles.locationRow}>
         <Ionicons name="location-outline" size={15} color={color.text.muted} />
         <Text variant="caption" tone="muted">
-          {`${ACADEMY.name} · Rehab, Cairo`}
+          {ACADEMY.locationLine}
         </Text>
       </View>
 
@@ -104,7 +97,16 @@ export function BookingCard(props: BookingCardProps) {
               text="Inside 3-hour window — cancelling now forfeits your credit"
             />
           )}
-          <Button label="Cancel booking" variant="secondary" destructive onPress={props.onCancel} />
+          <View style={styles.cancelRow}>
+            <Button
+              label="Cancel booking"
+              size="sm"
+              fullWidth={false}
+              variant="secondary"
+              destructive
+              onPress={props.onCancel}
+            />
+          </View>
         </>
       ) : null}
     </View>
@@ -123,4 +125,5 @@ const styles = StyleSheet.create({
   top: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   info: { flex: 1, gap: 2 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
+  cancelRow: { flexDirection: 'row', justifyContent: 'flex-end' },
 });

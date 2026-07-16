@@ -1,7 +1,9 @@
 import {
   canBookSlot,
+  creditExpiryState,
   formatExpiry,
   formatPiastres,
+  isCancellableWithoutForfeit,
   isPurchaseBacked,
   slotRemainingCapacity,
 } from '@tpa/core';
@@ -46,6 +48,34 @@ describe('purchases and bookings cover every status', () => {
   it('every booking references a real slot', () => {
     const slotIds = new Set(mockSlots.map((s) => s.id));
     for (const b of mockBookings) expect(slotIds.has(b.slotId)).toBe(true);
+  });
+});
+
+// Locks the cancellation demo bookings against MOCK_NOW / CANCELLATION_WINDOW_HOURS.
+// If either changes and silently flips what these cards mean, this fails loudly
+// rather than lying (the Sessions/cancel UI relies on both states existing).
+describe('cancellation-window demo assumptions', () => {
+  const nowMs = new Date(MOCK_NOW).getTime();
+  const slotById = (id: string) => mockSlots.find((s) => s.id === id)!;
+  const upcoming = mockBookings.filter(
+    (b) =>
+      b.playerId === mockCurrentPlayer.id &&
+      b.status === 'booked' &&
+      new Date(slotById(b.slotId).startsAt).getTime() > nowMs,
+  );
+
+  it('has exactly one upcoming booking inside the 3-hour window (forfeit), and at least one outside', () => {
+    const inside = upcoming.filter((b) => !isCancellableWithoutForfeit(slotById(b.slotId), MOCK_NOW));
+    expect(inside.length).toBe(1);
+    expect(upcoming.length).toBeGreaterThan(inside.length);
+  });
+
+  it('has an upcoming booking whose paying batch is already expired (refund-but-worthless edge)', () => {
+    const batchById = (id: string) => mockCreditBatches.find((b) => b.id === id)!;
+    const expiredPaid = upcoming.filter(
+      (b) => creditExpiryState(batchById(b.creditBatchId).expiresAt, MOCK_NOW) === 'expired',
+    );
+    expect(expiredPaid.length).toBeGreaterThanOrEqual(1);
   });
 });
 

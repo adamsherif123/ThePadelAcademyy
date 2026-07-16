@@ -90,6 +90,22 @@ function subscribe(listener: () => void): () => void {
 }
 
 /**
+ * TEST-ONLY: re-seed the store from the fixtures so each test starts from a clean,
+ * known state. The app never resets (screens only ever add to the store), and S9's
+ * real store won't need it — this exists purely so the mutation-seam tests
+ * (bookSlot / cancelBooking) don't leak state between cases. Mutations replace
+ * objects rather than mutating the fixtures in place, so re-cloning the arrays
+ * fully restores the original state.
+ */
+export function __resetStoreForTests(): void {
+  batches = [...mockCreditBatches];
+  purchases = [...mockPurchases];
+  slots = [...mockSlots];
+  bookings = [...mockBookings];
+  version = 0;
+}
+
+/**
  * Subscribe the calling component to store changes. Returns the version counter;
  * components then call the pure selectors. Screens showing mutable data (Home,
  * Wallet, Book, Profile, Purchase history) call this so they re-render after a

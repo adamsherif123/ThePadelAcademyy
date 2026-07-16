@@ -58,7 +58,7 @@ export default function BookedSuccessScreen() {
             <Badge label={meta.label} icon={meta.icon} />
           </View>
           <View style={styles.rows}>
-            <IconRow icon="location-outline" title={`${ACADEMY.name} · Rehab, Cairo`} />
+            <IconRow icon="location-outline" title={ACADEMY.locationLine} />
             <IconRow
               icon="time-outline"
               title={`Free cancellation until ${formatInstantTime(cancellationDeadline(slot))}`}

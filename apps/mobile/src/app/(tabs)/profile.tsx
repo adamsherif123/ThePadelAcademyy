@@ -14,18 +14,13 @@ import {
   Button,
   Card,
   CircleIconButton,
+  GENDER_LABEL,
+  LEVEL_LABEL,
   LinkRow,
   Screen,
   ScreenHeader,
   Text,
 } from '../../ui';
-
-const GENDER_LABEL = { men: 'Men', ladies: 'Ladies' } as const;
-const LEVEL_LABEL = {
-  beginner: 'Beginner',
-  adv_beginner: 'Advanced Beginner',
-  intermediate: 'Intermediate',
-} as const;
 
 /** 15 — Profile. Identity card, links, academy, sign out. */
 export default function ProfileScreen() {

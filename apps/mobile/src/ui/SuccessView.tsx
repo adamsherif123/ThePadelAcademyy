@@ -11,7 +11,7 @@ export type SuccessTone = 'success' | 'accent';
 
 /**
  * The shared success-screen layout (booked / purchased): a colored icon circle,
- * periwinkle eyebrow, weight-900 display heading, a detail card slot, then a
+ * periwinkle eyebrow, extrabold display heading, a detail card slot, then a
  * primary + optional secondary full-pill CTA. Establishes one look for every
  * confirmation screen. RTL-safe.
  */

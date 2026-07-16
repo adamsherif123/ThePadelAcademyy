@@ -7,15 +7,11 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Avatar } from './Avatar';
 import { CapacityDots } from './CapacityDots';
 import { Text } from './Text';
+import { GENDER_LABEL, LEVEL_LABEL } from './trainingMeta';
 
+// `booked` renders a static "Booked" pill; there's deliberately no action here —
+// managing/cancelling a booking lives only in the Sessions tab (by design).
 export type SlotCardState = 'bookable' | 'full' | 'booked' | 'unavailable';
-
-const GENDER_LABEL: Record<Gender, string> = { men: 'Men', ladies: 'Ladies' };
-const LEVEL_LABEL: Record<Level, string> = {
-  beginner: 'Beginner',
-  adv_beginner: 'Adv. Beginner',
-  intermediate: 'Intermediate',
-};
 
 /**
  * A bookable session card: coach photo, Cairo time range (via @tpa/core),

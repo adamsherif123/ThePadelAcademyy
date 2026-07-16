@@ -7,7 +7,7 @@ import { Text } from './Text';
 
 /**
  * The brand's signature header, on every screen: a periwinkle uppercase tracked
- * eyebrow, then a weight-900 UPPERCASE display heading. Optional circular back
+ * eyebrow, then an extrabold UPPERCASE display heading. Optional circular back
  * chevron (inline-start) and an optional `trailing` slot (e.g. an Avatar). `tone`
  * controls title/back-button colors for light vs navy surfaces. RTL-safe.
  */

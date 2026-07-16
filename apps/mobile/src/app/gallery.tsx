@@ -122,15 +122,32 @@ export default function GalleryScreen() {
         </View>
       </Section>
 
-      <Section title="Buttons">
-        <Row>
-          <Button label="Primary" onPress={() => {}} />
-          <Button label="Secondary" variant="secondary" onPress={() => {}} />
-          <Button label="Ghost" variant="ghost" onPress={() => {}} />
-        </Row>
+      <Section title="Buttons — md (default, full-width CTA)">
+        <Button label="Primary" onPress={() => {}} />
+        <Button label="Secondary" variant="secondary" onPress={() => {}} />
+        <Button label="Ghost" variant="ghost" onPress={() => {}} />
         <Row>
           <Button label="Disabled" disabled onPress={() => {}} />
           <Button label="Loading" loading onPress={() => {}} />
+        </Row>
+      </Section>
+
+      <Section title="Buttons — sm (inline / card action, self-sized)">
+        <Row>
+          <Button label="Primary" size="sm" fullWidth={false} onPress={() => {}} />
+          <Button label="Secondary" size="sm" fullWidth={false} variant="secondary" onPress={() => {}} />
+          <Button label="Ghost" size="sm" fullWidth={false} variant="ghost" onPress={() => {}} />
+        </Row>
+        <Row>
+          <Button
+            label="Cancel booking"
+            size="sm"
+            fullWidth={false}
+            variant="secondary"
+            destructive
+            onPress={() => {}}
+          />
+          <Button label="With icon" size="sm" fullWidth={false} icon="add-outline" onPress={() => {}} />
         </Row>
       </Section>
 

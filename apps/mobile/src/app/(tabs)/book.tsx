@@ -1,5 +1,5 @@
 import { space } from '@tpa/theme';
-import type { Gender, Level, SessionSlot, TrainingType } from '@tpa/types';
+import type { SessionSlot, TrainingType } from '@tpa/types';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -19,6 +19,8 @@ import {
   EmptyState,
   Screen,
   ScreenHeader,
+  GENDER_LABEL,
+  LEVEL_LABEL,
   SlotCard,
   type SlotCardState,
   Text,
@@ -27,12 +29,6 @@ import {
 } from '../../ui';
 
 const WEEKDAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
-const GENDER_LABEL: Record<Gender, string> = { men: 'Men', ladies: 'Ladies' };
-const LEVEL_LABEL: Record<Level, string> = {
-  beginner: 'Beginner',
-  adv_beginner: 'Adv. Beginner',
-  intermediate: 'Intermediate',
-};
 
 // Book-screen taglines (product copy). Layout lives in TypeCard.
 const TAGLINE: Record<TrainingType, string> = {

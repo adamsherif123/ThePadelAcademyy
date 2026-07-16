@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useSession } from '../../session/SessionProvider';
-import { BrandMark, Button, Input, NavyScreen, PillOnNavy, Text } from '../../ui';
+import { ACADEMY, BrandMark, Button, Input, NavyScreen, PillOnNavy, Text } from '../../ui';
 
 /** 01 — Sign in with phone. Any input advances (mock); OTP verifies. */
 export default function SignInScreen() {
@@ -38,7 +38,7 @@ export default function SignInScreen() {
         <View style={styles.locationRow}>
           <Ionicons name="location-outline" size={16} color={color.text.muted} />
           <Text variant="caption" tone="muted">
-            Oro Plaza Hotel · Rehab, Cairo
+            {ACADEMY.locationLine}
           </Text>
         </View>
 

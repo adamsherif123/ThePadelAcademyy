@@ -14,21 +14,16 @@ import {
   Button,
   Card,
   CreditCallout,
+  GENDER_LABEL,
   IconRow,
   InfoCard,
+  LEVEL_LABEL,
   Screen,
   ScreenHeader,
   Text,
   TRAINING_META,
   batchLabel,
 } from '../ui';
-
-const GENDER_LABEL: Record<Gender, string> = { men: 'Men', ladies: 'Ladies' };
-const LEVEL_LABEL: Record<Level, string> = {
-  beginner: 'Beginner',
-  adv_beginner: 'Adv. Beginner',
-  intermediate: 'Intermediate',
-};
 
 const UNBOOKABLE_MESSAGE: Record<string, string> = {
   slot_full: 'This session just filled up. Pick another slot.',
@@ -93,9 +88,6 @@ export default function ConfirmBookingScreen() {
             <Text variant="body" weight="bold">
               {coach?.name ?? 'Academy coach'}
             </Text>
-            <Text variant="caption" tone="secondary">
-              {coach?.bio ?? 'Academy coaching'}
-            </Text>
           </View>
           <Badge label={meta.label} icon={meta.icon} />
         </View>
@@ -110,12 +102,7 @@ export default function ConfirmBookingScreen() {
             label="Time"
             value={`${formatInstantTime(slot.startsAt)} – ${formatInstantTime(slot.endsAt)}`}
           />
-          <IconRow
-            chip
-            icon="location-outline"
-            label="Location"
-            value={`${ACADEMY.name} · Rehab, Cairo`}
-          />
+          <IconRow chip icon="location-outline" label="Location" value={ACADEMY.locationLine} />
         </View>
 
         <View style={styles.tags}>

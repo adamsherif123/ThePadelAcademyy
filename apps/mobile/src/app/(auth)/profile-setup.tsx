@@ -6,9 +6,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useSession } from '../../session/SessionProvider';
-import { Button, InfoCard, Input, Screen, ScreenHeader, Text } from '../../ui';
-
-const GENDER_LABEL: Record<Gender, string> = { men: 'Men', ladies: 'Ladies' };
+import { Button, GENDER_LABEL, InfoCard, Input, Screen, ScreenHeader, Text } from '../../ui';
 
 const LEVEL_COPY: Record<Level, { title: string; description: string }> = {
   beginner: { title: 'Beginner', description: 'New to padel or still learning the basics' },

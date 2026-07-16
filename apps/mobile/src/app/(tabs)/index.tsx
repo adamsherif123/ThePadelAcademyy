@@ -81,7 +81,7 @@ export default function HomeScreen() {
               />
             </View>
             <View style={styles.divider} />
-            <IconRow icon="location-outline" title={`${ACADEMY.name} · Rehab`} />
+            <IconRow icon="location-outline" title={ACADEMY.locationLine} />
           </Card>
         </View>
       ) : null}
