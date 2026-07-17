@@ -10,6 +10,13 @@ begin;
 select plan(67);
 
 -- ── seed (as postgres / superuser: RLS bypassed, constraints still apply) ────
+-- S8: players.auth_user_id now FK-references auth.users, so the linked auth rows
+-- must exist first (id-only is enough — these tests don't touch auth.users.phone).
+insert into auth.users (id) values
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
+  ('ffffffff-ffff-ffff-ffff-ffffffffffff');
+
 insert into public.players (id, phone, name, gender, level, created_at, auth_user_id, is_admin) values
   ('pl_A',     '+201000000001', 'Ali', 'men',    'beginner',     now(), 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', false),
   ('pl_B',     '+201000000002', 'Bea', 'ladies', 'intermediate', now(), 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', false),

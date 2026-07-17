@@ -60,7 +60,8 @@ cleanup_rows() {
        delete from public.credit_batches where id like 'cbr_%' or player_id like 'plr_%';
        delete from public.session_slots  where id like 'slr_%';
        delete from public.players        where id like 'plr_%';
-       delete from public.coaches        where id like 'cor_%';" >/dev/null
+       delete from public.coaches        where id like 'cor_%';
+       delete from auth.users            where id::text like '00000000-0000-0000-0000-%';" >/dev/null
 }
 
 # ── setup ────────────────────────────────────────────────────────────────────
@@ -74,9 +75,12 @@ insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,ca
   ('slr_c2','cor_c2', now()+interval '1 day', now()+interval '1 day 1 hour','trial',4,0,'published');"
 
 # Scenario A players (8) + B players (10), each with one trial credit.
-for i in $(seq 1 8);  do SETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_a$i','+2010000${i}1','A','men','beginner',now(),'$(uuid $((100+i)))');"; SETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_a$i','plr_a$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now());"; done
-for i in $(seq 1 10); do SETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_b$i','+2010000${i}2','B','men','beginner',now(),'$(uuid $((200+i)))');"; SETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_b$i','plr_b$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now());"; done
+# S8: auth_user_id FK-references auth.users, and the JWT sub must resolve via it —
+# so each racer's auth.users row is seeded (id-only) before its player.
+for i in $(seq 1 8);  do SETUP+="insert into auth.users (id) values ('$(uuid $((100+i)))');"; SETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_a$i','+2010000${i}1','A','men','beginner',now(),'$(uuid $((100+i)))');"; SETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_a$i','plr_a$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now());"; done
+for i in $(seq 1 10); do SETUP+="insert into auth.users (id) values ('$(uuid $((200+i)))');"; SETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_b$i','+2010000${i}2','B','men','beginner',now(),'$(uuid $((200+i)))');"; SETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_b$i','plr_b$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now());"; done
 # Scenario C: one player, ONE credit, two slots.
+SETUP+="insert into auth.users (id) values ('$(uuid 301)');"
 SETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_c1','+201000099','C','men','beginner',now(),'$(uuid 301)');"
 SETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_c1','plr_c1','signup_grant',null,'trial',1,1,now()+interval '30 day',now());"
 sql "$SETUP" >/dev/null
@@ -126,10 +130,12 @@ check "exactly one booking for the player"  "$(sql "select count(*) from public.
 # landed was refunded by cancel_session).
 echo "Scenario D — book_slot vs cancel_session raced on the same slot (K=40):"
 D_N=40
-DSETUP="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id,is_admin) values ('plr_dadm','+201000900','Adm','men','beginner',now(),'$(uuid 999)',true);"
+DSETUP="insert into auth.users (id) values ('$(uuid 999)');"
+DSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id,is_admin) values ('plr_dadm','+201000900','Adm','men','beginner',now(),'$(uuid 999)',true);"
 for i in $(seq 1 $D_N); do
   DSETUP+="insert into public.coaches (id,name,bio,is_active) values ('cor_d$i','C','b',true);"
   DSETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status) values ('slr_d$i','cor_d$i',now()+interval '1 day',now()+interval '1 day 1 hour','trial',4,0,'published');"
+  DSETUP+="insert into auth.users (id) values ('$(uuid $((400+i)))');"
   DSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_d$i','+2010009${i}','D','men','beginner',now(),'$(uuid $((400+i)))');"
   DSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_d$i','plr_d$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now());"
 done

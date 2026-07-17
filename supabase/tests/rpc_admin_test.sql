@@ -12,6 +12,13 @@ begin;
 select plan(60);
 
 -- ── seed as postgres ─────────────────────────────────────────────────────────
+-- S8: auth_user_id now FK-references auth.users — seed the linked auth rows first.
+insert into auth.users (id) values
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
+  ('cccccccc-cccc-cccc-cccc-cccccccccccc'),
+  ('ffffffff-ffff-ffff-ffff-ffffffffffff');
+
 insert into public.players (id, phone, name, gender, level, created_at, auth_user_id, is_admin) values
   ('pl_adm', '+201000000000', 'Adm', 'men', 'beginner', now(), 'ffffffff-ffff-ffff-ffff-ffffffffffff', true),
   ('pl_a',   '+201000000001', 'Ali', 'men', 'beginner', now(), 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', false),

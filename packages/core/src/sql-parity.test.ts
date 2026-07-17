@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { CANCELLATION_WINDOW_HOURS, CREDIT_EXPIRY_DAYS } from './constants';
+import { CANCELLATION_WINDOW_HOURS, CREDIT_EXPIRY_DAYS, SIGNUP_TRIAL_CREDITS } from './constants';
 
 /**
  * The anti-drift guard for the constants that live in BOTH @tpa/core and the SQL
@@ -25,6 +25,12 @@ function tpaInterval(fnName: string): string | null {
   return allMigrationSql.match(re)?.[1] ?? null;
 }
 
+/** The integer a `create ... function tpa.<name>()` returns via `select <N>`. */
+function tpaInt(fnName: string): string | null {
+  const re = new RegExp(`function\\s+tpa\\.${fnName}\\s*\\(\\s*\\)[\\s\\S]*?select\\s+(\\d+)`, 'i');
+  return allMigrationSql.match(re)?.[1] ?? null;
+}
+
 describe('SQL ⇄ core constant parity (no silent drift)', () => {
   it('tpa.cancellation_window() mirrors CANCELLATION_WINDOW_HOURS', () => {
     expect(tpaInterval('cancellation_window')).toBe(`${CANCELLATION_WINDOW_HOURS} hours`);
@@ -32,6 +38,10 @@ describe('SQL ⇄ core constant parity (no silent drift)', () => {
 
   it('tpa.credit_expiry() mirrors CREDIT_EXPIRY_DAYS', () => {
     expect(tpaInterval('credit_expiry')).toBe(`${CREDIT_EXPIRY_DAYS} days`);
+  });
+
+  it('tpa.signup_trial_credits() mirrors SIGNUP_TRIAL_CREDITS', () => {
+    expect(tpaInt('signup_trial_credits')).toBe(String(SIGNUP_TRIAL_CREDITS));
   });
 });
 
