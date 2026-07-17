@@ -1,6 +1,6 @@
-import { formatInstantDate, formatInstantTime } from '@tpa/core';
-import type { Booking, CoachId, Player, SessionSlot } from '@tpa/types';
-import { AlertTriangle, ArrowLeft, Ban, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { cairoCalendarDate, formatInstantDate, formatInstantTime } from '@tpa/core';
+import type { Booking, CoachId, Player, SessionSlot, Weekday } from '@tpa/types';
+import { AlertTriangle, ArrowLeft, Ban, CalendarClock, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { useState } from 'react';
 
 import {
@@ -10,6 +10,12 @@ import {
   removeBooking,
 } from '../data/booking';
 import { cancelSession } from '../data/cancelSession';
+import {
+  cairoWallMinutes,
+  closedWeekdays,
+  findCoachConflict,
+  slotTimesFromWall,
+} from '../data/schedule';
 import {
   activeBookingsForSlot,
   allCoaches,
@@ -48,7 +54,24 @@ const BLOCK_TEXT: Record<string, string> = {
   slot_cancelled: 'Session cancelled',
 };
 
-type View = { k: 'main' } | { k: 'add' } | { k: 'remove'; booking: Booking } | { k: 'cancel' };
+const pad = (n: number) => String(n).padStart(2, '0');
+/** Sane session durations (a padel session isn't 12 hours — the select IS the guard). */
+const DURATIONS: readonly { value: number; label: string }[] = [
+  { value: 30, label: '30 min' },
+  { value: 45, label: '45 min' },
+  { value: 60, label: '1 hr' },
+  { value: 90, label: '1.5 hr' },
+  { value: 120, label: '2 hr' },
+  { value: 150, label: '2.5 hr' },
+  { value: 180, label: '3 hr' },
+];
+
+type View =
+  | { k: 'main' }
+  | { k: 'add' }
+  | { k: 'remove'; booking: Booking }
+  | { k: 'cancel' }
+  | { k: 'reschedule' };
 
 /**
  * The slot detail modal: the player roster, and every operational action on the
@@ -61,9 +84,17 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
   useAdminStore(); // re-render as the roster/seats change
   const slot = slotById(initial.id) ?? initial;
 
+  const startWall0 = cairoWallMinutes(slot.startsAt);
+  const endWall0 = cairoWallMinutes(slot.endsAt);
+  const duration0 = endWall0 >= startWall0 ? endWall0 - startWall0 : endWall0 + 24 * 60 - startWall0;
+  const cairo0 = cairoCalendarDate(slot.startsAt);
+
   const [view, setView] = useState<View>({ k: 'main' });
   const [coachId, setCoachId] = useState<CoachId>(slot.coachId);
   const [capacity, setCapacity] = useState<number>(slot.capacity);
+  const [dateStr, setDateStr] = useState(`${cairo0.year}-${pad(cairo0.month)}-${pad(cairo0.day)}`);
+  const [startStr, setStartStr] = useState(`${pad(Math.floor(startWall0 / 60))}:${pad(startWall0 % 60)}`);
+  const [durationMin, setDurationMin] = useState(duration0);
   const [refund, setRefund] = useState(true); // remove-player: refund is the default, never forfeit
   const [showHistory, setShowHistory] = useState(false);
 
@@ -76,16 +107,42 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
   const eyebrow = `${formatInstantDate(slot.startsAt)} · ${formatInstantTime(slot.startsAt)} – ${formatInstantTime(slot.endsAt)}`;
   const title = `${TRAINING_LABEL[slot.trainingType]} session`;
 
+  // New wall time → UTC instants (all conversion via @tpa/core, DST-correct).
+  const [yy, mm, dd] = dateStr.split('-').map(Number);
+  const [sh, sm] = startStr.split(':').map(Number);
+  const timeValid = dateStr !== '' && startStr !== '' && [yy, mm, dd, sh, sm].every((n) => Number.isFinite(n));
+  const { startsAt: newStart, endsAt: newEnd } = timeValid
+    ? slotTimesFromWall(yy!, mm!, dd!, sh! * 60 + sm!, durationMin)
+    : { startsAt: slot.startsAt, endsAt: slot.endsAt };
+  const timeChanged = newStart !== slot.startsAt || newEnd !== slot.endsAt;
+  const startMoved = newStart !== slot.startsAt;
+  const inPast = startMoved && new Date(newStart).getTime() <= new Date(now).getTime();
+  const newWeekday = timeValid ? new Date(Date.UTC(yy!, mm! - 1, dd!)).getUTCDay() : -1;
+  const closedDay = newWeekday >= 0 && closedWeekdays().has(newWeekday as Weekday);
+  const conflict = timeChanged ? findCoachConflict(coachId, newStart, newEnd, slot.id) : undefined;
+  const conflictCoach = coachById(coachId)?.name ?? 'this coach';
+
   const capacityTooLow = capacity < occupied;
   const coachChanged = coachId !== slot.coachId;
   const warnCoachChange = coachChanged && occupied > 0;
   const originalCoach = coachById(slot.coachId)?.name ?? 'the coach';
   const newCoach = coachById(coachId)?.name ?? 'another coach';
 
-  const onSave = () => {
-    if (capacityTooLow) return;
-    updateSlotDetails(slot.id, coachId, capacity);
+  const canSave = !capacityTooLow && timeValid && !inPast;
+
+  const applyEdit = () => {
+    updateSlotDetails(slot.id, { coachId, capacity, startsAt: newStart, endsAt: newEnd }, now);
     onClose();
+  };
+  const onSave = () => {
+    if (!canSave) return;
+    // A move that affects booked players demands an explicit confirm (nobody is
+    // auto-notified yet). Coach/capacity-only edits apply straight away.
+    if (timeChanged && occupied > 0) {
+      setView({ k: 'reschedule' });
+      return;
+    }
+    applyEdit();
   };
 
   // ---- ADD view: a searchable roster of bookable players ----
@@ -223,6 +280,54 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
     );
   }
 
+  // ---- RESCHEDULE view: confirm moving a session that has players in it ----
+  if (view.k === 'reschedule') {
+    const oldTime = `${formatInstantDate(slot.startsAt)} · ${formatInstantTime(slot.startsAt)} – ${formatInstantTime(slot.endsAt)}`;
+    const newTime = `${formatInstantDate(newStart)} · ${formatInstantTime(newStart)} – ${formatInstantTime(newEnd)}`;
+    return (
+      <Modal
+        open
+        onClose={onClose}
+        eyebrow={title}
+        title="Reschedule session"
+        footer={
+          <>
+            <Button variant="secondary" icon={ArrowLeft} onClick={() => setView({ k: 'main' })}>
+              Back
+            </Button>
+            <Button icon={CalendarClock} onClick={applyEdit}>
+              Reschedule anyway
+            </Button>
+          </>
+        }
+      >
+        <div className={styles.moveRow}>
+          <span className={styles.moveOld}>{oldTime}</span>
+          <span className={styles.moveArrow}>→</span>
+          <span className={styles.moveNew}>{newTime}</span>
+        </div>
+        <div className={styles.notify}>
+          <AlertTriangle size={18} aria-hidden />
+          <p>
+            <strong>
+              {occupied} player{occupied === 1 ? '' : 's'} {occupied === 1 ? 'is' : 'are'} booked.
+            </strong>{' '}
+            They will NOT be notified automatically — you must message them the new time. If a player
+            can’t make it, remove them with a refund: they’re blameless, since the academy moved the
+            session.
+          </p>
+        </div>
+        {conflict ? (
+          <p className={styles.warn}>
+            <AlertTriangle size={15} aria-hidden />
+            {conflictCoach} already coaches {formatInstantTime(conflict.startsAt)} –{' '}
+            {formatInstantTime(conflict.endsAt)} — that overlaps, and they can’t be in two places.
+          </p>
+        ) : null}
+      </Modal>
+    );
+  }
+
   // ---- MAIN view ----
   const footer = (
     <>
@@ -232,7 +337,7 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
       <Button variant="secondary" onClick={onClose}>
         Close
       </Button>
-      <Button onClick={onSave} disabled={capacityTooLow}>
+      <Button onClick={onSave} disabled={!canSave}>
         Save changes
       </Button>
     </>
@@ -326,7 +431,22 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
           </div>
         ) : null}
 
-        {/* Edit */}
+        {/* Edit — time */}
+        <div className={styles.timeFields}>
+          <Input label="Date" type="date" value={dateStr} onChange={(e) => setDateStr(e.target.value)} />
+          <Input label="Start" type="time" value={startStr} onChange={(e) => setStartStr(e.target.value)} />
+          <Select
+            label="Duration"
+            value={String(durationMin)}
+            onChange={(e) => setDurationMin(Number(e.target.value))}
+            options={(DURATIONS.some((d) => d.value === durationMin)
+              ? DURATIONS
+              : [{ value: durationMin, label: `${durationMin} min` }, ...DURATIONS]
+            ).map((d) => ({ value: String(d.value), label: d.label }))}
+          />
+        </div>
+
+        {/* Edit — coach + capacity */}
         <div className={styles.fields}>
           <Select
             label="Coach"
@@ -347,11 +467,30 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
         {capacityTooLow ? (
           <p className={styles.error}>Capacity can’t be below the {occupied} already booked.</p>
         ) : null}
+        {inPast ? (
+          <p className={styles.error}>
+            <AlertTriangle size={15} aria-hidden />
+            That start time is in the past — a session can’t have already happened.
+          </p>
+        ) : null}
         {warnCoachChange ? (
           <p className={styles.warn}>
             <AlertTriangle size={15} aria-hidden />
             {occupied} player{occupied === 1 ? '' : 's'} booked expecting {originalCoach} — they’ll be
             reassigned to {newCoach}.
+          </p>
+        ) : null}
+        {conflict ? (
+          <p className={styles.warn}>
+            <AlertTriangle size={15} aria-hidden />
+            {conflictCoach} already coaches {formatInstantTime(conflict.startsAt)} –{' '}
+            {formatInstantTime(conflict.endsAt)} — that overlaps.
+          </p>
+        ) : null}
+        {closedDay && !inPast ? (
+          <p className={styles.note}>
+            <CalendarClock size={15} aria-hidden />
+            That’s normally a closed day (Thu–Sat) — allowed for a one-off, but worth a glance.
           </p>
         ) : null}
       </div>

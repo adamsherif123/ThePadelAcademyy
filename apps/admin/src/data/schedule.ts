@@ -1,5 +1,5 @@
 import { cairoCalendarDate, cairoOffsetMs, cairoWallTimeToInstant, parseInstant } from '@tpa/core';
-import type { IsoInstant, SessionSlot, Weekday } from '@tpa/types';
+import type { CoachId, IsoInstant, SessionSlot, SlotId, Weekday } from '@tpa/types';
 
 import { assignLanes } from './lanes';
 import { getSlots, getTemplates } from './store';
@@ -84,6 +84,56 @@ export function slotsForDay(dayStart: IsoInstant): SessionSlot[] {
 /** How many published slots fall in the given columns — for the empty-week state. */
 export function weekHasSlots(columns: readonly DayColumn[]): boolean {
   return columns.some((col) => slotsForDay(col.dayStart).length > 0);
+}
+
+/**
+ * Cairo wall-clock (a calendar date + start minute-of-day + duration) → the UTC
+ * start/end instants a slot stores. EVERY conversion goes through @tpa/core's
+ * cairoWallTimeToInstant, which is DST-correct across both Egyptian transitions —
+ * a hand-rolled +2/+3 offset would be wrong twice a year with no error anywhere.
+ * The end is computed as a WALL time (rolling the clock, and the date if it passes
+ * midnight) and then converted, so a session is defined by its wall times on both
+ * ends rather than by adding raw milliseconds across a DST edge.
+ */
+export function slotTimesFromWall(
+  year: number,
+  month: number,
+  day: number,
+  startMinutes: number,
+  durationMinutes: number,
+): { startsAt: IsoInstant; endsAt: IsoInstant } {
+  const endTotal = startMinutes + durationMinutes;
+  const rollDays = Math.floor(endTotal / (24 * 60));
+  const endMin = ((endTotal % (24 * 60)) + 24 * 60) % (24 * 60);
+  const end = addDays({ year, month, day }, rollDays);
+  return {
+    startsAt: cairoWallTimeToInstant(year, month, day, Math.floor(startMinutes / 60), startMinutes % 60),
+    endsAt: cairoWallTimeToInstant(end.year, end.month, end.day, Math.floor(endMin / 60), endMin % 60),
+  };
+}
+
+/**
+ * Another ACTIVE published slot for the same coach whose time overlaps
+ * [startsAt, endsAt) — the coach can't be in two places. Touching boundaries do
+ * NOT conflict (6–8 and 8–10 are fine), matching the lane algorithm's rule. Pure
+ * app-level detection; the durable fix is a DB EXCLUDE constraint (see report).
+ */
+export function findCoachConflict(
+  coachId: CoachId,
+  startsAt: IsoInstant,
+  endsAt: IsoInstant,
+  excludeSlotId: SlotId,
+): SessionSlot | undefined {
+  const s = parseInstant(startsAt).getTime();
+  const e = parseInstant(endsAt).getTime();
+  return getSlots().find(
+    (slot) =>
+      slot.id !== excludeSlotId &&
+      slot.coachId === coachId &&
+      slot.status === 'published' &&
+      parseInstant(slot.startsAt).getTime() < e &&
+      s < parseInstant(slot.endsAt).getTime(),
+  );
 }
 
 const NOON = 12 * 60;
