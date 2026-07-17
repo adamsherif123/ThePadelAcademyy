@@ -7,7 +7,7 @@
 -- Whole file runs in one transaction and is rolled back.
 -- ============================================================================
 begin;
-select plan(61);
+select plan(67);
 
 -- ── seed (as postgres / superuser: RLS bypassed, constraints still apply) ────
 insert into public.players (id, phone, name, gender, level, created_at, auth_user_id, is_admin) values
@@ -32,9 +32,9 @@ insert into public.credit_batches (id, player_id, source, purchase_id, training_
   ('cb_A', 'pl_A', 'signup_grant', null, 'trial', 2, 2, now() + interval '30 day', now(), null),
   ('cb_B', 'pl_B', 'signup_grant', null, 'trial', 2, 2, now() + interval '30 day', now(), null);
 
-insert into public.purchases (id, player_id, package_id, status, amount, created_at, gateway_order_id, gateway_transaction_id) values
-  ('pu_A', 'pl_A', 'pk_active', 'pending', 35000, now(), null, null),
-  ('pu_B', 'pl_B', 'pk_active', 'pending', 35000, now(), null, null);
+insert into public.purchases (id, player_id, package_id, status, amount, payment_method, created_at, gateway_order_id, gateway_transaction_id) values
+  ('pu_A', 'pl_A', 'pk_active', 'pending', 35000, 'paymob', now(), null, null),
+  ('pu_B', 'pl_B', 'pk_active', 'pending', 35000, 'paymob', now(), null, null);
 
 insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, cancelled_at) values
   ('bk_A', 'sl_pub', 'pl_A', 'cb_A', 'booked', now(), null);
@@ -59,21 +59,26 @@ select is((select count(*)::int from public.credit_batches where player_id = 'pl
 
 -- Purchases: pending-only insert surface.
 select lives_ok(
-  $$ insert into public.purchases (id, player_id, package_id, status, amount, created_at)
-     values ('pu_A_new', 'pl_A', 'pk_active', 'pending', 35000, now()) $$,
+  $$ insert into public.purchases (id, player_id, package_id, status, amount, payment_method, created_at)
+     values ('pu_A_new', 'pl_A', 'pk_active', 'pending', 35000, 'paymob', now()) $$,
   'A can insert a pending purchase for themselves');
 select throws_ok(
-  $$ insert into public.purchases (id, player_id, package_id, status, amount, created_at)
-     values ('pu_A_bad', 'pl_A', 'pk_active', 'succeeded', 35000, now()) $$,
+  $$ insert into public.purchases (id, player_id, package_id, status, amount, payment_method, created_at)
+     values ('pu_A_bad', 'pl_A', 'pk_active', 'succeeded', 35000, 'paymob', now()) $$,
   '42501', null, 'A cannot insert a succeeded purchase (RLS)');
 select throws_ok(
-  $$ insert into public.purchases (id, player_id, package_id, status, amount, created_at)
-     values ('pu_forB', 'pl_B', 'pk_active', 'pending', 35000, now()) $$,
+  $$ insert into public.purchases (id, player_id, package_id, status, amount, payment_method, created_at)
+     values ('pu_forB', 'pl_B', 'pk_active', 'pending', 35000, 'paymob', now()) $$,
   '42501', null, 'A cannot insert a purchase on B''s behalf (RLS)');
 select throws_ok(
-  $$ insert into public.purchases (id, player_id, package_id, status, amount, created_at)
-     values ('pu_A_amt', 'pl_A', 'pk_active', 'pending', 1, now()) $$,
+  $$ insert into public.purchases (id, player_id, package_id, status, amount, payment_method, created_at)
+     values ('pu_A_amt', 'pl_A', 'pk_active', 'pending', 1, 'paymob', now()) $$,
   '42501', null, 'A cannot insert a purchase with a tampered amount (RLS amount pin)');
+-- S5.2 — a player can never record their own CASH payment (policy pins paymob).
+select throws_ok(
+  $$ insert into public.purchases (id, player_id, package_id, status, amount, payment_method, created_at)
+     values ('pu_A_cash', 'pl_A', 'pk_active', 'pending', 35000, 'cash', now()) $$,
+  '42501', null, 'A cannot insert a cash purchase (policy pins payment_method=paymob)');
 
 -- credit_batches: zero client write surface.
 select throws_ok(
@@ -118,8 +123,8 @@ select is(
 -- to the player, so the RLS-filtered price subselect is NULL and the purchase is
 -- denied EVEN WITH the correct amount. This is the proof the owner asked for.
 select throws_ok(
-  $$ insert into public.purchases (id, player_id, package_id, status, amount, created_at)
-     values ('pu_hidden', 'pl_A', 'pk_inactive', 'pending', 280000, now()) $$,
+  $$ insert into public.purchases (id, player_id, package_id, status, amount, payment_method, created_at)
+     values ('pu_hidden', 'pl_A', 'pk_inactive', 'pending', 280000, 'paymob', now()) $$,
   '42501', null, 'A cannot purchase an INACTIVE package even with the correct amount (amount pin)');
 
 -- S5.1 TASK 3 — a player cannot perform any admin write.
@@ -195,6 +200,12 @@ select throws_ok(
 select throws_ok(
   $$ update public.credit_batches set quantity_remaining = 0 where id = 'cb_A' $$,
   '42501', null, 'admin CANNOT write credit_batches directly (RPC only)');
+-- S5.2 — recording a cash sale (succeeded purchase + credit mint) is atomic
+-- money → RPC only; no admin insert policy on purchases.
+select throws_ok(
+  $$ insert into public.purchases (id, player_id, package_id, status, amount, payment_method, created_at)
+     values ('pu_admin_cash', 'pl_A', 'pk_active', 'succeeded', 35000, 'cash', now()) $$,
+  '42501', null, 'admin CANNOT insert a purchase directly, incl. a cash sale (RPC only)');
 
 reset role;
 
@@ -277,6 +288,24 @@ select lives_ok(
   $$ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_type, capacity, status)
      values ('sx_cancel', 'co_x', timestamptz '2030-01-01 18:30+02', timestamptz '2030-01-01 19:30+02', 'trial', 4, 'cancelled') $$,
   'exclusion: a cancelled slot does not block its published replacement');
+
+-- S5.2 — payment_method + cash/gateway-ref invariants (as postgres).
+select throws_ok(
+  $$ insert into public.purchases (id, player_id, package_id, status, amount, payment_method, created_at)
+     values ('pu_pm_bad', 'pl_A', 'pk_active', 'succeeded', 35000, 'venmo', now()) $$,
+  '23514', null, 'CHECK rejects an invalid payment_method');
+select throws_ok(
+  $$ insert into public.purchases (id, player_id, package_id, status, amount, payment_method, created_at, gateway_order_id)
+     values ('pu_cash_ref', 'pl_A', 'pk_active', 'succeeded', 35000, 'cash', now(), 'ord_123') $$,
+  '23514', null, 'CHECK rejects a cash purchase carrying gateway refs');
+select lives_ok(
+  $$ insert into public.purchases (id, player_id, package_id, status, amount, payment_method, created_at)
+     values ('pu_paymob_pending', 'pl_A', 'pk_active', 'pending', 35000, 'paymob', now()) $$,
+  'a paymob purchase may be pending with NULL gateway refs (asymmetry: constraint does not bite paymob)');
+select lives_ok(
+  $$ insert into public.purchases (id, player_id, package_id, status, amount, payment_method, created_at)
+     values ('pu_cash_ok', 'pl_A', 'pk_active', 'succeeded', 35000, 'cash', now()) $$,
+  'a cash purchase is a valid succeeded sale with NULL gateway refs');
 
 select * from finish();
 rollback;
