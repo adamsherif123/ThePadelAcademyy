@@ -121,6 +121,14 @@ create policy purchases_select_own_or_admin on public.purchases
 -- A player may insert ONLY a pending purchase, for themselves, with no gateway
 -- handles yet, and with amount pinned to the live price of the ACTIVE package
 -- being bought. This is the whole client-side write surface for payments.
+--
+-- LOAD-BEARING — DO NOT "simplify" the amount subselect. It is RLS-filtered:
+-- `(select price from public.packages where id = package_id)` runs under the
+-- caller's own policies, so an INACTIVE package (invisible to the player via
+-- packages_select_active_public) yields NULL → `amount = NULL` → NULL → the
+-- WITH CHECK fails. This subselect is therefore the ONLY thing stopping a
+-- player from purchasing a hidden/inactive package. Proven by rls_test.sql
+-- ("player cannot purchase an inactive package even with the correct amount").
 create policy purchases_insert_own_pending on public.purchases
   for insert to authenticated
   with check (
