@@ -154,9 +154,49 @@ D_LOST=$(sql "select count(*) from public.credit_batches cb
                 and (select status from public.session_slots where id='slr_d'||substr(cb.id,6))='cancelled'")
 D_CANCELLED=$(sql "select count(*) from public.session_slots where id like 'slr_d%' and status='cancelled'")
 D_REFUNDED=$(sql "select count(*) from public.bookings where slot_id like 'slr_d%' and status='cancelled'")
-check "no live booking on any cancelled slot (no orphan)"          "$D_ORPHAN" "0"
-check "no credit lost on a cancelled session (every one refunded)" "$D_LOST"   "0"
+D_DEADLOCK=$(grep -rl "deadlock detected" "$TMP"/d_*.txt 2>/dev/null | wc -l | tr -d ' ')
+check "no live booking on any cancelled slot (no orphan)"          "$D_ORPHAN"   "0"
+check "no credit lost on a cancelled session (every one refunded)" "$D_LOST"     "0"
+check "zero deadlocks (book_slot vs cancel_session serialise on the slot row)" "$D_DEADLOCK" "0"
 echo "  info — $D_CANCELLED/$D_N slots cancelled; $D_REFUNDED booking(s) landed-then-refunded (proves both orderings raced)"
+
+# ── Scenario E: cancel_session × cancel_session sharing credit batches (S7b.1) ──
+# The REAL money-path deadlock: two admins cancel two different sessions that share
+# players, so both refund the SAME credit_batches. cancel_session is the only
+# multi-refund RPC, and before S7b.1 it locked those credits in booking-scan order —
+# two cancels with an overlapping set in opposite order would cycle (reproduced ~5/6
+# rounds). The fix refunds in credit_batch_id order, so shared credit locks are
+# always taken in one global order and no cycle can form. Here each pair books 8
+# shared players onto slot X in order 1..8 and onto slot Y in order 8..1 (forcing the
+# opposite lock order), then races cancel(X) vs cancel(Y). Assert ZERO deadlocks and
+# that BOTH cancels fully refunded (every shared credit ends at 2 → both refunds ran).
+echo "Scenario E — cancel_session × cancel_session on shared credits, opposite order (KE=20 pairs):"
+E_KE=20
+ESETUP=""
+for k in $(seq 1 $E_KE); do
+  ESETUP+="insert into public.coaches (id,name,bio,is_active) values ('cor_ex$k','C','b',true),('cor_ey$k','C','b',true);"
+  ESETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status) values ('slr_ex$k','cor_ex$k',now()+interval '1 day',now()+interval '1 day 1 hour','trial',8,8,'published'),('slr_ey$k','cor_ey$k',now()+interval '1 day',now()+interval '1 day 1 hour','trial',8,8,'published');"
+  for p in $(seq 1 8); do
+    ESETUP+="insert into public.players (id,phone,name,gender,level,created_at) values ('plr_e${k}_${p}','+201e${k}x${p}','E','men','beginner',now());"
+    ESETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_e${k}_${p}','plr_e${k}_${p}','signup_grant',null,'trial',2,0,now()+interval '30 day',now());"
+  done
+  for p in 1 2 3 4 5 6 7 8; do ESETUP+="insert into public.bookings (id,slot_id,player_id,credit_batch_id,status,booked_at) values ('bkr_ex${k}_${p}','slr_ex$k','plr_e${k}_${p}','cbr_e${k}_${p}','booked',now());"; done
+  for p in 8 7 6 5 4 3 2 1; do ESETUP+="insert into public.bookings (id,slot_id,player_id,credit_batch_id,status,booked_at) values ('bkr_ey${k}_${p}','slr_ey$k','plr_e${k}_${p}','cbr_e${k}_${p}','booked',now());"; done
+done
+sql "$ESETUP" >/dev/null
+
+T=$(target 5)
+for k in $(seq 1 $E_KE); do
+  racer_cancel "$(uuid 999)" "slr_ex$k" "$T" "$TMP/e_x_$k.txt"
+  racer_cancel "$(uuid 999)" "slr_ey$k" "$T" "$TMP/e_y_$k.txt"
+done
+wait
+E_DEADLOCK=$(grep -rl "deadlock detected" "$TMP"/e_*.txt 2>/dev/null | wc -l | tr -d ' ')
+E_CANCELLED=$(sql "select count(*) from public.session_slots where id like 'slr_e%' and status='cancelled'")
+E_UNREFUNDED=$(sql "select count(*) from public.credit_batches where id like 'cbr_e%' and quantity_remaining <> 2")
+check "zero deadlocks (cancel×cancel refund credits in one global order)" "$E_DEADLOCK"   "0"
+check "all $((2*E_KE)) sessions cancelled (no cancel aborted)"            "$E_CANCELLED"   "$((2*E_KE))"
+check "every shared credit refunded by BOTH cancels (ends at 2/2)"       "$E_UNREFUNDED"  "0"
 
 # ── teardown ─────────────────────────────────────────────────────────────────
 cleanup_rows
