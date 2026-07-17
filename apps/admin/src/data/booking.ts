@@ -68,10 +68,15 @@ export function classifyAdminBooking(
   return { kind: 'blocked', reason: raw.reason };
 }
 
-/** Does the player already hold an ACTIVE booking on this slot? (UNIQUE guard.) */
+/**
+ * Does the player already hold a NON-CANCELLED booking on this slot? This is the
+ * uniqueness guard, so it mirrors the DB's partial unique index (…WHERE status <>
+ * 'cancelled'): a cancelled booking doesn't block a re-add, but booked/attended/
+ * no_show all do.
+ */
 export function isActivelyBooked(slotId: SlotId, playerId: PlayerId): boolean {
   return getBookings().some(
-    (b) => b.slotId === slotId && b.playerId === playerId && b.status === 'booked',
+    (b) => b.slotId === slotId && b.playerId === playerId && b.status !== 'cancelled',
   );
 }
 

@@ -100,22 +100,27 @@ const handBookings: Booking[] = [
 ];
 
 /**
- * Enforce the occupancy invariant across the combined set: no slot ever has more
- * ACTIVE (booked) bookings than its capacity. Hand bookings come first and are
- * always kept (they're within capacity and locked by tests); a generated booking
- * that would oversell a slot — e.g. one that landed on an ad-hoc demo slot a hand
- * booking already fills — is dropped. Keeps the modal roster honest ("2 of 4").
+ * Enforce the occupancy invariant across the combined set, matching the DB rule the
+ * S7a RPCs enforce: a seat is consumed by every NON-CANCELLED booking (booked +
+ * attended + no_show), so a slot's non-cancelled bookings never exceed its capacity
+ * (a past 4/4 session stays 4/4), and a player never holds two non-cancelled
+ * bookings on one slot (the partial unique index). Only a cancellation frees a
+ * seat, so cancelled rows pass through unconstrained. Hand bookings come first and
+ * are always kept; a generated booking that would oversell or duplicate is dropped.
  */
 function capActiveBookings(all: readonly Booking[]): Booking[] {
   const capBySlot = new Map(mockSlots.map((s) => [s.id, s.capacity] as const));
   const seats = new Map<string, number>();
+  const activePairs = new Set<string>();
   const out: Booking[] = [];
   for (const b of all) {
-    if (b.status === 'booked') {
+    if (b.status !== 'cancelled') {
       const cap = capBySlot.get(b.slotId) ?? Number.POSITIVE_INFINITY;
       const used = seats.get(b.slotId) ?? 0;
-      if (used >= cap) continue; // would oversell → drop this generated booking
+      const pair = `${b.playerId}|${b.slotId}`;
+      if (used >= cap || activePairs.has(pair)) continue; // oversell or duplicate non-cancelled → drop
       seats.set(b.slotId, used + 1);
+      activePairs.add(pair);
     }
     out.push(b);
   }

@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# ============================================================================
+# S7a — the concurrency proof (the exit gate).
+#
+# pgTAP is single-session, so it CANNOT prove the atomic guarantee. This opens N
+# real, separate connections that call book_slot on the SAME slot at the same
+# wall-clock instant, and asserts the invariant the whole session exists for:
+#   * capacity-1 slot, 8 racers      → exactly 1 books, booked_count=1, 1 credit spent
+#   * capacity-4 slot, 10 racers     → exactly 4 book,  booked_count=4, 4 credits spent
+#   * one player, 1 credit, 2 slots  → exactly 1 books (the credit guard is a
+#                                       different lock from the seat guard)
+#
+# Contention is forced: every racer sleeps until a shared target instant, then
+# fires book_slot together, so they pile onto the same row lock.
+#
+# Run against the local dev DB:  bash supabase/tests/concurrency.sh
+# Leaves the DB as it found it (teardown deletes only its own rows).
+# ============================================================================
+set -uo pipefail
+
+CONTAINER="supabase_db_TPA-schema"
+PSQL=(docker exec -i "$CONTAINER" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -tA)
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+# Run SQL from stdin as the superuser (RLS bypassed) and return trimmed output.
+sql() { "${PSQL[@]}" -c "$1"; }
+# Run a racer in its own connection: assume the player's JWT, wait for the shared
+# target, then book. Emits exactly WIN or LOSE (nothing else prints that token).
+racer() { # $1=uuid $2=slot $3=target_iso $4=outfile
+  "${PSQL[@]}" \
+    -c "set role authenticated" \
+    -c "select set_config('request.jwt.claims', '{\"sub\":\"$1\",\"role\":\"authenticated\"}', false)" \
+    -c "select pg_sleep(greatest(0, extract(epoch from (timestamptz '$3' - clock_timestamp()))))" \
+    -c "select case when (public.book_slot('$2')->>'ok')='true' then 'WIN' else 'LOSE' end" \
+    > "$4" 2>&1 &
+}
+
+uuid() { printf '00000000-0000-0000-0000-%012d' "$1"; }  # deterministic test uuids
+
+FAILS=0
+check() { # $1=label $2=got $3=want
+  if [ "$2" = "$3" ]; then echo "  ok   — $1 (=$2)"; else echo "  FAIL — $1 (got $2, want $3)"; FAILS=$((FAILS+1)); fi
+}
+
+cleanup_rows() {
+  # book_slot mints bookings with 'bk_<uuid>' ids, so delete bookings by their
+  # slot/player, not by an id prefix (FK-safe order: bookings → batches → slots → players → coaches).
+  sql "delete from public.bookings       where slot_id like 'slr_%' or player_id like 'plr_%';
+       delete from public.credit_batches where id like 'cbr_%' or player_id like 'plr_%';
+       delete from public.session_slots  where id like 'slr_%';
+       delete from public.players        where id like 'plr_%';
+       delete from public.coaches        where id like 'cor_%';" >/dev/null
+}
+
+# ── setup ────────────────────────────────────────────────────────────────────
+cleanup_rows
+SETUP="insert into public.coaches (id,name,bio,is_active) values
+  ('cor_a','C','b',true),('cor_b','C','b',true),('cor_c1','C','b',true),('cor_c2','C','b',true);
+insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status) values
+  ('slr_a','cor_a',   now()+interval '1 day', now()+interval '1 day 1 hour','trial',1,0,'published'),
+  ('slr_b','cor_b',   now()+interval '1 day', now()+interval '1 day 1 hour','trial',4,0,'published'),
+  ('slr_c1','cor_c1', now()+interval '1 day', now()+interval '1 day 1 hour','trial',4,0,'published'),
+  ('slr_c2','cor_c2', now()+interval '1 day', now()+interval '1 day 1 hour','trial',4,0,'published');"
+
+# Scenario A players (8) + B players (10), each with one trial credit.
+for i in $(seq 1 8);  do SETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_a$i','+2010000${i}1','A','men','beginner',now(),'$(uuid $((100+i)))');"; SETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_a$i','plr_a$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now());"; done
+for i in $(seq 1 10); do SETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_b$i','+2010000${i}2','B','men','beginner',now(),'$(uuid $((200+i)))');"; SETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_b$i','plr_b$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now());"; done
+# Scenario C: one player, ONE credit, two slots.
+SETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_c1','+201000099','C','men','beginner',now(),'$(uuid 301)');"
+SETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_c1','plr_c1','signup_grant',null,'trial',1,1,now()+interval '30 day',now());"
+sql "$SETUP" >/dev/null
+
+target() { date -u -v+"$1"S +%Y-%m-%dT%H:%M:%S 2>/dev/null || date -u -d "+$1 seconds" +%Y-%m-%dT%H:%M:%S; }
+
+# ── Scenario A: capacity-1, 8 racers → exactly one wins ──────────────────────
+echo "Scenario A — capacity-1 slot, 8 concurrent racers:"
+T=$(target 4)
+for i in $(seq 1 8); do racer "$(uuid $((100+i)))" slr_a "$T" "$TMP/a_$i.txt"; done
+wait
+WINS_A=$(grep -lFx WIN "$TMP"/a_*.txt 2>/dev/null | wc -l | tr -d ' ')
+check "exactly one racer booked"        "$WINS_A" "1"
+check "booked_count = 1 (no oversell)"  "$(sql "select booked_count from public.session_slots where id='slr_a'")" "1"
+check "exactly one booking row"         "$(sql "select count(*) from public.bookings where slot_id='slr_a' and status<>'cancelled'")" "1"
+check "exactly one credit spent"        "$(sql "select coalesce(sum(quantity_total-quantity_remaining),0) from public.credit_batches where id like 'cbr_a%'")" "1"
+
+# ── Scenario B: capacity-4, 10 racers → exactly four win ─────────────────────
+echo "Scenario B — capacity-4 slot, 10 concurrent racers:"
+T=$(target 4)
+for i in $(seq 1 10); do racer "$(uuid $((200+i)))" slr_b "$T" "$TMP/b_$i.txt"; done
+wait
+WINS_B=$(grep -lFx WIN "$TMP"/b_*.txt 2>/dev/null | wc -l | tr -d ' ')
+check "exactly four racers booked"      "$WINS_B" "4"
+check "booked_count = 4 (no oversell)"  "$(sql "select booked_count from public.session_slots where id='slr_b'")" "4"
+check "exactly four booking rows"       "$(sql "select count(*) from public.bookings where slot_id='slr_b' and status<>'cancelled'")" "4"
+check "exactly four credits spent"      "$(sql "select coalesce(sum(quantity_total-quantity_remaining),0) from public.credit_batches where id like 'cbr_b%'")" "4"
+
+# ── Scenario C: one credit, two slots → exactly one win ──────────────────────
+echo "Scenario C — one player, one credit, two slots raced at once:"
+T=$(target 4)
+racer "$(uuid 301)" slr_c1 "$T" "$TMP/c_1.txt"
+racer "$(uuid 301)" slr_c2 "$T" "$TMP/c_2.txt"
+wait
+WINS_C=$(grep -lFx WIN "$TMP"/c_*.txt 2>/dev/null | wc -l | tr -d ' ')
+check "exactly one of the two slots booked" "$WINS_C" "1"
+check "the single credit was spent once"    "$(sql "select quantity_total-quantity_remaining from public.credit_batches where id='cbr_c1'")" "1"
+check "exactly one booking for the player"  "$(sql "select count(*) from public.bookings where player_id='plr_c1' and status<>'cancelled'")" "1"
+
+# ── teardown ─────────────────────────────────────────────────────────────────
+cleanup_rows
+echo
+if [ "$FAILS" -eq 0 ]; then echo "CONCURRENCY PROOF: PASS (all invariants held under real parallelism)"; exit 0
+else echo "CONCURRENCY PROOF: FAIL ($FAILS assertion(s) broke)"; exit 1; fi

@@ -99,10 +99,16 @@ export function slotsForType(
     .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
 }
 
-/** Slot ids the player currently has an active (`booked`) booking for. */
+/**
+ * Slot ids the player holds a NON-CANCELLED booking for (booked / attended /
+ * no_show). Only a cancellation frees the seat, so this is exactly the set that
+ * blocks a second booking — mirroring the DB's partial unique index
+ * `bookings_one_active_per_player_slot WHERE status <> 'cancelled'`. A cancelled
+ * booking is excluded, so cancel → re-book the same slot is allowed on both sides.
+ */
 export function bookedSlotIds(playerId: Player['id']): Set<SlotId> {
   return new Set(
-    getBookings().filter((b) => b.playerId === playerId && b.status === 'booked').map((b) => b.slotId),
+    getBookings().filter((b) => b.playerId === playerId && b.status !== 'cancelled').map((b) => b.slotId),
   );
 }
 

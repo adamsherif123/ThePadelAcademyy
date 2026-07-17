@@ -35,15 +35,18 @@ import { useSyncExternalStore } from 'react';
  * attendance mutation seams land with their screens (S4c onward).
  */
 /**
- * Seed slots with their bookedCount RECONCILED to the actual active bookings, so
- * the admin has one truth for occupancy — the roster, "X of Y", the calendar
- * badge, and fill rate all agree. (The mobile store keeps the fixtures' preset
- * counts; only the admin, which shows the roster, reconciles.) The seams keep the
- * two in step after every add/remove.
+ * Seed slots with their bookedCount RECONCILED to occupancy, so the admin has one
+ * truth — the roster, "X of Y", the calendar badge, and fill rate all agree. (The
+ * mobile store keeps the fixtures' preset counts; only the admin, which shows the
+ * roster, reconciles.) The seams keep the two in step after every add/remove.
+ *
+ * Occupancy = NON-CANCELLED bookings (booked + attended + no_show): only a
+ * cancellation frees a seat, so a past 4/4 session whose players were marked
+ * attended/no-show still reads 4/4. This matches the DB rule the RPCs enforce.
  */
 function seededSlots(): SessionSlot[] {
   const seats = new Map<string, number>();
-  for (const b of mockBookings) if (b.status === 'booked') seats.set(b.slotId, (seats.get(b.slotId) ?? 0) + 1);
+  for (const b of mockBookings) if (b.status !== 'cancelled') seats.set(b.slotId, (seats.get(b.slotId) ?? 0) + 1);
   return mockSlots.map((s) => ({ ...s, bookedCount: seats.get(s.id) ?? 0 }));
 }
 

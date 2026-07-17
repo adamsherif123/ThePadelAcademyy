@@ -17,6 +17,11 @@ export const PIASTRES_PER_EGP = 100;
  * Credits expire this many days after the batch is created — the SAME rule for
  * purchased credits and for signup-grant trial credits. There is deliberately no
  * second expiry rule.
+ *
+ * MIRRORED IN SQL as `tpa.credit_expiry()` (interval '30 days') in
+ * supabase/migrations/20260718000005_s7a_booking_rpcs.sql. Changing this number
+ * means changing that function too; sql-parity.test.ts reads both and fails if
+ * they drift.
  */
 export const CREDIT_EXPIRY_DAYS = 30;
 
@@ -39,6 +44,11 @@ export const EXPIRING_SOON_DAYS = 3;
 /**
  * Free cancellation + credit refund is allowed up to this many hours before a
  * slot starts. Inside the window the credit is forfeited; a no-show forfeits too.
+ *
+ * MIRRORED IN SQL as `tpa.cancellation_window()` (interval '3 hours') in
+ * supabase/migrations/20260718000005_s7a_booking_rpcs.sql, which the cancel_booking
+ * RPC enforces with the DB clock. Changing this number means changing that function
+ * too; sql-parity.test.ts reads both and fails if they drift.
  */
 export const CANCELLATION_WINDOW_HOURS = 3;
 
