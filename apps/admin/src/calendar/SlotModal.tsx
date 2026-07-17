@@ -1,8 +1,9 @@
 import { cairoCalendarDate, formatInstantDate, formatInstantTime } from '@tpa/core';
 import type { Booking, CoachId, Player, SessionSlot, Weekday } from '@tpa/types';
-import { AlertTriangle, ArrowLeft, Ban, CalendarClock, Trash2, UserPlus, Users, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Ban, CalendarClock, Check, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { useState } from 'react';
 
+import { markAttendance, type AttendanceStatus } from '../data/attendance';
 import {
   addPlayerToSlot,
   classifyAdminBooking,
@@ -99,10 +100,25 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
   const [showHistory, setShowHistory] = useState(false);
 
   const isGroup = slot.gender !== null && slot.level !== null;
-  const roster = activeBookingsForSlot(slot.id);
-  const occupied = roster.length;
+  const activeRoster = activeBookingsForSlot(slot.id);
+  const occupied = activeRoster.length;
   const emptySeats = Math.max(0, slot.capacity - occupied);
-  const history = bookingsForSlot(slot.id).filter((b) => b.status !== 'booked');
+
+  // Attendance is taken per session, once it has happened. On a PAST session the
+  // roster shows everyone who held a seat (booked/attended/no_show) with attendance
+  // controls; on a FUTURE one it's the live booked roster with a Remove action.
+  const isPast = new Date(slot.startsAt).getTime() <= new Date(now).getTime();
+  const rosterBookings = isPast
+    ? bookingsForSlot(slot.id)
+        .filter((b) => b.status !== 'cancelled')
+        .sort((a, b) => new Date(a.bookedAt).getTime() - new Date(b.bookedAt).getTime())
+    : activeRoster;
+  const attendedCount = rosterBookings.filter((b) => b.status === 'attended').length;
+  const noShowCount = rosterBookings.filter((b) => b.status === 'no_show').length;
+  const unmarkedCount = rosterBookings.filter((b) => b.status === 'booked').length;
+  // "Previously booked" now means players who were REMOVED (cancelled) — the
+  // attended/no_show ones live in the roster on a past session.
+  const history = bookingsForSlot(slot.id).filter((b) => b.status === 'cancelled');
 
   const eyebrow = `${formatInstantDate(slot.startsAt)} · ${formatInstantTime(slot.startsAt)} – ${formatInstantTime(slot.endsAt)}`;
   const title = `${TRAINING_LABEL[slot.trainingType]} session`;
@@ -352,10 +368,12 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
           </span>
           <div className={styles.summaryText}>
             <p className={styles.summaryTitle}>
-              {occupied} of {slot.capacity} booked
+              {isPast
+                ? `${attendedCount} attended · ${noShowCount} no-show${unmarkedCount > 0 ? ` · ${unmarkedCount} unmarked` : ''}`
+                : `${occupied} of ${slot.capacity} booked`}
             </p>
             <p className={styles.summarySub}>
-              {TYPE_PLAYERS[slot.trainingType]} · coached by {originalCoach}
+              {isPast ? 'Session ended' : TYPE_PLAYERS[slot.trainingType]} · coached by {originalCoach}
             </p>
           </div>
           {isGroup ? (
@@ -368,9 +386,10 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
 
         {/* Roster */}
         <div className={styles.roster}>
-          {roster.map((b) => {
+          {rosterBookings.map((b) => {
             const player = playerById(b.playerId);
             const tags = player && isGroup ? groupTags(player.gender, player.level) : '';
+            const setStatus = (status: AttendanceStatus) => markAttendance(b.id, status, now);
             return (
               <div key={b.id} className={styles.rosterRow}>
                 <Avatar name={player?.name ?? 'Player'} size={36} />
@@ -381,34 +400,66 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
                     {tags ? ` · ${tags}` : ''}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  className={styles.removeLink}
-                  aria-label={`Remove ${player?.name ?? 'player'}`}
-                  onClick={() => {
-                    setRefund(true);
-                    setView({ k: 'remove', booking: b });
-                  }}
-                >
-                  <X size={14} aria-hidden />
-                  Remove
-                </button>
+                {isPast ? (
+                  <div className={styles.attend}>
+                    {/* Toggle: clicking the active state again clears it back to booked. */}
+                    <button
+                      type="button"
+                      className={styles.attendBtn}
+                      data-kind="attended"
+                      data-on={b.status === 'attended'}
+                      aria-pressed={b.status === 'attended'}
+                      onClick={() => setStatus(b.status === 'attended' ? 'booked' : 'attended')}
+                    >
+                      <Check size={13} aria-hidden />
+                      Attended
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.attendBtn}
+                      data-kind="no_show"
+                      data-on={b.status === 'no_show'}
+                      aria-pressed={b.status === 'no_show'}
+                      onClick={() => setStatus(b.status === 'no_show' ? 'booked' : 'no_show')}
+                    >
+                      No-show
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.removeLink}
+                    aria-label={`Remove ${player?.name ?? 'player'}`}
+                    onClick={() => {
+                      setRefund(true);
+                      setView({ k: 'remove', booking: b });
+                    }}
+                  >
+                    <X size={14} aria-hidden />
+                    Remove
+                  </button>
+                )}
               </div>
             );
           })}
-          {Array.from({ length: emptySeats }, (_, i) => (
-            <div key={`empty-${i}`} className={styles.emptySeat}>
-              Empty seat
-            </div>
-          ))}
-          {occupied === 0 && emptySeats === 0 ? (
-            <p className={styles.emptyState}>No seats on this session.</p>
+          {!isPast &&
+            Array.from({ length: emptySeats }, (_, i) => (
+              <div key={`empty-${i}`} className={styles.emptySeat}>
+                Empty seat
+              </div>
+            ))}
+          {rosterBookings.length === 0 ? (
+            <p className={styles.emptyState}>
+              {isPast ? 'Nobody was booked on this session.' : 'No seats on this session.'}
+            </p>
           ) : null}
         </div>
 
-        <Button size="sm" variant="secondary" icon={UserPlus} onClick={() => setView({ k: 'add' })}>
-          Add a player
-        </Button>
+        {!isPast ? (
+          <Button size="sm" variant="secondary" icon={UserPlus} onClick={() => setView({ k: 'add' })}>
+            Add a player
+          </Button>
+        ) : null}
 
         {history.length > 0 ? (
           <div className={styles.history}>

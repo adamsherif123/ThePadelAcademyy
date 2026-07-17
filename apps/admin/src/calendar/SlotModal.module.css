@@ -103,6 +103,39 @@
   background: var(--expiry-expired-bg);
   color: var(--expiry-expired-fg);
 }
+/* Per-row attendance toggle (past sessions). */
+.attend {
+  display: flex;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+}
+.attendBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+.attendBtn:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text-secondary);
+}
+.attendBtn[data-on='true'][data-kind='attended'] {
+  border-color: transparent;
+  background: var(--expiry-ok-bg);
+  color: var(--expiry-ok-fg);
+}
+.attendBtn[data-on='true'][data-kind='no_show'] {
+  border-color: transparent;
+  background: var(--expiry-expiring_soon-bg);
+  color: var(--expiry-expiring_soon-fg);
+}
 .emptySeat {
   padding-block: var(--space-sm);
   padding-inline: var(--space-md);

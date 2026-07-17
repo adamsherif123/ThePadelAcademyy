@@ -168,6 +168,35 @@ export function commitBookingRemoval(
 }
 
 /**
+ * Commit an attendance mark: a plain status flip on ONE booking (booked ⇄ attended
+ * ⇄ no_show). No batch or seat changes — the credit was spent at booking time and
+ * stays spent whatever happened on court. S10 → a small is_admin-gated UPDATE.
+ */
+export function commitBookingStatus(updatedBooking: Booking): void {
+  bookings = bookings.map((b) => (b.id === updatedBooking.id ? updatedBooking : b));
+  emit();
+}
+
+/**
+ * Mint a credit batch (the admin_grant comp). Purely additive. Unlike coach/package
+ * config writes, credit_batches has NO admin write policy in the schema — minting
+ * credits is money and must be atomic + audited — so S10 replaces the grant seam
+ * with a SECURITY DEFINER RPC, not a plain insert. This commit is the mock stand-in.
+ */
+export function commitCreditGrant(batch: CreditBatch): void {
+  batches = [batch, ...batches];
+  emit();
+}
+
+/** Insert-or-replace a player by id (edit replaces in place). S10 → is_admin UPDATE. */
+export function commitPlayerSave(player: Player): void {
+  players = players.some((p) => p.id === player.id)
+    ? players.map((p) => (p.id === player.id ? player : p))
+    : [...players, player];
+  emit();
+}
+
+/**
  * Insert-or-replace a coach by id (create appends, edit replaces in place).
  * Coaches are never deleted — they hold historical slots and bookings, and the FK
  * would reject it — so "remove" is always isActive:false. S10 → is_admin-gated

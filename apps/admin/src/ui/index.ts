@@ -11,6 +11,7 @@ export { Modal } from './Modal';
 export { PageHeader } from './PageHeader';
 export { Panel } from './Panel';
 export { PlayerSearch } from './PlayerSearch';
+export { matchesPlayerQuery } from './playerQuery';
 export { SearchInput } from './SearchInput';
 export { SegmentedTabs, type SegmentTab } from './SegmentedTabs';
 export { Select } from './Select';

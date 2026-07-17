@@ -2,16 +2,9 @@ import type { Player } from '@tpa/types';
 import { useMemo, useState, type ReactNode } from 'react';
 
 import { Avatar } from './Avatar';
+import { matchesPlayerQuery } from './playerQuery';
 import { SearchInput } from './SearchInput';
 import styles from './PlayerSearch.module.css';
-
-/** Case-insensitive match on name or phone (phone compared with spaces stripped). */
-function matchesPlayerQuery(player: Player, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (q === '') return true;
-  const phone = player.phone.replace(/\s+/g, '');
-  return player.name.toLowerCase().includes(q) || phone.includes(q.replace(/\s+/g, ''));
-}
 
 /**
  * A searchable player list — search by name or phone, scrollable rows of avatar +

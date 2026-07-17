@@ -28,6 +28,22 @@ export function perSessionPrice(pkg: Package): Piastres {
   return Math.round(pkg.price / pkg.sessionCount) as Piastres;
 }
 
+/**
+ * The retail value of ONE session of a type — for showing the owner what a comp
+ * gives away. Prefers the active single-session package's price (the list price of
+ * one session); falls back to the cheapest active bundle's per-session rate; null
+ * if the type isn't sold at all. Read live on purpose: it's an at-a-glance "worth ~X
+ * EGP" for a grant happening now, not a captured figure.
+ */
+export function sessionRetailValue(type: TrainingType): Piastres | null {
+  const active = getPackages().filter((p) => p.isActive && p.trainingType === type);
+  if (active.length === 0) return null;
+  const single = active.find((p) => p.sessionCount === 1);
+  if (single) return single.price;
+  const best = active.reduce((a, b) => (b.price / b.sessionCount < a.price / a.sessionCount ? b : a));
+  return perSessionPrice(best);
+}
+
 /** "Single group session" / "8-session group pack" — a package one-liner for the stat cards. */
 export function packageDescriptor(pkg: Package): string {
   return pkg.sessionCount === 1

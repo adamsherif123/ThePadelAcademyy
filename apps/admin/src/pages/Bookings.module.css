@@ -1,0 +1,80 @@
+.counts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-lg);
+  margin-block: var(--space-xl) var(--space-lg);
+}
+@media (max-width: 900px) {
+  .counts {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.countCard {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-lg);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+.countNum {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.1;
+}
+.countLabel {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  margin-block-end: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+.search {
+  flex: 1;
+  min-width: 240px;
+}
+
+.tableWrap {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+  overflow: hidden;
+}
+
+.playerCell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+.playerCell:hover {
+  color: var(--color-accent-default);
+}
+.muted {
+  color: var(--color-text-secondary);
+}
+
+.empty {
+  padding: var(--space-xxl);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body);
+}

@@ -1,0 +1,110 @@
+.filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  margin-block: var(--space-xl) var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+.search {
+  flex: 1;
+  min-width: 240px;
+}
+.filterEnd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.count {
+  margin-block-end: var(--space-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+  overflow: hidden;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  padding: var(--space-md) var(--space-lg);
+  border: none;
+  border-block-end: 1px solid var(--color-border-subtle);
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+}
+.row:last-child {
+  border-block-end: none;
+}
+.row:hover {
+  background: var(--color-bg-canvas);
+}
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.name {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+.phone {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+}
+.pills {
+  display: flex;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+}
+.credits {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  flex-shrink: 0;
+  min-width: 116px;
+}
+.creditsTotal {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+.creditsBreak {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+.chevron {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.empty {
+  padding: var(--space-xxl);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body);
+}
+
+@media (max-width: 720px) {
+  .pills {
+    display: none;
+  }
+}
