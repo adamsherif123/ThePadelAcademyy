@@ -1,20 +1,36 @@
-import { buildSignupGrant } from '@tpa/core';
-import { MOCK_NOW, mockCurrentPlayer } from '@tpa/mocks';
-import type { CreditBatch, Gender, Level, Player } from '@tpa/types';
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { buildSignupGrant, toInstant } from '@tpa/core';
+import type { CreditBatch, Gender, IsoInstant, Level, Player } from '@tpa/types';
+import type { Session } from '@supabase/supabase-js';
+import { useQuery } from '@tanstack/react-query';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
+
+import { completeSignupRpc, fetchCurrentPlayer } from '../lib/api';
+import { queryClient, queryKeys } from '../lib/queryClient';
+import { supabase } from '../lib/supabase';
+import { resetMockOverlay } from '../data/mockPayments';
 
 /**
- * Mock session state. Deliberately a tiny React Context, not a state-management
- * library: the whole app needs exactly one small, mostly-static object (the
- * signed-in player + onboarding progress) read in a handful of places. Context is
- * the right-sized tool; adding Redux/Zustand here would be ceremony.
+ * Real Supabase auth (S9). The mock context is gone: `session` comes from the
+ * auth client (persisted in AsyncStorage, auto-refreshed), and `player` is the
+ * signed-in player's row read through RLS. The three meaningful states are made
+ * explicit as `status`, because "verified but no profile yet" is a real place a
+ * user can be — a route, not an error:
  *
- * S8 swaps this provider's internals for real Supabase auth, and S9 swaps the
- * data selectors (src/data/*) for real queries. The screens depend only on this
- * hook's shape, so neither swap touches screen code.
+ *   signed_out    — no session          → (auth)/sign-in
+ *   needs_profile — session, no player   → (auth)/profile-setup, run complete_signup
+ *   ready         — session + player     → (tabs)
  *
- * `now` is fixed to MOCK_NOW so every screen's dates/expiry line up with the
- * @tpa/mocks fixtures; S9 replaces it with the real clock.
+ * The non-auth screens still read only `player` / `now` / `signOut`, so swapping
+ * the internals here left them untouched. `now` is the real clock, refreshed on an
+ * interval so expiry countdowns and the 3-hour cancel window stay honest.
  */
 interface ProfileDraft {
   name: string;
@@ -22,51 +38,132 @@ interface ProfileDraft {
   level: Level;
 }
 
+export type SessionStatus = 'loading' | 'signed_out' | 'needs_profile' | 'ready';
+
 interface SessionValue {
+  status: SessionStatus;
   isAuthed: boolean;
-  now: typeof MOCK_NOW;
+  now: IsoInstant;
   phone: string | null;
   player: Player | null;
-  /** The signup trial grant, built via @tpa/core once the profile is created. */
   trialGrant: CreditBatch | null;
-  setPhone: (phone: string) => void;
-  completeProfile: (draft: ProfileDraft) => void;
-  finishOnboarding: () => void;
-  signOut: () => void;
+  /** Send an OTP to `phone`. Returns an error message on transport failure. */
+  sendOtp: (phone: string) => Promise<{ ok: boolean; error?: string }>;
+  /** Verify the SMS code, establishing a session. */
+  verifyOtp: (code: string) => Promise<{ ok: boolean; error?: string }>;
+  /** Create the player + trial grant via complete_signup. */
+  completeProfile: (draft: ProfileDraft) => Promise<{ ok: boolean; error?: string }>;
+  signOut: () => Promise<void>;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
 
+/** Digits only, always +20 E.164 — matches how the DB stores phone + the test_otp keys. */
+function normalizePhone(raw: string): string {
+  const digits = raw.replace(/[^0-9]/g, '').replace(/^0+/, '');
+  const local = digits.startsWith('20') ? digits : `20${digits}`;
+  return `+${local}`;
+}
+
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [isAuthed, setIsAuthed] = useState(false);
-  const [phone, setPhoneState] = useState<string | null>(null);
-  const [player, setPlayer] = useState<Player | null>(null);
+  // `undefined` = still restoring from storage; `null` = restored, signed out.
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [phone, setPhone] = useState<string | null>(null);
   const [trialGrant, setTrialGrant] = useState<CreditBatch | null>(null);
+  const [now, setNow] = useState<IsoInstant>(() => toInstant(new Date()));
+
+  // Restore the persisted session, then track every auth change (verify, refresh,
+  // sign-out) for the life of the app.
+  useEffect(() => {
+    void supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+      setSession(next);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // Keep `now` current so expiry / cancel-window UI doesn't drift during a session.
+  useEffect(() => {
+    const id = setInterval(() => setNow(toInstant(new Date())), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // The player row (RLS returns exactly the caller's own, or none). Only queried
+  // once a session exists; on sign-out React Query drops it.
+  const hasSession = Boolean(session);
+  const playerQuery = useQuery({
+    queryKey: queryKeys.player,
+    queryFn: fetchCurrentPlayer,
+    enabled: hasSession,
+  });
+  const player = hasSession ? (playerQuery.data ?? null) : null;
+
+  const status: SessionStatus =
+    session === undefined || (hasSession && playerQuery.isLoading)
+      ? 'loading'
+      : !hasSession
+        ? 'signed_out'
+        : player
+          ? 'ready'
+          : 'needs_profile';
+
+  const sendOtp = useCallback(async (input: string) => {
+    const e164 = normalizePhone(input);
+    setPhone(e164);
+    const { error } = await supabase.auth.signInWithOtp({ phone: e164 });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  }, []);
+
+  const verifyOtp = useCallback(
+    async (code: string) => {
+      if (!phone) return { ok: false, error: 'No phone number to verify.' };
+      const { error } = await supabase.auth.verifyOtp({ phone, token: code, type: 'sms' });
+      if (error) return { ok: false, error: error.message };
+      // onAuthStateChange will flip `session`; the player query then decides
+      // needs_profile vs ready.
+      return { ok: true };
+    },
+    [phone],
+  );
+
+  const completeProfile = useCallback(
+    async (draft: ProfileDraft) => {
+      const res = await completeSignupRpc(draft);
+      if (!res.ok) return { ok: false, error: res.reason };
+      // Show the trial grant we know the server just minted (same @tpa/core rule).
+      setTrialGrant(buildSignupGrant(res.playerId as Player['id'], toInstant(new Date())));
+      // Refetch the player so status flips to `ready`; the wallet now has credits.
+      await queryClient.invalidateQueries({ queryKey: queryKeys.player });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.creditBatches });
+      return { ok: true };
+    },
+    [],
+  );
+
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut();
+    setPhone(null);
+    setTrialGrant(null);
+    // Drop every cached read + the mock-purchase overlay so the next player starts clean.
+    resetMockOverlay();
+    queryClient.clear();
+  }, []);
 
   const value = useMemo<SessionValue>(
     () => ({
-      isAuthed,
-      now: MOCK_NOW,
+      status,
+      isAuthed: status === 'ready',
+      now,
       phone,
       player,
       trialGrant,
-      setPhone: (p) => setPhoneState(p),
-      completeProfile: (draft) => {
-        // Reuse the mock player's id so the wallet/session fixtures resolve; the
-        // profile fields the user just entered override name/gender/level.
-        const next: Player = { ...mockCurrentPlayer, ...draft };
-        setPlayer(next);
-        setTrialGrant(buildSignupGrant(next.id, MOCK_NOW));
-      },
-      finishOnboarding: () => setIsAuthed(true),
-      signOut: () => {
-        setIsAuthed(false);
-        setPhoneState(null);
-        setPlayer(null);
-        setTrialGrant(null);
-      },
+      sendOtp,
+      verifyOtp,
+      completeProfile,
+      signOut,
     }),
-    [isAuthed, phone, player, trialGrant],
+    [status, now, phone, player, trialGrant, sendOtp, verifyOtp, completeProfile, signOut],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

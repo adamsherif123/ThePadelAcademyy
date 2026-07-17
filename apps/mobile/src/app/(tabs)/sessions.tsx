@@ -5,9 +5,17 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { pastSessions, upcomingSessions } from '../../data/booking';
-import { useDataStore } from '../../data/store';
+import { useBookings, useCoaches, useSlots, combine } from '../../data/queries';
 import { useSession } from '../../session/SessionProvider';
-import { BookingCard, EmptyState, Screen, ScreenHeader, SegmentedControl } from '../../ui';
+import {
+  BookingCard,
+  EmptyState,
+  ErrorView,
+  LoadingView,
+  Screen,
+  ScreenHeader,
+  SegmentedControl,
+} from '../../ui';
 
 type Tab = 'upcoming' | 'past';
 const TABS: readonly { value: Tab; label: string }[] = [
@@ -19,12 +27,24 @@ const TABS: readonly { value: Tab; label: string }[] = [
 export default function SessionsScreen() {
   const router = useRouter();
   const { player, now } = useSession();
-  useDataStore();
+  const bookings = useBookings();
+  const slots = useSlots();
+  const coaches = useCoaches();
+  const gate = combine(bookings, slots, coaches);
   const [tab, setTab] = useState<Tab>('upcoming');
   if (!player) return null;
 
-  const upcoming = upcomingSessions(player.id, now);
-  const past = pastSessions(player.id, now);
+  if (gate.isPending || gate.isError) {
+    return (
+      <Screen scroll tabBar contentContainerStyle={styles.content}>
+        <ScreenHeader eyebrow="Your court time" title="Sessions" />
+        {gate.isPending ? <LoadingView /> : <ErrorView onRetry={gate.refetch} />}
+      </Screen>
+    );
+  }
+
+  const upcoming = upcomingSessions(bookings.data ?? [], slots.data ?? [], coaches.data ?? [], now);
+  const past = pastSessions(bookings.data ?? [], slots.data ?? [], coaches.data ?? [], now);
 
   return (
     <Screen scroll tabBar contentContainerStyle={styles.content}>

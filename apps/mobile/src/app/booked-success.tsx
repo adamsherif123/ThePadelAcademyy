@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { coachById, slotById } from '../data/booking';
-import { getBookings, useDataStore } from '../data/store';
+import { useBatches, useBookings, useCoaches, useSlots, combine } from '../data/queries';
 import { balanceByType } from '../data/wallet';
 import { useSession } from '../session/SessionProvider';
 import {
@@ -14,26 +14,39 @@ import {
   Badge,
   Card,
   IconRow,
+  LoadingView,
   Screen,
   SuccessView,
   Text,
   TRAINING_META,
 } from '../ui';
 
-/** 13 — Booked success. Shared SuccessView; every number computed from the store. */
+/** 13 — Booked success. Shared SuccessView; every number computed from live data. */
 export default function BookedSuccessScreen() {
   const router = useRouter();
   const { player, now } = useSession();
-  useDataStore();
+  const slotsQ = useSlots();
+  const batchesQ = useBatches();
+  const bookingsQ = useBookings();
+  const coachesQ = useCoaches();
+  const gate = combine(slotsQ, batchesQ, bookingsQ, coachesQ);
   const { bookingId } = useLocalSearchParams<{ bookingId: string }>();
 
-  const booking = getBookings().find((b) => b.id === (bookingId as BookingId));
-  const slot = booking ? slotById(booking.slotId) : undefined;
+  if (gate.isPending) {
+    return (
+      <Screen>
+        <LoadingView />
+      </Screen>
+    );
+  }
+
+  const booking = (bookingsQ.data ?? []).find((b) => b.id === (bookingId as BookingId));
+  const slot = booking ? slotById(slotsQ.data ?? [], booking.slotId) : undefined;
   if (!player || !booking || !slot) return <Screen />;
 
-  const coach = coachById(slot.coachId);
+  const coach = coachById(coachesQ.data ?? [], slot.coachId);
   const meta = TRAINING_META[slot.trainingType];
-  const left = balanceByType(player.id, now)[slot.trainingType];
+  const left = balanceByType(batchesQ.data ?? [], now)[slot.trainingType];
 
   return (
     <Screen>

@@ -6,8 +6,8 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { activePackages } from '../../data/catalog';
+import { useBatches, useBookings, useCoaches, usePackages, useSlots, combine } from '../../data/queries';
 import { nextSession } from '../../data/schedule';
-import { useDataStore } from '../../data/store';
 import { soonestExpiringBatch, totalReadyToBook } from '../../data/wallet';
 import { useSession } from '../../session/SessionProvider';
 import {
@@ -18,8 +18,10 @@ import {
   Button,
   Card,
   CreditsSummaryCard,
+  ErrorView,
   IconRow,
   InfoCard,
+  LoadingView,
   PackageCard,
   Screen,
   ScreenHeader,
@@ -30,19 +32,43 @@ import {
 export default function HomeScreen() {
   const router = useRouter();
   const { player, now } = useSession();
-  useDataStore(); // re-render when a purchase grants credits
+  const batches = useBatches();
+  const bookings = useBookings();
+  const slots = useSlots();
+  const coaches = useCoaches();
+  const packagesQ = usePackages();
+  const gate = combine(batches, bookings, slots, coaches, packagesQ);
   // Session-scoped, in-memory dismissals, keyed by batch id — a nag by design:
-  // this is pure view state (S9 replaces the data selectors, never this), it
-  // resets on relaunch, and keying by id means dismissing one batch's notice
-  // doesn't suppress a different batch's later.
+  // pure view state, resets on relaunch, and keying by id means dismissing one
+  // batch's notice doesn't suppress a different batch's later.
   const [dismissed, setDismissed] = useState<Set<CreditBatchId>>(() => new Set());
   if (!player) return null;
 
   const firstName = player.name.split(' ')[0] ?? player.name;
-  const total = totalReadyToBook(player.id, now);
-  const expiring = soonestExpiringBatch(player.id, now);
-  const next = nextSession(player.id, now);
-  const packages = activePackages();
+  const header = (
+    <ScreenHeader eyebrow="The Padel Academy" title={`Hey, ${firstName}`} trailing={<Avatar name={player.name} />} />
+  );
+  if (gate.isPending) {
+    return (
+      <Screen scroll tabBar contentContainerStyle={styles.content}>
+        {header}
+        <LoadingView />
+      </Screen>
+    );
+  }
+  if (gate.isError) {
+    return (
+      <Screen scroll tabBar contentContainerStyle={styles.content}>
+        {header}
+        <ErrorView onRetry={gate.refetch} />
+      </Screen>
+    );
+  }
+
+  const total = totalReadyToBook(batches.data ?? [], now);
+  const expiring = soonestExpiringBatch(batches.data ?? [], now);
+  const next = nextSession(bookings.data ?? [], slots.data ?? [], coaches.data ?? [], now);
+  const packages = activePackages(packagesQ.data ?? []);
 
   const expiryText = expiring
     ? `${expiring.quantityRemaining} ${TRAINING_META[expiring.trainingType].label} credit${
@@ -52,11 +78,7 @@ export default function HomeScreen() {
 
   return (
     <Screen scroll tabBar contentContainerStyle={styles.content}>
-      <ScreenHeader
-        eyebrow="The Padel Academy"
-        title={`Hey, ${firstName}`}
-        trailing={<Avatar name={player.name} />}
-      />
+      {header}
 
       <CreditsSummaryCard
         total={total}

@@ -1,10 +1,11 @@
 import { TRAINING_TYPES } from '@tpa/core';
-import { mockPackages } from '@tpa/mocks';
 import type { Package, PackageId, TrainingType } from '@tpa/types';
 
 /**
- * Catalog selectors over @tpa/mocks. The catalog is static (packages don't change
- * on purchase), so these read the fixtures directly. Pure; S9 swaps the bodies.
+ * Catalog selectors — pure functions of a package list. The list is the active
+ * packages read from Supabase (RLS exposes only active ones to players), passed in
+ * by the query layer (S9). Pure; the derivations (sorting, per-session price, the
+ * "what's included" copy) are unchanged.
  */
 
 /** Purchasable training types — everything except trial (trials are only granted). */
@@ -18,19 +19,19 @@ export const PLAYER_COUNT: Record<TrainingType, string> = {
   individual: '1 player',
 };
 
-export function activePackages(): Package[] {
-  return mockPackages.filter((p) => p.isActive);
+export function activePackages(packages: Package[]): Package[] {
+  return packages.filter((p) => p.isActive);
 }
 
 /** Active packages for one training type, cheapest first. */
-export function packagesByType(type: TrainingType): Package[] {
-  return activePackages()
+export function packagesByType(packages: Package[], type: TrainingType): Package[] {
+  return activePackages(packages)
     .filter((p) => p.trainingType === type)
     .sort((a, b) => a.sessionCount - b.sessionCount);
 }
 
-export function packageById(id: PackageId): Package | undefined {
-  return mockPackages.find((p) => p.id === id);
+export function packageById(packages: Package[], id: PackageId): Package | undefined {
+  return packages.find((p) => p.id === id);
 }
 
 /** Per-session unit price in piastres (for "N EGP / session"). */

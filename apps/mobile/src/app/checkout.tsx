@@ -2,16 +2,21 @@ import { formatPiastres } from '@tpa/core';
 import { color, space } from '@tpa/theme';
 import type { PackageId, Piastres } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { packageById, perSessionPiastres } from '../data/catalog';
-import { payForPackage } from '../data/purchases';
+import { usePackages } from '../data/queries';
+import { payForPackage } from '../data/mockPayments';
+import { queryClient, queryKeys } from '../lib/queryClient';
 import { useSession } from '../session/SessionProvider';
 import {
   Badge,
   Button,
   Card,
+  ErrorView,
   InfoCard,
+  LoadingView,
   Money,
   Screen,
   ScreenHeader,
@@ -22,13 +27,25 @@ import {
 /**
  * Checkout (undesigned — built to the established pattern). Order summary + a
  * single pay CTA. Payment is entirely mocked behind the `payForPackage` seam,
- * which S6 replaces with the real Paymob flow.
+ * which S6 replaces with the real Paymob flow — see ../data/mockPayments.
  */
 export default function CheckoutScreen() {
   const router = useRouter();
   const { player, now } = useSession();
+  const packagesQ = usePackages();
+  const [paying, setPaying] = useState(false);
   const { packageId } = useLocalSearchParams<{ packageId: string }>();
-  const pkg = packageById(packageId as PackageId);
+
+  if (packagesQ.isPending || packagesQ.isError) {
+    return (
+      <Screen>
+        <ScreenHeader eyebrow="Checkout" title="Order Summary" onBack={() => router.back()} />
+        {packagesQ.isPending ? <LoadingView /> : <ErrorView onRetry={packagesQ.refetch} />}
+      </Screen>
+    );
+  }
+
+  const pkg = packageById(packagesQ.data ?? [], packageId as PackageId);
 
   if (!pkg || !player) {
     return (
@@ -41,8 +58,13 @@ export default function CheckoutScreen() {
   const meta = TRAINING_META[pkg.trainingType];
   const perSession = perSessionPiastres(pkg) as Piastres;
 
-  const onPay = () => {
-    const { batch } = payForPackage(player.id, pkg, now);
+  const onPay = async () => {
+    if (paying) return;
+    setPaying(true);
+    const { batch } = await payForPackage(player.id, pkg, now);
+    // The overlay changed — re-read it so the wallet reflects the new credits with
+    // no manual refresh (S6: the gateway webhook mints them server-side instead).
+    await queryClient.invalidateQueries({ queryKey: queryKeys.mockOverlay });
     router.replace({ pathname: '/purchase-success', params: { batchId: batch.id } });
   };
 
@@ -50,7 +72,13 @@ export default function CheckoutScreen() {
     <Screen
       scroll
       contentContainerStyle={styles.content}
-      footer={<Button label={`Pay ${formatPiastres(pkg.price)}`} onPress={onPay} />}
+      footer={
+        <Button
+          label={paying ? 'Processing…' : `Pay ${formatPiastres(pkg.price)}`}
+          onPress={onPay}
+          disabled={paying}
+        />
+      }
     >
       <ScreenHeader eyebrow="Checkout" title="Order Summary" onBack={() => router.back()} />
 

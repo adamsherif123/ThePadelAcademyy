@@ -4,12 +4,13 @@ import type { CreditBatchId } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { getBatches, useDataStore } from '../data/store';
+import { useBatches } from '../data/queries';
 import { balanceByType } from '../data/wallet';
 import { useSession } from '../session/SessionProvider';
 import {
   Badge,
   Card,
+  LoadingView,
   Screen,
   StatusChip,
   SuccessView,
@@ -25,16 +26,25 @@ import {
 export default function PurchaseSuccessScreen() {
   const router = useRouter();
   const { player, now } = useSession();
-  useDataStore();
+  const batchesQ = useBatches();
   const { batchId } = useLocalSearchParams<{ batchId: string }>();
-  const batch = getBatches().find((b) => b.id === (batchId as CreditBatchId));
+
+  if (batchesQ.isPending) {
+    return (
+      <Screen>
+        <LoadingView />
+      </Screen>
+    );
+  }
+
+  const batch = (batchesQ.data ?? []).find((b) => b.id === (batchId as CreditBatchId));
 
   if (!batch || !player) {
     return <Screen />;
   }
 
   const meta = TRAINING_META[batch.trainingType];
-  const balance = balanceByType(player.id, now)[batch.trainingType];
+  const balance = balanceByType(batchesQ.data ?? [], now)[batch.trainingType];
 
   return (
     <Screen>

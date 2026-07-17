@@ -1,17 +1,19 @@
 import { formatInstantDate } from '@tpa/core';
 import { space } from '@tpa/theme';
-import type { PaymentMethod, Purchase, PurchaseStatus } from '@tpa/types';
+import type { Package, PaymentMethod, Purchase, PurchaseStatus } from '@tpa/types';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { packageForPurchase, playerPurchases } from '../data/purchases';
-import { useDataStore } from '../data/store';
+import { usePackages, usePurchases, combine } from '../data/queries';
 import { useSession } from '../session/SessionProvider';
 import {
   Badge,
   type BadgeTone,
   Card,
   EmptyState,
+  ErrorView,
+  LoadingView,
   Money,
   Screen,
   ScreenHeader,
@@ -34,10 +36,22 @@ const METHOD_LABEL: Record<PaymentMethod, string> = { paymob: 'Card', cash: 'Cas
 export default function PurchaseHistoryScreen() {
   const router = useRouter();
   const { player } = useSession();
-  useDataStore();
+  const purchasesQ = usePurchases();
+  const packagesQ = usePackages();
+  const gate = combine(purchasesQ, packagesQ);
   if (!player) return null;
 
-  const purchases = playerPurchases(player.id);
+  if (gate.isPending || gate.isError) {
+    return (
+      <Screen scroll contentContainerStyle={styles.content}>
+        <ScreenHeader eyebrow="Your account" title="Purchase History" onBack={() => router.back()} />
+        {gate.isPending ? <LoadingView /> : <ErrorView onRetry={gate.refetch} />}
+      </Screen>
+    );
+  }
+
+  const purchases = playerPurchases(purchasesQ.data ?? []);
+  const packages = packagesQ.data ?? [];
 
   return (
     <Screen scroll contentContainerStyle={styles.content}>
@@ -51,14 +65,16 @@ export default function PurchaseHistoryScreen() {
             cta={{ label: 'Buy credits', onPress: () => router.push('/buy-credits') }}
           />
         ) : (
-          purchases.map((purchase) => <PurchaseRow key={purchase.id} purchase={purchase} />)
+          purchases.map((purchase) => (
+            <PurchaseRow key={purchase.id} purchase={purchase} packages={packages} />
+          ))
         )}
     </Screen>
   );
 }
 
-function PurchaseRow({ purchase }: { purchase: Purchase }) {
-  const pkg = packageForPurchase(purchase);
+function PurchaseRow({ purchase, packages }: { purchase: Purchase; packages: Package[] }) {
+  const pkg = packageForPurchase(packages, purchase);
   const status = STATUS_META[purchase.status];
   return (
     <Card>

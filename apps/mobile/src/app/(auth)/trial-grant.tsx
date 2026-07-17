@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { CREDIT_EXPIRY_DAYS, buildSignupGrant, formatInstantDate } from '@tpa/core';
-import { MOCK_NOW } from '@tpa/mocks';
 import { color, radius, space } from '@tpa/theme';
+import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { useSession } from '../../session/SessionProvider';
@@ -10,13 +10,14 @@ import { Button, NavyScreen, PillOnNavy, Text } from '../../ui';
 /**
  * 04 — Trial grant. The credit count comes from SIGNUP_TRIAL_CREDITS and the
  * expiry date from the built grant (buildSignupGrant + formatInstantDate) — never
- * hardcoded.
+ * hardcoded. The grant mirrors what complete_signup just minted server-side.
  */
 export default function TrialGrantScreen() {
-  const { player, trialGrant, finishOnboarding } = useSession();
+  const router = useRouter();
+  const { player, trialGrant, now } = useSession();
 
   // Fall back to a fresh grant if the user somehow arrives without one.
-  const grant = trialGrant ?? buildSignupGrant(player?.id ?? ('pl_guest' as never), MOCK_NOW);
+  const grant = trialGrant ?? buildSignupGrant(player?.id ?? ('pl_guest' as never), now);
   const count = grant.quantityTotal;
   const validUntil = formatInstantDate(grant.expiresAt);
 
@@ -44,7 +45,7 @@ export default function TrialGrantScreen() {
           </View>
         </View>
 
-        <Button label="Let's go" onPress={finishOnboarding} />
+        <Button label="Let's go" onPress={() => router.replace('/(tabs)')} />
       </View>
     </NavyScreen>
   );

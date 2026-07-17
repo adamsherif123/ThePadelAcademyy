@@ -1,181 +1,191 @@
-import { canBookSlot, isBatchUsable, isCancellableWithoutForfeit } from '@tpa/core';
-import { MOCK_NOW, mockCurrentPlayer } from '@tpa/mocks';
-import type { BookingId, IsoInstant, PlayerId, SessionSlot } from '@tpa/types';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { cairoCalendarDate } from '@tpa/core';
+import type { Booking, Coach, CreditBatch, IsoInstant, Player, SessionSlot } from '@tpa/types';
+import { describe, expect, it } from 'vitest';
 
-import { bookSlot, bookedSlotIds, cancelBooking, type CancelResult } from './booking';
-import { __resetStoreForTests, getBatches, getBookings, getSlots } from './store';
+import {
+  bookedSlotIds,
+  operatingWeekdays,
+  pastSessions,
+  slotAvailability,
+  slotsForType,
+  upcomingSessions,
+} from './booking';
+import { balanceByType } from './wallet';
 
 /**
- * Permanent coverage for the two mutation seams that move money-equivalent value:
- * bookSlot (spend a credit) and cancelBooking (conditionally refund one). Both had
- * real bugs — the S3d double-spend and the S3e double-refund — caught by throwaway
- * scripts; this is that spec, committed. When S7 swaps these bodies for atomic DB
- * RPCs, these become the regression net. Runs against the mock store, reset before
- * each case via the test-only seed hook.
+ * The client-side read derivations that survived S9 — pure functions of the rows
+ * the query layer fetches. The two mutation seams (bookSlot / cancelBooking) moved
+ * to the DB RPCs and are proven server-side (pgTAP + concurrency + the real-session
+ * suite); what remains to cover here is the read logic: availability preview, the
+ * upcoming/past split, operating days, and typed balances. Inputs are constructed
+ * explicitly (not mined from fixtures) so each case is deterministic — exactly the
+ * arrays the hooks feed from live Supabase rows.
  */
+const NOW = '2026-03-15T09:00:00.000Z' as IsoInstant;
+const iso = (dayOffset: number, hour = 12): IsoInstant =>
+  new Date(Date.UTC(2026, 2, 15 + dayOffset, hour)).toISOString() as IsoInstant;
 
-const player = mockCurrentPlayer; // pl_omar — men / beginner
-const now = MOCK_NOW;
-
-beforeEach(() => __resetStoreForTests());
-
-const batch = (id: string) => getBatches().find((b) => b.id === id);
-const booking = (id: string) => getBookings().find((b) => b.id === (id as BookingId));
-const slot = (id: string): SessionSlot => {
-  const s = getSlots().find((x) => x.id === id);
-  if (!s) throw new Error(`no slot ${id}`);
-  return s;
+const player: Player = {
+  id: 'pl_test' as Player['id'],
+  phone: '+201555550001',
+  name: 'Omar Test',
+  gender: 'men',
+  level: 'beginner',
+  createdAt: iso(-30),
 };
-const slotOf = (bookingId: string) => slot(booking(bookingId)!.slotId);
-const reasonOf = (r: CancelResult) => (r.ok ? null : r.reason);
 
-/** First slot pl_omar can book right now of a given type, that he hasn't booked. */
-function findBookable(trainingType: string): SessionSlot {
-  const booked = bookedSlotIds(player.id);
-  const s = getSlots().find(
-    (x) =>
-      !booked.has(x.id) &&
-      x.trainingType === trainingType &&
-      canBookSlot(x, player, getBatches(), now).ok,
-  );
-  if (!s) throw new Error(`no bookable ${trainingType} slot in fixtures`);
-  return s;
+const coach: Coach = {
+  id: 'co_1' as Coach['id'],
+  name: 'Coach',
+  bio: 'b',
+  photoUrl: null,
+  isActive: true,
+};
+
+function slot(over: Partial<SessionSlot> & Pick<SessionSlot, 'id'>): SessionSlot {
+  return {
+    coachId: coach.id,
+    startsAt: iso(2),
+    endsAt: iso(2, 13),
+    trainingType: 'group',
+    capacity: 4,
+    bookedCount: 0,
+    gender: 'men',
+    level: 'beginner',
+    status: 'published',
+    templateId: null,
+    ...over,
+  };
 }
 
-/** A slot (not already booked) that core says fails for exactly `reason`. */
-function findByReason(reason: string): SessionSlot {
-  const booked = bookedSlotIds(player.id);
-  const s = getSlots().find((x) => {
-    if (booked.has(x.id)) return false;
-    const v = canBookSlot(x, player, getBatches(), now);
-    return !v.ok && v.reason === reason;
-  });
-  if (!s) throw new Error(`no fixture slot yields reason ${reason}`);
-  return s;
+function batch(over: Partial<CreditBatch> & Pick<CreditBatch, 'id'>): CreditBatch {
+  return {
+    playerId: player.id,
+    source: 'purchase',
+    purchaseId: null,
+    trainingType: 'group',
+    quantityTotal: 4,
+    quantityRemaining: 4,
+    expiresAt: iso(20),
+    createdAt: iso(-1),
+    note: null,
+    ...over,
+  };
 }
 
-describe('bookSlot', () => {
-  it('spends the earliest-expiring usable batch, records it, and takes a seat', () => {
-    const s = findBookable('group');
-    const seatsBefore = slot(s.id).bookedCount;
-    // pl_omar's usable group batches: cb_group_main (+25d) and cb_group_expiring
-    // (+2d). Earliest-expiring wins, so the +2d batch is spent.
-    const qtyBefore = batch('cb_group_expiring')!.quantityRemaining;
+function booking(over: Partial<Booking> & Pick<Booking, 'id' | 'slotId'>): Booking {
+  return {
+    playerId: player.id,
+    creditBatchId: 'cb_1' as Booking['creditBatchId'],
+    status: 'booked',
+    bookedAt: iso(-1),
+    cancelledAt: null,
+    ...over,
+  };
+}
 
-    const res = bookSlot(player, s.id, now);
-
-    expect(res.ok).toBe(true);
-    if (!res.ok) return;
-    expect(res.booking.creditBatchId).toBe('cb_group_expiring');
-    expect(res.batch.id).toBe('cb_group_expiring');
-    expect(batch('cb_group_expiring')!.quantityRemaining).toBe(qtyBefore - 1);
-    expect(slot(s.id).bookedCount).toBe(seatsBefore + 1);
-  });
-
-  it('rejects a second booking of the same slot — no double-spend', () => {
-    const s = findBookable('group');
-    const first = bookSlot(player, s.id, now);
-    expect(first.ok).toBe(true);
-    if (!first.ok) return;
-    const spent = first.batch.id;
-    const qtyAfterFirst = batch(spent)!.quantityRemaining;
-    const seatsAfterFirst = slot(s.id).bookedCount;
-
-    const second = bookSlot(player, s.id, now);
-
-    expect(second.ok).toBe(false);
-    expect(second.ok ? null : second.reason).toBe('already_booked');
-    expect(batch(spent)!.quantityRemaining).toBe(qtyAfterFirst); // no second decrement
-    expect(slot(s.id).bookedCount).toBe(seatsAfterFirst); // no second seat
-  });
-
-  it.each([
-    'slot_cancelled',
-    'slot_in_past',
-    'slot_full',
-    'gender_mismatch',
-    'level_mismatch',
-    'no_usable_credit',
-  ])('rejects the %s block reason', (reason) => {
-    const s = findByReason(reason);
-    const res = bookSlot(player, s.id, now);
-    expect(res.ok).toBe(false);
-    expect(res.ok ? null : res.reason).toBe(reason);
+describe('bookedSlotIds', () => {
+  it('includes non-cancelled bookings and excludes cancelled ones', () => {
+    const ids = bookedSlotIds([
+      booking({ id: 'bk_a' as Booking['id'], slotId: 'sl_a' as SessionSlot['id'] }),
+      booking({ id: 'bk_b' as Booking['id'], slotId: 'sl_b' as SessionSlot['id'], status: 'cancelled' }),
+      booking({ id: 'bk_c' as Booking['id'], slotId: 'sl_c' as SessionSlot['id'], status: 'attended' }),
+    ]);
+    expect(ids.has('sl_a' as SessionSlot['id'])).toBe(true);
+    expect(ids.has('sl_c' as SessionSlot['id'])).toBe(true); // attended still holds the seat
+    expect(ids.has('sl_b' as SessionSlot['id'])).toBe(false); // cancelled frees it
   });
 });
 
-describe('cancelBooking', () => {
-  it('outside the window: refunds to the original batch with its original expiry, frees the seat', () => {
-    const s = slotOf('bk_booked');
-    const batchId = booking('bk_booked')!.creditBatchId; // cb_group_main
-    const qtyBefore = batch(batchId)!.quantityRemaining;
-    const expiryBefore = batch(batchId)!.expiresAt;
-    const seatsBefore = s.bookedCount;
-    expect(isCancellableWithoutForfeit(s, now)).toBe(true);
+describe('slotAvailability', () => {
+  const usableGroup = batch({ id: 'cb_g' as CreditBatch['id'] });
 
-    const res = cancelBooking(player, 'bk_booked' as BookingId, now);
-
-    expect(res.ok && res.refunded).toBe(true);
-    expect(batch(batchId)!.quantityRemaining).toBe(qtyBefore + 1);
-    expect(batch(batchId)!.expiresAt).toBe(expiryBefore); // NOT extended
-    expect(slot(s.id).bookedCount).toBe(seatsBefore - 1);
-    expect(booking('bk_booked')!.status).toBe('cancelled');
-    expect(booking('bk_booked')!.cancelledAt).toBe(now);
+  it('reports `booked` for a slot the player already holds', () => {
+    const s = slot({ id: 'sl_1' as SessionSlot['id'] });
+    const bookings = [booking({ id: 'bk_1' as Booking['id'], slotId: s.id })];
+    expect(slotAvailability(s, player, [usableGroup], bookings, NOW).kind).toBe('booked');
   });
 
-  it('rejects a second cancel — no double-refund', () => {
-    cancelBooking(player, 'bk_booked' as BookingId, now);
-    const qtyAfterFirst = batch('cb_group_main')!.quantityRemaining;
-
-    const res = cancelBooking(player, 'bk_booked' as BookingId, now);
-
-    expect(res.ok).toBe(false);
-    expect(reasonOf(res)).toBe('already_cancelled');
-    expect(batch('cb_group_main')!.quantityRemaining).toBe(qtyAfterFirst);
+  it('reports `bookable` for a fresh matching slot with a usable credit', () => {
+    const s = slot({ id: 'sl_2' as SessionSlot['id'] });
+    const av = slotAvailability(s, player, [usableGroup], [], NOW);
+    expect(av.kind).toBe('bookable');
   });
 
-  it('inside the window: frees the seat but forfeits the credit', () => {
-    const s = slotOf('bk_soon');
-    const batchId = booking('bk_soon')!.creditBatchId;
-    const qtyBefore = batch(batchId)!.quantityRemaining;
-    const seatsBefore = s.bookedCount;
-    expect(isCancellableWithoutForfeit(s, now)).toBe(false);
-
-    const res = cancelBooking(player, 'bk_soon' as BookingId, now);
-
-    expect(res.ok).toBe(true);
-    expect(res.ok && res.refunded).toBe(false);
-    expect(batch(batchId)!.quantityRemaining).toBe(qtyBefore); // no refund
-    expect(slot(s.id).bookedCount).toBe(seatsBefore - 1); // seat still freed
+  it('reports `full` when the slot is at capacity', () => {
+    const s = slot({ id: 'sl_3' as SessionSlot['id'], capacity: 4, bookedCount: 4 });
+    expect(slotAvailability(s, player, [usableGroup], [], NOW).kind).toBe('full');
   });
 
-  it('expired-batch edge: returns the credit anyway, and it stays unusable', () => {
-    const batchId = booking('bk_expired_refund')!.creditBatchId; // cb_duo_expired
-    const qtyBefore = batch(batchId)!.quantityRemaining;
-    expect(isBatchUsable(batch(batchId)!, 'duo', now)).toBe(false);
-
-    const res = cancelBooking(player, 'bk_expired_refund' as BookingId, now);
-
-    expect(res.ok && res.refunded).toBe(true); // the ledger tells the truth
-    expect(batch(batchId)!.quantityRemaining).toBe(qtyBefore + 1);
-    expect(isBatchUsable(batch(batchId)!, 'duo', now)).toBe(false); // returned worthless
+  it('distinguishes `no_credit` (never had) from `credits_expired` (lapsed)', () => {
+    const s = slot({ id: 'sl_4' as SessionSlot['id'] });
+    expect(slotAvailability(s, player, [], [], NOW).kind).toBe('no_credit');
+    const expired = batch({ id: 'cb_exp' as CreditBatch['id'], expiresAt: iso(-1), quantityRemaining: 2 });
+    expect(slotAvailability(s, player, [expired], [], NOW).kind).toBe('credits_expired');
   });
 
-  it('rejects terminal, missing, and non-owned bookings', () => {
-    expect(reasonOf(cancelBooking(player, 'bk_attended' as BookingId, now))).toBe('not_cancellable');
-    expect(reasonOf(cancelBooking(player, 'bk_no_show' as BookingId, now))).toBe('not_cancellable');
-    expect(reasonOf(cancelBooking(player, 'bk_missing' as BookingId, now))).toBe('booking_missing');
-    const other = { ...player, id: 'pl_other' as PlayerId };
-    expect(reasonOf(cancelBooking(other, 'bk_booked' as BookingId, now))).toBe('not_owner');
+  it('reports `gender_mismatch` for a ladies-only slot', () => {
+    const s = slot({ id: 'sl_5' as SessionSlot['id'], gender: 'ladies' });
+    expect(slotAvailability(s, player, [usableGroup], [], NOW).kind).toBe('gender_mismatch');
   });
+});
 
-  it('the 3-hour boundary is exact: at startsAt − 3h forfeit, a millisecond earlier refundable', () => {
-    const s = slotOf('bk_soon');
-    const startMs = new Date(s.startsAt).getTime();
-    const exactly3h = new Date(startMs - 3 * 3_600_000).toISOString() as IsoInstant;
-    const oneMsEarlier = new Date(startMs - 3 * 3_600_000 - 1).toISOString() as IsoInstant;
-    expect(isCancellableWithoutForfeit(s, exactly3h)).toBe(false);
-    expect(isCancellableWithoutForfeit(s, oneMsEarlier)).toBe(true);
+describe('slotsForType', () => {
+  it('returns only published duo slots on the chosen day, sorted by start', () => {
+    const day = cairoCalendarDate(iso(2));
+    const slots: SessionSlot[] = [
+      slot({ id: 'd2' as SessionSlot['id'], trainingType: 'duo', gender: null, level: null, startsAt: iso(2, 16) }),
+      slot({ id: 'd1' as SessionSlot['id'], trainingType: 'duo', gender: null, level: null, startsAt: iso(2, 10) }),
+      slot({ id: 'g1' as SessionSlot['id'], trainingType: 'group', startsAt: iso(2, 11) }), // wrong type
+      slot({ id: 'd3' as SessionSlot['id'], trainingType: 'duo', gender: null, level: null, startsAt: iso(3, 10) }), // wrong day
+      slot({ id: 'dc' as SessionSlot['id'], trainingType: 'duo', gender: null, level: null, status: 'cancelled', startsAt: iso(2, 8) }),
+    ];
+    const out = slotsForType(slots, 'duo', player, day);
+    expect(out.map((s) => s.id)).toEqual(['d1', 'd2']);
+  });
+});
+
+describe('upcoming / past split', () => {
+  it('upcoming = active booking with a future slot; cancelled + past go to past', () => {
+    const future = slot({ id: 'f' as SessionSlot['id'], startsAt: iso(3) });
+    const past = slot({ id: 'p' as SessionSlot['id'], startsAt: iso(-3) });
+    const cancelledFuture = slot({ id: 'cf' as SessionSlot['id'], startsAt: iso(4) });
+    const slots = [future, past, cancelledFuture];
+    const bookings = [
+      booking({ id: 'b_f' as Booking['id'], slotId: future.id }),
+      booking({ id: 'b_p' as Booking['id'], slotId: past.id }),
+      booking({ id: 'b_cf' as Booking['id'], slotId: cancelledFuture.id, status: 'cancelled' }),
+    ];
+    const up = upcomingSessions(bookings, slots, [coach], NOW).map((e) => e.booking.id);
+    const pastIds = pastSessions(bookings, slots, [coach], NOW).map((e) => e.booking.id);
+    expect(up).toEqual(['b_f']);
+    expect(pastIds.sort()).toEqual(['b_cf', 'b_p']);
+  });
+});
+
+describe('operatingWeekdays', () => {
+  it('is derived from published slots only — a cancelled-only day is closed', () => {
+    const openDay = slot({ id: 'o' as SessionSlot['id'], startsAt: iso(2) });
+    const closedDay = slot({ id: 'c' as SessionSlot['id'], startsAt: iso(5), status: 'cancelled' });
+    const open = operatingWeekdays([openDay, closedDay]);
+    expect(open.has(cairoCalendarDate(iso(2)).weekday)).toBe(true);
+    const closedWeekday = cairoCalendarDate(iso(5)).weekday;
+    // Only closed if no published slot shares that weekday.
+    if (cairoCalendarDate(iso(2)).weekday !== closedWeekday) {
+      expect(open.has(closedWeekday)).toBe(false);
+    }
+  });
+});
+
+describe('balanceByType', () => {
+  it('sums only usable credits, per type', () => {
+    const batches = [
+      batch({ id: 'g' as CreditBatch['id'], trainingType: 'group', quantityRemaining: 3 }),
+      batch({ id: 'd_exp' as CreditBatch['id'], trainingType: 'duo', quantityRemaining: 2, expiresAt: iso(-1) }),
+    ];
+    const bal = balanceByType(batches, NOW);
+    expect(bal.group).toBe(3);
+    expect(bal.duo).toBe(0); // expired → not counted
+    expect(bal.individual).toBe(0);
   });
 });

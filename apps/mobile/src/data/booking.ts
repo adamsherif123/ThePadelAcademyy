@@ -1,14 +1,10 @@
 import {
-  ID_PREFIXES,
   cairoCalendarDate,
   canBookSlot,
   cancellationDeadline,
   creditExpiryState,
   isCancellableWithoutForfeit,
-  newId,
-  type BookBlockReason,
 } from '@tpa/core';
-import { mockCoaches, mockTemplates } from '@tpa/mocks';
 import type {
   Booking,
   BookingId,
@@ -23,15 +19,16 @@ import type {
   Weekday,
 } from '@tpa/types';
 
-import { commitBooking, commitCancellation, getBatches, getBookings, getSlots } from './store';
 import { balanceByType } from './wallet';
 
 /**
- * Booking selectors over @tpa/mocks + the store. Availability rules are NOT
- * reimplemented here — the per-slot verdict calls @tpa/core's canBookSlot (the
- * client-side preview of the S7 RPC). Pure; S9 swaps the bodies for Supabase
- * queries with the same shapes. Batches come from the store so a fresh purchase
- * updates Book's credit counts and bookability.
+ * Booking derivations — pure functions of the rows the query layer fetched from
+ * Supabase (published slots, the player's own bookings + credit batches, active
+ * coaches). Availability is NOT reimplemented: each verdict calls @tpa/core's
+ * canBookSlot, the client-side PREVIEW of the book_slot RPC that actually enforces
+ * it. The two mutation seams that used to live here (bookSlot / cancelBooking) are
+ * now the server RPCs in ../lib/api and the mutations in ./queries — this file is
+ * read-only derivation.
  */
 
 export interface CairoDay {
@@ -47,17 +44,21 @@ function sameCairoDay(instant: IsoInstant, d: CairoDay): boolean {
 }
 
 /**
- * The weekdays the academy operates — DERIVED from availability templates, not a
- * constant. A weekday with no active template from any coach is closed, so if the
- * academy adds (say) Thursday availability later, the Book UI opens it up with no
- * code change.
+ * The weekdays the academy operates — DERIVED from the published slots the client
+ * can see. (Availability templates are admin-only under RLS, so unlike the mock we
+ * can't read them here; the published schedule is the client's source of truth.) A
+ * weekday with at least one published slot is open.
  */
-export function operatingWeekdays(): Set<Weekday> {
-  return new Set(mockTemplates.filter((t) => t.isActive).map((t) => t.weekday));
+export function operatingWeekdays(slots: SessionSlot[]): Set<Weekday> {
+  const open = new Set<Weekday>();
+  for (const s of slots) {
+    if (s.status === 'published') open.add(cairoCalendarDate(s.startsAt).weekday as Weekday);
+  }
+  return open;
 }
 
-export function isClosedWeekday(weekday: Weekday): boolean {
-  return !operatingWeekdays().has(weekday);
+export function isClosedWeekday(slots: SessionSlot[], weekday: Weekday): boolean {
+  return !operatingWeekdays(slots).has(weekday);
 }
 
 export interface DateStripDay extends CairoDay {
@@ -66,7 +67,8 @@ export interface DateStripDay extends CairoDay {
 }
 
 /** `count` consecutive Cairo days starting today, each flagged open/closed. */
-export function dateStrip(now: IsoInstant, count: number): DateStripDay[] {
+export function dateStrip(slots: SessionSlot[], now: IsoInstant, count: number): DateStripDay[] {
+  const open = operatingWeekdays(slots);
   const start = cairoCalendarDate(now);
   const base = Date.UTC(start.year, start.month - 1, start.day);
   return Array.from({ length: count }, (_, i) => {
@@ -78,21 +80,21 @@ export function dateStrip(now: IsoInstant, count: number): DateStripDay[] {
       day: d.getUTCDate(),
       weekday,
     };
-    return { ...day, key: `${day.year}-${day.month}-${day.day}`, closed: isClosedWeekday(weekday) };
+    return { ...day, key: `${day.year}-${day.month}-${day.day}`, closed: !open.has(weekday) };
   });
 }
 
 /**
  * Published slots of `trainingType` on `day`, sorted by start. Group slots are
- * matched to the player's profile (gender AND level — men/ladies train separately
- * and players are placed by level); duo/individual/trial don't filter.
+ * matched to the player's profile (gender AND level); duo/individual/trial don't.
  */
 export function slotsForType(
+  slots: SessionSlot[],
   trainingType: TrainingType,
   player: Player,
   day: CairoDay,
 ): SessionSlot[] {
-  return getSlots()
+  return slots
     .filter((s) => s.status === 'published' && s.trainingType === trainingType)
     .filter((s) => sameCairoDay(s.startsAt, day))
     .filter((s) => trainingType !== 'group' || (s.gender === player.gender && s.level === player.level))
@@ -100,32 +102,23 @@ export function slotsForType(
 }
 
 /**
- * Slot ids the player holds a NON-CANCELLED booking for (booked / attended /
- * no_show). Only a cancellation frees the seat, so this is exactly the set that
- * blocks a second booking — mirroring the DB's partial unique index
- * `bookings_one_active_per_player_slot WHERE status <> 'cancelled'`. A cancelled
- * booking is excluded, so cancel → re-book the same slot is allowed on both sides.
+ * Slot ids the player holds a NON-CANCELLED booking for. Only a cancellation frees
+ * the seat, so this is exactly the set that blocks a second booking — mirroring the
+ * DB's partial unique index on (player, slot) WHERE status <> 'cancelled'.
  */
-export function bookedSlotIds(playerId: Player['id']): Set<SlotId> {
-  return new Set(
-    getBookings().filter((b) => b.playerId === playerId && b.status !== 'cancelled').map((b) => b.slotId),
-  );
+export function bookedSlotIds(bookings: Booking[]): Set<SlotId> {
+  return new Set(bookings.filter((b) => b.status !== 'cancelled').map((b) => b.slotId));
 }
 
-export function coachById(id: Coach['id']): Coach | undefined {
-  return mockCoaches.find((c) => c.id === id);
+export function coachById(coaches: Coach[], id: Coach['id']): Coach | undefined {
+  return coaches.find((c) => c.id === id);
 }
 
-export function slotById(id: SlotId): SessionSlot | undefined {
-  return getSlots().find((s) => s.id === id);
+export function slotById(slots: SessionSlot[], id: SlotId): SessionSlot | undefined {
+  return slots.find((s) => s.id === id);
 }
 
-/**
- * Everything the confirm screen needs for one slot: the slot + coach, the
- * canBookSlot verdict (so the screen can guard if it went unbookable), the batch
- * that WILL be spent (chosen by core, not here), and the current usable balance
- * of that type (to show "N left after booking" = balance − 1).
- */
+/** Everything the confirm screen needs for one slot. */
 export interface BookingPreview {
   slot: SessionSlot;
   coach: Coach | undefined;
@@ -136,30 +129,29 @@ export interface BookingPreview {
 }
 
 export function bookingPreview(
+  ctx: { slots: SessionSlot[]; coaches: Coach[]; batches: CreditBatch[]; bookings: Booking[] },
   player: Player,
   slotId: SlotId,
   now: IsoInstant,
 ): BookingPreview | null {
-  const slot = slotById(slotId);
+  const slot = slotById(ctx.slots, slotId);
   if (!slot) return null;
-  const batches = getBatches().filter((b) => b.playerId === player.id);
-  const verdict = canBookSlot(slot, player, batches, now);
-  const batch = verdict.ok ? batches.find((b) => b.id === verdict.creditBatchId) : undefined;
+  const verdict = canBookSlot(slot, player, ctx.batches, now);
+  const batch = verdict.ok ? ctx.batches.find((b) => b.id === verdict.creditBatchId) : undefined;
   return {
     slot,
-    coach: coachById(slot.coachId),
+    coach: coachById(ctx.coaches, slot.coachId),
     verdict,
     batch,
-    typeBalance: balanceByType(player.id, now)[slot.trainingType],
-    alreadyBooked: bookedSlotIds(player.id).has(slotId),
+    typeBalance: balanceByType(ctx.batches, now)[slot.trainingType],
+    alreadyBooked: bookedSlotIds(ctx.bookings).has(slotId),
   };
 }
 
 /**
  * Why a slot can or can't be booked, for the current player, right now. Wraps
- * canBookSlot and adds two UI-only distinctions core doesn't make: `booked`
- * (the player already holds this slot) and `credits_expired` vs `no_credit`
- * (had credits of this type but they lapsed, vs never had any).
+ * canBookSlot and adds two UI-only distinctions core doesn't make: `booked` and
+ * `credits_expired` vs `no_credit`.
  */
 export type SlotAvailability =
   | { kind: 'bookable'; creditBatchId: CreditBatchId }
@@ -175,11 +167,12 @@ export type SlotAvailability =
 export function slotAvailability(
   slot: SessionSlot,
   player: Player,
+  batches: CreditBatch[],
+  bookings: Booking[],
   now: IsoInstant,
 ): SlotAvailability {
-  if (bookedSlotIds(player.id).has(slot.id)) return { kind: 'booked' };
+  if (bookedSlotIds(bookings).has(slot.id)) return { kind: 'booked' };
 
-  const batches = getBatches().filter((b) => b.playerId === player.id);
   const res = canBookSlot(slot, player, batches, now);
   if (res.ok) return { kind: 'bookable', creditBatchId: res.creditBatchId };
 
@@ -203,58 +196,6 @@ export function slotAvailability(
   }
 }
 
-/**
- * THE BOOKING SEAM. The credit-spend mutation, mirroring payForPackage.
- *
- * Re-validates through @tpa/core's canBookSlot and REJECTS anything it says isn't
- * ok — the mutation never trusts the caller. Batch selection is NOT decided here:
- * canBookSlot returns the exact creditBatchId to spend (S1 verified it's the
- * earliest-expiring usable batch). On success it decrements that batch, takes a
- * seat on the slot, and creates a Booking recording the spent batch (S3e refunds
- * to that batch, with its original expiry), then commits all three atomically.
- *
- * MOCK (S3d): commits to the local store. S7 replaces THIS BODY with a single
- * atomic DB RPC that enforces capacity (can't oversell) and credit (can't double-
- * spend) under real concurrency. Screens call bookSlot and route to booked-success
- * on ok; nothing above this function changes.
- */
-export type BookResult =
-  | { ok: true; booking: Booking; batch: CreditBatch }
-  | { ok: false; reason: BookBlockReason | 'slot_missing' | 'already_booked' };
-
-export function bookSlot(player: Player, slotId: SlotId, now: IsoInstant): BookResult {
-  const slot = getSlots().find((s) => s.id === slotId);
-  if (!slot) return { ok: false, reason: 'slot_missing' };
-
-  // Uniqueness guard — a player can't hold two bookings for one slot (canBookSlot
-  // is about capacity/credits/profile and doesn't see existing bookings; in S7
-  // this is a DB unique constraint on (player, slot)).
-  if (bookedSlotIds(player.id).has(slotId)) return { ok: false, reason: 'already_booked' };
-
-  const batches = getBatches().filter((b) => b.playerId === player.id);
-  const verdict = canBookSlot(slot, player, batches, now);
-  if (!verdict.ok) return { ok: false, reason: verdict.reason };
-
-  // canBookSlot chose the batch; we only spend the one it named.
-  const batch = batches.find((b) => b.id === verdict.creditBatchId);
-  if (!batch) return { ok: false, reason: 'no_usable_credit' };
-
-  const updatedBatch: CreditBatch = { ...batch, quantityRemaining: batch.quantityRemaining - 1 };
-  const updatedSlot: SessionSlot = { ...slot, bookedCount: slot.bookedCount + 1 };
-  const booking: Booking = {
-    id: newId(ID_PREFIXES.booking) as BookingId,
-    slotId: slot.id,
-    playerId: player.id,
-    creditBatchId: batch.id, // exact batch spent — S3e refunds here
-    status: 'booked',
-    bookedAt: now,
-    cancelledAt: null,
-  };
-
-  commitBooking(booking, updatedBatch, updatedSlot);
-  return { ok: true, booking, batch: updatedBatch };
-}
-
 /** A booking paired with its slot and coach, for the Sessions lists. */
 export interface SessionEntry {
   booking: Booking;
@@ -262,12 +203,15 @@ export interface SessionEntry {
   coach: Coach | undefined;
 }
 
-function sessionEntries(playerId: Player['id']): SessionEntry[] {
-  return getBookings()
-    .filter((b) => b.playerId === playerId)
+function sessionEntries(
+  bookings: Booking[],
+  slots: SessionSlot[],
+  coaches: Coach[],
+): SessionEntry[] {
+  return bookings
     .map((b) => {
-      const slot = slotById(b.slotId);
-      return slot ? { booking: b, slot, coach: coachById(slot.coachId) } : null;
+      const slot = slotById(slots, b.slotId);
+      return slot ? { booking: b, slot, coach: coachById(coaches, slot.coachId) } : null;
     })
     .filter((e): e is SessionEntry => e !== null);
 }
@@ -276,35 +220,31 @@ function hasStarted(slot: SessionSlot, now: IsoInstant): boolean {
   return new Date(slot.startsAt).getTime() <= new Date(now).getTime();
 }
 
-/**
- * "Upcoming" is genuine future court time: an ACTIVE (`booked`) booking whose slot
- * has not started yet. The split is by the slot's startsAt, not booking status —
- * EXCEPT that a cancelled booking is never upcoming even if its slot is still in
- * the future (a cancelled seat is a record, not a plan). Soonest first.
- */
-export function upcomingSessions(playerId: Player['id'], now: IsoInstant): SessionEntry[] {
-  return sessionEntries(playerId)
+/** Active (`booked`) bookings whose slot has not started, soonest first. */
+export function upcomingSessions(
+  bookings: Booking[],
+  slots: SessionSlot[],
+  coaches: Coach[],
+  now: IsoInstant,
+): SessionEntry[] {
+  return sessionEntries(bookings, slots, coaches)
     .filter((e) => e.booking.status === 'booked' && !hasStarted(e.slot, now))
     .sort((a, b) => new Date(a.slot.startsAt).getTime() - new Date(b.slot.startsAt).getTime());
 }
 
-/**
- * "Past" is everything else: sessions whose slot has started (attended / no_show /
- * a booking never cancelled) AND any cancelled booking regardless of slot time.
- * Most recent first.
- */
-export function pastSessions(playerId: Player['id'], now: IsoInstant): SessionEntry[] {
-  return sessionEntries(playerId)
+/** Everything else — started sessions and any cancelled booking. Most recent first. */
+export function pastSessions(
+  bookings: Booking[],
+  slots: SessionSlot[],
+  coaches: Coach[],
+  now: IsoInstant,
+): SessionEntry[] {
+  return sessionEntries(bookings, slots, coaches)
     .filter((e) => !(e.booking.status === 'booked' && !hasStarted(e.slot, now)))
     .sort((a, b) => new Date(b.slot.startsAt).getTime() - new Date(a.slot.startsAt).getTime());
 }
 
-/**
- * Everything the cancel screen needs for one booking: the slot + coach, whether
- * cancelling now refunds (isCancellableWithoutForfeit), the refund deadline, the
- * batch the credit returns to, and whether that batch is ALREADY expired at `now`
- * — so the sheet can promise a refund only when it's actually spendable.
- */
+/** Everything the cancel screen needs for one booking. */
 export interface CancelPreview {
   booking: Booking;
   slot: SessionSlot;
@@ -316,86 +256,25 @@ export interface CancelPreview {
 }
 
 export function cancelPreview(
-  player: Player,
+  ctx: { slots: SessionSlot[]; coaches: Coach[]; batches: CreditBatch[]; bookings: Booking[] },
   bookingId: BookingId,
   now: IsoInstant,
 ): CancelPreview | null {
-  const booking = getBookings().find((b) => b.id === bookingId && b.playerId === player.id);
+  const booking = ctx.bookings.find((b) => b.id === bookingId);
   if (!booking) return null;
-  const slot = slotById(booking.slotId);
+  const slot = slotById(ctx.slots, booking.slotId);
   if (!slot) return null;
-  const batch = getBatches().find((b) => b.id === booking.creditBatchId);
+  const batch = ctx.batches.find((b) => b.id === booking.creditBatchId);
   const refundable = isCancellableWithoutForfeit(slot, now);
   const refundExpired =
     refundable && batch !== undefined && creditExpiryState(batch.expiresAt, now) === 'expired';
   return {
     booking,
     slot,
-    coach: coachById(slot.coachId),
+    coach: coachById(ctx.coaches, slot.coachId),
     refundable,
     deadline: cancellationDeadline(slot),
     batch,
     refundExpired,
   };
-}
-
-/**
- * THE CANCELLATION SEAM. The third money-equivalent mutation, mirroring bookSlot.
- *
- * Re-validates and never trusts the caller: rejects a booking that isn't the
- * player's, isn't active, or whose slot has already started. `already_cancelled`
- * is an explicit idempotency guard — the mirror of bookSlot's `already_booked`,
- * and the thing that stops a double-refund (cancel twice → credit back twice).
- *
- * The seat is ALWAYS freed (bookedCount − 1) so someone else can book it, refund
- * or not. The credit is refunded ONLY when @tpa/core's isCancellableWithoutForfeit
- * says so (outside the 3-hour window), and it goes back to booking.creditBatchId —
- * the exact batch that paid — with that batch's ORIGINAL expiry (we only bump
- * quantityRemaining; we never mint a batch or extend expiry). If that batch has
- * since expired, the credit still returns (the ledger tells the truth) and is
- * simply unusable — isBatchUsable rejects it. All three writes commit atomically.
- *
- * MOCK (S3e): commits to the local store. S7 replaces THIS BODY with one atomic DB
- * RPC that frees the seat and conditionally refunds under real concurrency, with a
- * unique/status guard so a double-cancel can't double-refund. Screens are unchanged.
- */
-export type CancelBlockReason =
-  | 'booking_missing'
-  | 'not_owner'
-  | 'already_cancelled'
-  | 'not_cancellable'
-  | 'slot_missing';
-
-export type CancelResult =
-  | { ok: true; refunded: boolean; booking: Booking; batch: CreditBatch | null }
-  | { ok: false; reason: CancelBlockReason };
-
-export function cancelBooking(player: Player, bookingId: BookingId, now: IsoInstant): CancelResult {
-  const booking = getBookings().find((b) => b.id === bookingId);
-  if (!booking) return { ok: false, reason: 'booking_missing' };
-  if (booking.playerId !== player.id) return { ok: false, reason: 'not_owner' };
-  // Idempotency — cancelling an already-cancelled booking must not refund again.
-  if (booking.status === 'cancelled') return { ok: false, reason: 'already_cancelled' };
-  // attended / no_show are the admin's terminal states, not cancellable.
-  if (booking.status !== 'booked') return { ok: false, reason: 'not_cancellable' };
-
-  const slot = getSlots().find((s) => s.id === booking.slotId);
-  if (!slot) return { ok: false, reason: 'slot_missing' };
-  // Can't cancel a session that has already started.
-  if (hasStarted(slot, now)) return { ok: false, reason: 'not_cancellable' };
-
-  const refundable = isCancellableWithoutForfeit(slot, now);
-  const cancelledBooking: Booking = { ...booking, status: 'cancelled', cancelledAt: now };
-  const freedSlot: SessionSlot = { ...slot, bookedCount: Math.max(0, slot.bookedCount - 1) };
-
-  let updatedBatch: CreditBatch | null = null;
-  if (refundable) {
-    const batch = getBatches().find((b) => b.id === booking.creditBatchId);
-    // Return the credit to its original batch, keeping that batch's expiry. If the
-    // batch has lapsed, it still returns — worthless — rather than being extended.
-    if (batch) updatedBatch = { ...batch, quantityRemaining: batch.quantityRemaining + 1 };
-  }
-
-  commitCancellation(cancelledBooking, freedSlot, updatedBatch ?? undefined);
-  return { ok: true, refunded: updatedBatch !== null, booking: cancelledBooking, batch: updatedBatch };
 }

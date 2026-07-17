@@ -24,13 +24,24 @@ export default function ProfileSetupScreen() {
   const [name, setName] = useState('');
   const [gender, setGender] = useState<Gender | null>(null);
   const [level, setLevel] = useState<Level | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const complete = name.trim().length > 0 && gender !== null && level !== null;
 
-  const onCreate = () => {
-    if (!complete) return;
-    completeProfile({ name: name.trim(), gender, level });
-    router.push('/(auth)/trial-grant');
+  const onCreate = async () => {
+    if (!complete || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    // complete_signup creates the player and grants the 2 trial credits atomically.
+    const res = await completeProfile({ name: name.trim(), gender, level });
+    if (res.ok) {
+      // Show the trial-grant celebration; the guard allows it for a ready user.
+      router.push('/(auth)/trial-grant');
+    } else {
+      setSubmitting(false);
+      setError('We couldn’t create your profile. Please try again.');
+    }
   };
 
   return (
@@ -100,12 +111,20 @@ export default function ProfileSetupScreen() {
           text="Men's and ladies' groups train separately, and players are placed by level. You'll only see group slots that match your category and level."
         />
 
-        <Button label="Create my Profile" onPress={onCreate} disabled={!complete} />
-        {!complete ? (
-        <Text variant="caption" tone="muted" style={styles.helper}>
-          Fill in all three fields to continue
-        </Text>
-      ) : null}
+        <Button
+          label={submitting ? 'Creating…' : 'Create my Profile'}
+          onPress={onCreate}
+          disabled={!complete || submitting}
+        />
+        {error ? (
+          <Text variant="caption" tone="accent" style={styles.helper}>
+            {error}
+          </Text>
+        ) : !complete ? (
+          <Text variant="caption" tone="muted" style={styles.helper}>
+            Fill in all three fields to continue
+          </Text>
+        ) : null}
     </Screen>
   );
 }

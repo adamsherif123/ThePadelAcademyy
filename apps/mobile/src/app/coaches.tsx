@@ -2,16 +2,27 @@ import { space } from '@tpa/theme';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { allCoaches } from '../data/schedule';
-import { Avatar, Badge, Card, Screen, ScreenHeader, Text } from '../ui';
+import { useCoaches } from '../data/queries';
+import { Avatar, Badge, Card, ErrorView, LoadingView, Screen, ScreenHeader, Text } from '../ui';
 
 /**
- * Meet the coaches (undesigned — built to the established pattern). The 4 mock
- * coaches with photos, names, and specialties; inactive coaches are marked.
+ * Meet the coaches (undesigned — built to the established pattern). The active
+ * academy coaches with photos, names, and specialties, read live via RLS.
  */
 export default function CoachesScreen() {
   const router = useRouter();
-  const coaches = allCoaches();
+  const coachesQ = useCoaches();
+
+  if (coachesQ.isPending || coachesQ.isError) {
+    return (
+      <Screen scroll contentContainerStyle={styles.content}>
+        <ScreenHeader eyebrow="The team" title="Meet the Coaches" onBack={() => router.back()} />
+        {coachesQ.isPending ? <LoadingView /> : <ErrorView onRetry={coachesQ.refetch} />}
+      </Screen>
+    );
+  }
+
+  const coaches = coachesQ.data ?? [];
 
   return (
     <Screen scroll contentContainerStyle={styles.content}>

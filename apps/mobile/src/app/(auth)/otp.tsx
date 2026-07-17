@@ -9,19 +9,42 @@ import { fontFamilyForWeight } from '../../theme/fonts';
 
 const LENGTH = 6;
 
-/** 02 — OTP. Any 6-digit code passes (mock), then on to profile setup. */
+/**
+ * 02 — OTP. Verifies the real SMS code; on success the session appears and the
+ * root guard routes on (profile-setup if new, tabs if returning). We don't
+ * navigate here — the auth state machine owns that transition.
+ */
 export default function OtpScreen() {
   const router = useRouter();
-  const { phone } = useSession();
+  const { phone, verifyOtp, sendOtp } = useSession();
   const [code, setCode] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<TextInput>(null);
+
+  const submit = async (digits: string) => {
+    if (verifying) return;
+    setVerifying(true);
+    setError(null);
+    const res = await verifyOtp(digits);
+    if (!res.ok) {
+      setVerifying(false);
+      setError(res.error ?? 'That code didn’t work. Check it and try again.');
+      setCode('');
+    }
+    // On success we stay put; the guard redirects once status flips.
+  };
 
   const onChange = (next: string) => {
     const digits = next.replace(/[^0-9]/g, '').slice(0, LENGTH);
     setCode(digits);
-    if (digits.length === LENGTH) {
-      router.push('/(auth)/profile-setup');
-    }
+    if (digits.length === LENGTH) void submit(digits);
+  };
+
+  const onResend = () => {
+    setCode('');
+    setError(null);
+    if (phone) void sendOtp(phone);
   };
 
   return (
@@ -40,6 +63,12 @@ export default function OtpScreen() {
             {phone ?? ''}
           </Text>
         </Text>
+
+        {error ? (
+          <Text variant="body" tone="accent">
+            {error}
+          </Text>
+        ) : null}
 
         <Pressable style={styles.boxes} onPress={() => inputRef.current?.focus()}>
           {Array.from({ length: LENGTH }).map((_, i) => {
@@ -61,23 +90,26 @@ export default function OtpScreen() {
           onChangeText={onChange}
           keyboardType="number-pad"
           maxLength={LENGTH}
+          editable={!verifying}
           autoFocus
           style={styles.hiddenInput}
         />
 
         <View style={styles.resendRow}>
           <Text variant="body" tone="secondary">
-            Didn&apos;t get it?{' '}
+            {verifying ? 'Verifying…' : "Didn't get it? "}
           </Text>
-          <Pressable onPress={() => setCode('')}>
-            <Text variant="body" weight="bold" tone="accent">
-              Resend code
-            </Text>
-          </Pressable>
+          {verifying ? null : (
+            <Pressable onPress={onResend}>
+              <Text variant="body" weight="bold" tone="accent">
+                Resend code
+              </Text>
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.demoRow}>
-          <PillOnNavy label="Demo — any 6-digit code works" />
+          <PillOnNavy label="Dev — test numbers use code 123456" />
         </View>
       </View>
     </NavyScreen>

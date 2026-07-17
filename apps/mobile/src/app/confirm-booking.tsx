@@ -2,10 +2,11 @@ import { CANCELLATION_WINDOW_HOURS, formatInstantDate, formatInstantTime } from 
 import { color, space } from '@tpa/theme';
 import type { Gender, Level, SlotId } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { bookSlot, bookingPreview } from '../data/booking';
-import { useDataStore } from '../data/store';
+import { bookingPreview } from '../data/booking';
+import { useBatches, useBookSlot, useBookings, useCoaches, useSlots, combine } from '../data/queries';
 import { useSession } from '../session/SessionProvider';
 import {
   ACADEMY,
@@ -14,35 +15,66 @@ import {
   Button,
   Card,
   CreditCallout,
+  ErrorView,
   GENDER_LABEL,
   IconRow,
   InfoCard,
   LEVEL_LABEL,
+  LoadingView,
   Screen,
   ScreenHeader,
   Text,
   TRAINING_META,
   batchLabel,
 } from '../ui';
+import type { BookReason } from '../lib/api';
 
-const UNBOOKABLE_MESSAGE: Record<string, string> = {
+const UNBOOKABLE_MESSAGE: Record<BookReason, string> = {
   slot_full: 'This session just filled up. Pick another slot.',
   slot_in_past: 'This session has already started.',
   slot_cancelled: 'This session was cancelled.',
   gender_mismatch: "This session isn't for your group.",
   level_mismatch: "This session isn't for your level.",
   no_usable_credit: 'You no longer have a usable credit for this session.',
+  slot_missing: 'This session is no longer available.',
+  already_booked: "You've already booked this session.",
+  not_authenticated: 'Your session expired. Please sign in again.',
 };
 
-/** 12 — Confirm booking. Read-through preview + the credit-spend confirmation. */
+/** 12 — Confirm booking. Read-through preview + the real credit-spend RPC. */
 export default function ConfirmBookingScreen() {
   const router = useRouter();
   const { player, now } = useSession();
-  useDataStore();
+  const slotsQ = useSlots();
+  const batchesQ = useBatches();
+  const bookingsQ = useBookings();
+  const coachesQ = useCoaches();
+  const gate = combine(slotsQ, batchesQ, bookingsQ, coachesQ);
+  const bookMutation = useBookSlot();
+  const [error, setError] = useState<string | null>(null);
   const { slotId } = useLocalSearchParams<{ slotId: string }>();
   if (!player) return null;
 
-  const preview = bookingPreview(player, slotId as SlotId, now);
+  if (gate.isPending || gate.isError) {
+    return (
+      <Screen>
+        <ScreenHeader eyebrow="Confirm" title="Confirm Booking" onBack={() => router.back()} />
+        {gate.isPending ? <LoadingView /> : <ErrorView onRetry={gate.refetch} />}
+      </Screen>
+    );
+  }
+
+  const preview = bookingPreview(
+    {
+      slots: slotsQ.data ?? [],
+      coaches: coachesQ.data ?? [],
+      batches: batchesQ.data ?? [],
+      bookings: bookingsQ.data ?? [],
+    },
+    player,
+    slotId as SlotId,
+    now,
+  );
   if (!preview) {
     return (
       <Screen>
@@ -57,22 +89,39 @@ export default function ConfirmBookingScreen() {
   const { slot, coach, verdict, batch, typeBalance, alreadyBooked } = preview;
   const meta = TRAINING_META[slot.trainingType];
   const isGroup = slot.gender !== null && slot.level !== null;
-  const canConfirm = verdict.ok && batch !== undefined && !alreadyBooked;
+  const submitting = bookMutation.isPending;
+  const canConfirm = verdict.ok && batch !== undefined && !alreadyBooked && !submitting;
   const leftAfter = typeBalance - 1;
 
-  const onConfirm = () => {
-    const res = bookSlot(player, slot.id, now);
-    if (res.ok) {
-      router.replace({ pathname: '/booked-success', params: { bookingId: res.booking.id } });
+  const onConfirm = async () => {
+    setError(null);
+    // The RPC is the enforcement; canBookSlot above was only the preview. If they
+    // disagree, the RPC wins and its reason is shown here.
+    const outcome = await bookMutation.mutateAsync(slot.id);
+    if (outcome.status === 'booked') {
+      router.replace({ pathname: '/booked-success', params: { bookingId: outcome.bookingId } });
+    } else if (outcome.status === 'rejected') {
+      setError(UNBOOKABLE_MESSAGE[outcome.reason] ?? 'This session is unavailable.');
+    } else {
+      // Lost response after a possible success — never claim failure. The wallet /
+      // sessions were just re-read; tell them to check, offer a safe retry.
+      setError(
+        "We couldn't confirm your booking. Check Sessions — if it's not there, tap Confirm to try again.",
+      );
     }
-    // On !ok the store is untouched; useDataStore re-render shows the unbookable guard.
   };
 
   return (
     <Screen
       scroll
       contentContainerStyle={styles.content}
-      footer={<Button label="Confirm booking" disabled={!canConfirm} onPress={onConfirm} />}
+      footer={
+        <Button
+          label={submitting ? 'Booking…' : 'Confirm booking'}
+          disabled={!canConfirm}
+          onPress={onConfirm}
+        />
+      }
     >
       <ScreenHeader
         eyebrow={`${meta.label} session`}
@@ -138,6 +187,9 @@ export default function ConfirmBookingScreen() {
           }
         />
       )}
+
+      {/* Runtime booking error (RPC rejection or an unconfirmed/lost response) */}
+      {error ? <InfoCard variant="amber" icon="alert-circle-outline" text={error} /> : null}
 
       {/* Cancellation policy */}
       <InfoCard

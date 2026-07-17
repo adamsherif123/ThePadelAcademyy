@@ -2,9 +2,8 @@ import { space } from '@tpa/theme';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { allCoaches } from '../../data/schedule';
 import { playerPurchases } from '../../data/purchases';
-import { useDataStore } from '../../data/store';
+import { useBatches, useCoaches, usePurchases, combine } from '../../data/queries';
 import { totalReadyToBook } from '../../data/wallet';
 import { useSession } from '../../session/SessionProvider';
 import {
@@ -14,9 +13,11 @@ import {
   Button,
   Card,
   CircleIconButton,
+  ErrorView,
   GENDER_LABEL,
   LEVEL_LABEL,
   LinkRow,
+  LoadingView,
   Screen,
   ScreenHeader,
   Text,
@@ -26,12 +27,24 @@ import {
 export default function ProfileScreen() {
   const router = useRouter();
   const { player, now, signOut } = useSession();
-  useDataStore();
+  const batches = useBatches();
+  const purchases = usePurchases();
+  const coaches = useCoaches();
+  const gate = combine(batches, purchases, coaches);
   if (!player) return null;
 
-  const usable = totalReadyToBook(player.id, now);
-  const purchaseCount = playerPurchases(player.id).length;
-  const coachCount = allCoaches().length;
+  if (gate.isPending || gate.isError) {
+    return (
+      <Screen scroll tabBar contentContainerStyle={styles.content}>
+        <ScreenHeader eyebrow="Your account" title="Profile" />
+        {gate.isPending ? <LoadingView /> : <ErrorView onRetry={gate.refetch} />}
+      </Screen>
+    );
+  }
+
+  const usable = totalReadyToBook(batches.data ?? [], now);
+  const purchaseCount = playerPurchases(purchases.data ?? []).length;
+  const coachCount = (coaches.data ?? []).length;
 
   return (
     <Screen scroll tabBar contentContainerStyle={styles.content}>
@@ -70,7 +83,13 @@ export default function ProfileScreen() {
         <AcademyCard />
       </View>
 
-      <Button label="Sign out" variant="secondary" destructive icon="log-out-outline" onPress={signOut} />
+      <Button
+        label="Sign out"
+        variant="secondary"
+        destructive
+        icon="log-out-outline"
+        onPress={() => void signOut()}
+      />
     </Screen>
   );
 }

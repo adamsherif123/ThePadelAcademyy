@@ -1,5 +1,5 @@
 import { space } from '@tpa/theme';
-import type { SessionSlot, TrainingType } from '@tpa/types';
+import type { Booking, Coach, CreditBatch, IsoInstant, Player, SessionSlot, TrainingType } from '@tpa/types';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -11,12 +11,14 @@ import {
   slotAvailability,
   slotsForType,
 } from '../../data/booking';
-import { useDataStore } from '../../data/store';
+import { useBatches, useBookings, useCoaches, useSlots, combine } from '../../data/queries';
 import { balanceByType } from '../../data/wallet';
 import { useSession } from '../../session/SessionProvider';
 import {
   DateChip,
   EmptyState,
+  ErrorView,
+  LoadingView,
   Screen,
   ScreenHeader,
   GENDER_LABEL,
@@ -73,18 +75,36 @@ function slotDisplay(
 export default function BookScreen() {
   const router = useRouter();
   const { player, now } = useSession();
-  useDataStore(); // credit counts / bookability update after a purchase
+  const slotsQ = useSlots();
+  const batchesQ = useBatches();
+  const bookingsQ = useBookings();
+  const coachesQ = useCoaches();
+  const gate = combine(slotsQ, batchesQ, bookingsQ, coachesQ);
   const [type, setType] = useState<TrainingType>('group');
-
-  const days = dateStrip(now, DAYS);
-  const firstOpen = days.find((d) => !d.closed) ?? days[0]!;
-  const [dayKey, setDayKey] = useState(firstOpen.key);
-  const selectedDay = days.find((d) => d.key === dayKey) ?? firstOpen;
+  const [dayKey, setDayKey] = useState<string | null>(null);
 
   if (!player) return null;
 
-  const balance = balanceByType(player.id, now);
-  const slots = slotsForType(type, player, selectedDay);
+  if (gate.isPending || gate.isError) {
+    return (
+      <Screen scroll tabBar contentContainerStyle={styles.content}>
+        <ScreenHeader eyebrow="Spend your credits" title="Book a Session" />
+        {gate.isPending ? <LoadingView /> : <ErrorView onRetry={gate.refetch} />}
+      </Screen>
+    );
+  }
+
+  const allSlots = slotsQ.data ?? [];
+  const batches = batchesQ.data ?? [];
+  const bookings = bookingsQ.data ?? [];
+  const coaches = coachesQ.data ?? [];
+
+  const days = dateStrip(allSlots, now, DAYS);
+  const firstOpen = days.find((d) => !d.closed) ?? days[0]!;
+  const selectedDay = days.find((d) => d.key === dayKey) ?? firstOpen;
+
+  const balance = balanceByType(batches, now);
+  const slots = slotsForType(allSlots, type, player, selectedDay);
   const isToday = selectedDay.key === days[0]!.key;
   const dayLabel = isToday ? 'Today' : `${WEEKDAY_ABBR[selectedDay.weekday]} ${selectedDay.day}`;
 
@@ -128,7 +148,7 @@ export default function BookScreen() {
             weekday={d.weekday}
             dayNumber={d.day}
             closed={d.closed}
-            selected={d.key === dayKey}
+            selected={d.key === selectedDay.key}
             onPress={() => setDayKey(d.key)}
           />
         ))}
@@ -142,6 +162,9 @@ export default function BookScreen() {
         balance={balance[type]}
         slots={slots}
         player={player}
+        batches={batches}
+        bookings={bookings}
+        coaches={coaches}
         now={now}
         onBuy={() => router.push('/buy-credits')}
         onSlot={(slot) => router.push({ pathname: '/confirm-booking', params: { slotId: slot.id } })}
@@ -155,6 +178,9 @@ function BookBody({
   balance,
   slots,
   player,
+  batches,
+  bookings,
+  coaches,
   now,
   onBuy,
   onSlot,
@@ -162,8 +188,11 @@ function BookBody({
   type: TrainingType;
   balance: number;
   slots: SessionSlot[];
-  player: NonNullable<ReturnType<typeof useSession>['player']>;
-  now: ReturnType<typeof useSession>['now'];
+  player: Player;
+  batches: CreditBatch[];
+  bookings: Booking[];
+  coaches: Coach[];
+  now: IsoInstant;
   onBuy: () => void;
   onSlot: (slot: SessionSlot) => void;
 }) {
@@ -171,7 +200,9 @@ function BookBody({
 
   // No usable credits of this type — distinguish lapsed vs never (TASK 5) + CTA (TASK 6).
   if (balance === 0) {
-    const lapsed = slots.some((s) => slotAvailability(s, player, now).kind === 'credits_expired');
+    const lapsed = slots.some(
+      (s) => slotAvailability(s, player, batches, bookings, now).kind === 'credits_expired',
+    );
     return (
       <EmptyState
         icon="wallet-outline"
@@ -200,13 +231,13 @@ function BookBody({
   return (
     <View style={styles.slots}>
       {slots.map((slot) => {
-        const av = slotAvailability(slot, player, now);
+        const av = slotAvailability(slot, player, batches, bookings, now);
         const display = slotDisplay(av, slot);
         return (
           <SlotCard
             key={slot.id}
             slot={slot}
-            coach={coachById(slot.coachId)}
+            coach={coachById(coaches, slot.coachId)}
             now={now}
             state={display.state}
             note={display.note}

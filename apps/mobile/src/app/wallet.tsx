@@ -4,7 +4,7 @@ import type { CreditBatch } from '@tpa/types';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { useDataStore } from '../data/store';
+import { useBatches } from '../data/queries';
 import { activeBatches, balanceByType, expiredBatches, totalReadyToBook } from '../data/wallet';
 import { useSession } from '../session/SessionProvider';
 import {
@@ -12,6 +12,8 @@ import {
   BalancePills,
   Card,
   CreditsSummaryCard,
+  ErrorView,
+  LoadingView,
   ProgressBar,
   Screen,
   ScreenHeader,
@@ -33,13 +35,23 @@ function batchOrigin(b: CreditBatch): string {
 export default function WalletScreen() {
   const router = useRouter();
   const { player, now } = useSession();
-  useDataStore(); // re-render when a purchase grants credits
+  const batchesQ = useBatches();
   if (!player) return null;
 
-  const total = totalReadyToBook(player.id, now);
-  const balance = balanceByType(player.id, now);
-  const active = activeBatches(player.id, now);
-  const expired = expiredBatches(player.id, now);
+  if (batchesQ.isPending || batchesQ.isError) {
+    return (
+      <Screen scroll contentContainerStyle={styles.content}>
+        <ScreenHeader eyebrow="Wallet" title="Your Credits" onBack={() => router.back()} />
+        {batchesQ.isPending ? <LoadingView /> : <ErrorView onRetry={batchesQ.refetch} />}
+      </Screen>
+    );
+  }
+
+  const batches = batchesQ.data ?? [];
+  const total = totalReadyToBook(batches, now);
+  const balance = balanceByType(batches, now);
+  const active = activeBatches(batches, now);
+  const expired = expiredBatches(batches, now);
 
   return (
     <Screen scroll contentContainerStyle={styles.content}>

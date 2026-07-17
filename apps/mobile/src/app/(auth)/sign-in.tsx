@@ -7,15 +7,24 @@ import { StyleSheet, View } from 'react-native';
 import { useSession } from '../../session/SessionProvider';
 import { ACADEMY, BrandMark, Button, Input, NavyScreen, PillOnNavy, Text } from '../../ui';
 
-/** 01 — Sign in with phone. Any input advances (mock); OTP verifies. */
+/** 01 — Sign in with phone. Sends a real OTP, then the OTP screen verifies it. */
 export default function SignInScreen() {
   const router = useRouter();
-  const { setPhone } = useSession();
+  const { sendOtp } = useSession();
   const [value, setValue] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const onContinue = () => {
-    setPhone(value.trim() ? `+20 ${value.trim()}` : '+20 102 673 9782');
-    router.push('/(auth)/otp');
+  const onContinue = async () => {
+    if (submitting) return;
+    // Empty input falls back to a configured test number so dev sign-in is one tap.
+    const input = value.trim() || '155 555 0001';
+    setSubmitting(true);
+    setError(null);
+    const res = await sendOtp(input);
+    setSubmitting(false);
+    if (res.ok) router.push('/(auth)/otp');
+    else setError(res.error ?? 'Could not send the code. Please try again.');
   };
 
   return (
@@ -64,7 +73,16 @@ export default function SignInScreen() {
               />
             </View>
           </View>
-          <Button label="Continue" onPress={onContinue} />
+          <Button
+            label={submitting ? 'Sending code…' : 'Continue'}
+            onPress={onContinue}
+            disabled={submitting}
+          />
+          {error ? (
+            <Text variant="caption" tone="accent" style={styles.helper}>
+              {error}
+            </Text>
+          ) : null}
           <Text variant="caption" tone="muted" style={styles.helper}>
             We&apos;ll text you a verification code. New players get 2 free trial sessions.
           </Text>

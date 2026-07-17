@@ -1,5 +1,5 @@
-import { TRAINING_TYPES, cancellationDeadline } from '@tpa/core';
-import { MOCK_NOW, daysFromNow, egp, mockCoaches, mockCreditBatches, mockPackages, mockSlots } from '@tpa/mocks';
+import { TRAINING_TYPES, cancellationDeadline, toInstant } from '@tpa/core';
+import { daysFromNow, egp, mockCoaches, mockCreditBatches, mockPackages, mockSlots } from '@tpa/mocks';
 import { color, radius, space } from '@tpa/theme';
 import type { IsoInstant, SessionSlot } from '@tpa/types';
 import type { ReactNode } from 'react';
@@ -44,6 +44,8 @@ const DEMO_SLOT: SessionSlot | undefined = mockSlots.find(
   (s) => s.trainingType === 'group' && s.gender === 'men',
 );
 const DEMO_COACH = mockCoaches[0];
+// Dev gallery renders sample components against fixtures at the real clock.
+const GALLERY_NOW = toInstant(new Date());
 const SLOT_STATES: { state: SlotCardState; note?: string; creditNote?: string }[] = [
   { state: 'bookable', creditNote: 'Uses 1 Group credit' },
   { state: 'full' },
@@ -215,7 +217,7 @@ export default function GalleryScreen() {
       <Section title="StatusChip (expiry states)">
         <Row>
           {EXPIRY_SAMPLES.map((s) => (
-            <StatusChip key={s.label} expiresAt={s.expiresAt} now={MOCK_NOW} />
+            <StatusChip key={s.label} expiresAt={s.expiresAt} now={GALLERY_NOW} />
           ))}
         </Row>
       </Section>
@@ -258,7 +260,7 @@ export default function GalleryScreen() {
           detail="You'll have 5 Group credits left after booking."
           source="Group 8-Pack"
           expiresAt={daysFromNow(26)}
-          now={MOCK_NOW}
+          now={GALLERY_NOW}
         />
       </Section>
 
@@ -364,7 +366,7 @@ export default function GalleryScreen() {
                 key={i}
                 slot={DEMO_SLOT}
                 coach={DEMO_COACH}
-                now={MOCK_NOW}
+                now={GALLERY_NOW}
                 state={s.state}
                 note={s.note}
                 creditNote={s.creditNote}

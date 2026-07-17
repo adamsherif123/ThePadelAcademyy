@@ -5,11 +5,14 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { PLAYER_COUNT, packageById, packageIncludes, perSessionPiastres } from '../../data/catalog';
+import { usePackages } from '../../data/queries';
 import {
   Button,
   Card,
   CheckList,
+  ErrorView,
   InfoCard,
+  LoadingView,
   Money,
   PillOnNavy,
   Screen,
@@ -22,7 +25,18 @@ import {
 export default function PackageDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const pkg = packageById(id as PackageId);
+  const packagesQ = usePackages();
+
+  if (packagesQ.isPending || packagesQ.isError) {
+    return (
+      <Screen>
+        <ScreenHeader eyebrow="Session bundles" title="Package Details" onBack={() => router.back()} />
+        {packagesQ.isPending ? <LoadingView /> : <ErrorView onRetry={packagesQ.refetch} />}
+      </Screen>
+    );
+  }
+
+  const pkg = packageById(packagesQ.data ?? [], id as PackageId);
 
   if (!pkg) {
     return (

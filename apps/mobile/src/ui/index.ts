@@ -1,4 +1,5 @@
 export { AcademyCard, ACADEMY } from './AcademyCard';
+export { LoadingView, ErrorView } from './AsyncStates';
 export { Avatar } from './Avatar';
 export { Badge, type BadgeTone } from './Badge';
 export { BalancePills } from './BalancePills';

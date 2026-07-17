@@ -2,17 +2,20 @@ import { CANCELLATION_WINDOW_HOURS, formatExpiry, formatInstantTime } from '@tpa
 import { space } from '@tpa/theme';
 import type { BookingId } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { cancelBooking, cancelPreview } from '../data/booking';
-import { useDataStore } from '../data/store';
+import { cancelPreview } from '../data/booking';
+import { useBatches, useBookings, useCancelBooking, useCoaches, useSlots, combine } from '../data/queries';
 import { useSession } from '../session/SessionProvider';
 import {
   batchLabel,
   BookingCard,
   Button,
   CreditCallout,
+  ErrorView,
   InfoCard,
+  LoadingView,
   Screen,
   ScreenHeader,
   Text,
@@ -32,11 +35,35 @@ import {
 export default function CancelBookingScreen() {
   const router = useRouter();
   const { player, now } = useSession();
-  useDataStore();
+  const slotsQ = useSlots();
+  const batchesQ = useBatches();
+  const bookingsQ = useBookings();
+  const coachesQ = useCoaches();
+  const gate = combine(slotsQ, batchesQ, bookingsQ, coachesQ);
+  const cancelMutation = useCancelBooking();
+  const [error, setError] = useState<string | null>(null);
   const { bookingId } = useLocalSearchParams<{ bookingId: string }>();
   if (!player) return null;
 
-  const preview = cancelPreview(player, bookingId as BookingId, now);
+  if (gate.isPending || gate.isError) {
+    return (
+      <Screen>
+        <ScreenHeader eyebrow="Cancel" title="Cancel Booking" onBack={() => router.back()} />
+        {gate.isPending ? <LoadingView /> : <ErrorView onRetry={gate.refetch} />}
+      </Screen>
+    );
+  }
+
+  const preview = cancelPreview(
+    {
+      slots: slotsQ.data ?? [],
+      coaches: coachesQ.data ?? [],
+      batches: batchesQ.data ?? [],
+      bookings: bookingsQ.data ?? [],
+    },
+    bookingId as BookingId,
+    now,
+  );
   if (!preview) {
     return (
       <Screen>
@@ -50,11 +77,30 @@ export default function CancelBookingScreen() {
 
   const { slot, coach, refundable, refundExpired, batch } = preview;
   const meta = TRAINING_META[slot.trainingType];
+  const submitting = cancelMutation.isPending;
 
-  const onConfirm = () => {
-    cancelBooking(player, bookingId as BookingId, now);
-    // On !ok the store is untouched; either way Sessions (underneath) shows the truth.
-    router.back();
+  const onConfirm = async () => {
+    setError(null);
+    const outcome = await cancelMutation.mutateAsync({
+      bookingId: bookingId as BookingId,
+      expectedRefund: refundable,
+    });
+    if (outcome.status === 'cancelled') {
+      // Sessions (underneath) was just re-read via invalidation and shows the truth.
+      router.back();
+    } else if (outcome.status === 'rejected') {
+      setError(
+        outcome.reason === 'already_cancelled'
+          ? 'This booking was already cancelled.'
+          : outcome.reason === 'not_cancellable'
+            ? 'This booking can no longer be cancelled.'
+            : 'We couldn’t cancel this booking.',
+      );
+    } else {
+      setError(
+        "We couldn't confirm the cancellation. Check Sessions — if it's still there, try again.",
+      );
+    }
   };
 
   return (
@@ -63,8 +109,14 @@ export default function CancelBookingScreen() {
       contentContainerStyle={styles.content}
       footer={
         <View style={styles.footer}>
-          <Button label="Keep my booking" onPress={() => router.back()} />
-          <Button label="Cancel booking" variant="secondary" destructive onPress={onConfirm} />
+          <Button label="Keep my booking" onPress={() => router.back()} disabled={submitting} />
+          <Button
+            label={submitting ? 'Cancelling…' : 'Cancel booking'}
+            variant="secondary"
+            destructive
+            onPress={onConfirm}
+            disabled={submitting}
+          />
         </View>
       }
     >
@@ -100,6 +152,8 @@ export default function CancelBookingScreen() {
           text="Your seat will be freed. There's no credit on file to return for this booking."
         />
       )}
+
+      {error ? <InfoCard variant="amber" icon="alert-circle-outline" text={error} /> : null}
 
       <Text variant="caption" tone="muted" style={styles.note}>
         {refundable
