@@ -253,6 +253,9 @@ const PHOTO_EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'p
  * old file (S10a's flag), so we first delete every coaches/<coachId>.* variant, then
  * upsert the new one — one object per coach, no silent storage growth.
  */
+const photoVariants = (coachId: CoachId): string[] =>
+  Object.values(PHOTO_EXT).map((e) => `coaches/${coachId}.${e}`);
+
 export async function uploadCoachPhoto(coachId: CoachId, file: File): Promise<string> {
   const ext = PHOTO_EXT[file.type];
   if (!ext) throw new ApiError('Photo must be a JPEG, PNG, or WebP image.');
@@ -260,10 +263,16 @@ export async function uploadCoachPhoto(coachId: CoachId, file: File): Promise<st
 
   const bucket = supabase.storage.from('coach-photos');
   // Remove any prior extension variants so the coach never has two orphaned files.
-  await bucket.remove(Object.values(PHOTO_EXT).map((e) => `coaches/${coachId}.${e}`));
+  await bucket.remove(photoVariants(coachId));
 
   const path = `coaches/${coachId}.${ext}`;
   const { error } = await bucket.upload(path, file, { upsert: true, contentType: file.type });
   if (error) throw new ApiError(`Photo upload failed: ${error.message}`, undefined, error);
   return bucket.getPublicUrl(path).data.publicUrl;
+}
+
+/** Delete a coach's headshot object(s) — the admin delete policy (S10a) allows this. */
+export async function deleteCoachPhoto(coachId: CoachId): Promise<void> {
+  const { error } = await supabase.storage.from('coach-photos').remove(photoVariants(coachId));
+  if (error) throw new ApiError(`Photo delete failed: ${error.message}`, undefined, error);
 }

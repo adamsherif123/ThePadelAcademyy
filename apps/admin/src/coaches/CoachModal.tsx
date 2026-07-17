@@ -17,18 +17,18 @@ const ERROR_TEXT: Record<string, string> = {
  * Add or edit a coach. `coach` present → edit; absent → create. A coach is never
  * deleted (they own historical slots/bookings) — "remove" is the On-leave toggle,
  * which also pauses their active recurring sessions so nothing new generates. The
- * photo is a File chosen locally: while editing we show a preview via
- * URL.createObjectURL and pass the File to the seam on save (null keeps the
- * existing photo). A coach with no photo is a first-class state (Avatar falls back
- * to initials).
+ * photo is chosen locally: while editing we show a preview via URL.createObjectURL
+ * and pass the change to the seam on save — a File replaces, "Remove" deletes it
+ * from Storage, null keeps it. A coach with no photo is a first-class state (Avatar
+ * falls back to initials).
  */
 export function CoachModal({ coach, onClose }: { coach?: Coach; onClose: () => void }) {
   const editing = coach !== undefined;
   const [name, setName] = useState(coach?.name ?? '');
   const [bio, setBio] = useState(coach?.bio ?? '');
   const [isActive, setIsActive] = useState(coach?.isActive ?? true);
-  // The File the admin picked this session (null = keep the existing photo on save).
-  const [photo, setPhoto] = useState<File | null>(null);
+  // The photo change this session: a File replaces, 'remove' deletes it, null keeps.
+  const [photo, setPhoto] = useState<File | 'remove' | null>(null);
   // What the Avatar shows: a local object URL for a freshly-picked file, else the saved photo.
   const [preview, setPreview] = useState<string | null>(coach?.photoUrl ?? null);
   const [saving, setSaving] = useState(false);
@@ -53,13 +53,22 @@ export function CoachModal({ coach, onClose }: { coach?: Coach; onClose: () => v
     setError(null);
   };
 
+  const onRemovePhoto = () => {
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    objectUrlRef.current = null;
+    setPhoto('remove');
+    setPreview(null);
+    setError(null);
+  };
+
   const onSubmit = async () => {
     setSaving(true);
     setError(null);
     const draft = { name, bio, isActive };
+    // 'remove' only applies to an existing coach; a new coach has nothing to delete.
     const res: SaveCoachResult = editing
       ? await updateCoach(coach.id, draft, photo)
-      : await createCoach(draft, photo);
+      : await createCoach(draft, photo instanceof File ? photo : null);
     if (res.ok) {
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
       onClose();
@@ -100,6 +109,11 @@ export function CoachModal({ coach, onClose }: { coach?: Coach; onClose: () => v
               >
                 {preview ? 'Change photo' : 'Upload photo'}
               </Button>
+              {preview ? (
+                <Button size="sm" variant="secondary" onClick={onRemovePhoto} disabled={saving}>
+                  Remove
+                </Button>
+              ) : null}
             </div>
             <span className={styles.photoHint}>PNG or JPG. Optional — no photo shows initials.</span>
           </div>

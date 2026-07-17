@@ -8,7 +8,7 @@ import {
 } from '@tpa/core';
 import type { AvailabilityTemplate, Booking, Coach, CoachId, IsoInstant, SessionSlot, TrainingType } from '@tpa/types';
 
-import { insertCoach, updateCoach as updateCoachApi, updateTemplate, uploadCoachPhoto as uploadPhotoApi } from '../lib/api';
+import { deleteCoachPhoto, insertCoach, updateCoach as updateCoachApi, updateTemplate, uploadCoachPhoto as uploadPhotoApi } from '../lib/api';
 import { queryClient, queryKeys, TOUCHED } from '../lib/queryClient';
 import { runWrite } from './queries';
 
@@ -137,13 +137,30 @@ export async function createCoach(draft: CoachDraft, photo: File | null): Promis
   return withPhoto.ok ? { ok: true, coach: withPhoto.value } : { ok: false, reason: 'network' };
 }
 
-/** Edit a coach. `photo` File replaces the headshot; null leaves it as-is. */
-export async function updateCoach(id: CoachId, draft: CoachDraft, photo: File | null): Promise<SaveCoachResult> {
+/**
+ * Edit a coach. `photo`: a File REPLACES the headshot, `'remove'` DELETES it (the
+ * Storage bucket's admin delete policy, S10a) and clears photo_url, `null` leaves it
+ * as-is. So a coach CAN take a photo back off — no more one-way door.
+ */
+export async function updateCoach(
+  id: CoachId,
+  draft: CoachDraft,
+  photo: File | 'remove' | null,
+): Promise<SaveCoachResult> {
   const name = draft.name.trim();
   if (name === '') return { ok: false, reason: 'name_required' };
   const current = queryClient.getQueryData<Coach[]>(queryKeys.coaches)?.find((c) => c.id === id);
   if (current?.isActive && !draft.isActive) await pauseTemplatesForCoach(id);
-  const photoUrl = photo ? await uploadPhotoApi(id, photo).catch(() => undefined) : undefined;
+
+  // Resolve the photo_url patch: File → upload (new url); 'remove' → delete + null; null → untouched.
+  let photoUrl: string | null | undefined;
+  if (photo === 'remove') {
+    await deleteCoachPhoto(id).catch(() => undefined);
+    photoUrl = null;
+  } else if (photo) {
+    photoUrl = await uploadPhotoApi(id, photo).catch(() => undefined);
+  }
+
   const res = await runWrite(
     () => updateCoachApi(id, { name, bio: draft.bio.trim(), isActive: draft.isActive, ...(photoUrl !== undefined ? { photoUrl } : {}) }),
     TOUCHED.coaches,

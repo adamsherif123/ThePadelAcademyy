@@ -8,8 +8,8 @@ import styles from './Login.module.css';
  * the wrong place. Say so plainly and offer sign-out — never a dead end (S9.2).
  */
 export function NotAdmin() {
-  const { player, phone, signOut } = useSession();
-  const who = player?.name ?? phone ?? 'this number';
+  const { player, email, signOut } = useSession();
+  const who = player?.name ?? email ?? 'this account';
 
   return (
     <div className={styles.screen}>

@@ -12,10 +12,16 @@ import { deriveStatus, type AdminStatus } from './authMachine';
 export type { AdminStatus } from './authMachine';
 
 /**
- * Real admin auth (S10b) — phone OTP, mirroring the client (S8/S9). One auth method,
- * one identity model: the admin is a player row with is_admin = true. A verified user
- * who isn't an admin is REFUSED (status 'not_admin'), never signed in and never
- * trapped — App shows them why and offers sign-out. There is no complete_signup here.
+ * Real admin auth (S10b.1) — EMAIL + PASSWORD (`signInWithPassword`). The client uses
+ * phone OTP; the admin does not want it. Crucially this is still ONE auth user, two
+ * sign-in methods: the academy attaches an email+password credential to the admin's
+ * existing phone auth user out-of-band (see the handoff), so `auth.uid()` is the same
+ * identity that owns the player row — is_admin(), every RLS policy, and every RPC are
+ * untouched, zero schema change. A signed-in user who isn't an admin is REFUSED
+ * (status 'not_admin'), never trapped — App shows them why and offers sign-out. No
+ * password reset in-app: for a single admin, "reset it in the dashboard" is the
+ * honest answer (S8 rejected email because reset needs SMTP; that holds for a
+ * hundred users, not one).
  */
 export interface AdminUser {
   name: string;
@@ -28,24 +34,17 @@ interface SessionValue {
   admin: AdminUser | null;
   /** The signed-in player, whether or not they're an admin (for the refusal message). */
   player: Player | null;
+  /** The signed-in email, if any (for the refusal message). */
+  email: string | null;
   now: IsoInstant;
-  phone: string | null;
-  sendOtp: (phone: string) => Promise<{ ok: boolean; error?: string }>;
-  verifyOtp: (code: string) => Promise<{ ok: boolean; error?: string }>;
+  signInWithEmail: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   signOut: () => Promise<void>;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
 
-function normalizePhone(raw: string): string {
-  const digits = raw.replace(/[^0-9]/g, '').replace(/^0+/, '');
-  const local = digits.startsWith('20') ? digits : `20${digits}`;
-  return `+${local}`;
-}
-
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
-  const [phone, setPhone] = useState<string | null>(null);
   const [now, setNow] = useState<IsoInstant>(() => toInstant(new Date()));
 
   useEffect(() => {
@@ -77,31 +76,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const asMessage = (e: unknown, fallback: string): string =>
     e instanceof Error && e.message ? e.message : fallback;
 
-  const sendOtp = useCallback(async (input: string) => {
-    const e164 = normalizePhone(input);
-    setPhone(e164);
+  const signInWithEmail = useCallback(async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithOtp({ phone: e164 });
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (error) return { ok: false, error: error.message };
+      // onAuthStateChange flips `session`; the player + is_admin queries then decide
+      // ready vs not_admin. No navigation here — App renders on the status flip.
       return { ok: true };
     } catch (e) {
-      return { ok: false, error: asMessage(e, 'Could not send the code. Please try again.') };
+      return { ok: false, error: asMessage(e, 'Could not sign in. Please try again.') };
     }
   }, []);
-
-  const verifyOtp = useCallback(
-    async (code: string) => {
-      if (!phone) return { ok: false, error: 'No phone number to verify.' };
-      try {
-        const { error } = await supabase.auth.verifyOtp({ phone, token: code, type: 'sms' });
-        if (error) return { ok: false, error: error.message };
-        return { ok: true };
-      } catch (e) {
-        return { ok: false, error: asMessage(e, 'Could not verify the code. Please try again.') };
-      }
-    },
-    [phone],
-  );
 
   const signOut = useCallback(async () => {
     try {
@@ -110,7 +95,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // Ignore — force the local signed-out state below so no one is trapped.
     }
     setSession(null);
-    setPhone(null);
     queryClient.clear();
   }, []);
 
@@ -120,13 +104,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isAuthed: status === 'ready',
       admin: player ? { name: player.name, role: 'Academy Admin' } : null,
       player,
+      email: session?.user.email ?? null,
       now,
-      phone,
-      sendOtp,
-      verifyOtp,
+      signInWithEmail,
       signOut,
     }),
-    [status, player, now, phone, sendOtp, verifyOtp, signOut],
+    [status, player, session, now, signInWithEmail, signOut],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
