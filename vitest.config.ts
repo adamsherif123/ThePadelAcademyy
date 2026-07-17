@@ -7,7 +7,7 @@ import { defineConfig } from 'vitest/config';
 // Screens/components are still not tested (rendering proofs only).
 export default defineConfig({
   test: {
-    include: ['packages/*/src/**/*.test.ts', 'apps/*/src/**/*.test.ts'],
+    include: ['packages/*/src/**/*.test.ts', 'apps/*/src/**/*.test.{ts,tsx}'],
     environment: 'node',
   },
 });

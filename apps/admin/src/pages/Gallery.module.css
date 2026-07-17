@@ -35,3 +35,9 @@
   gap: var(--space-lg);
   max-width: 100%;
 }
+
+/* Relative box so the absolutely-positioned EventCard has something to fill. */
+.eventDemo {
+  position: relative;
+  height: 108px;
+}

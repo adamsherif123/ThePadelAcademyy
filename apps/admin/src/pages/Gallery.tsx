@@ -1,7 +1,8 @@
-import type { Piastres } from '@tpa/types';
+import type { CoachId, Piastres, SessionSlot, SlotId } from '@tpa/types';
 import { DollarSign, Gauge, Plus, Users } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
+import { EventCard } from '../calendar/EventCard';
 import { allCoaches, allPlayers } from '../data/selectors';
 import {
   Avatar,
@@ -29,6 +30,21 @@ import {
 import styles from './Gallery.module.css';
 
 const egp = (n: number) => (n * 100) as Piastres;
+
+/** A realistic worst-case card: long coach name + long tags + 0/4 capacity. */
+const DEMO_SLOT: SessionSlot = {
+  id: 'sl_demo' as SlotId,
+  coachId: 'co_mariam' as CoachId, // → "Mariam"
+  startsAt: '2026-07-19T15:00:00.000Z' as SessionSlot['startsAt'], // 6 PM Cairo
+  endsAt: '2026-07-19T17:00:00.000Z' as SessionSlot['startsAt'], // 8 PM Cairo
+  trainingType: 'group',
+  capacity: 4,
+  bookedCount: 0,
+  gender: 'ladies',
+  level: 'intermediate',
+  status: 'published',
+  templateId: null,
+};
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -211,6 +227,23 @@ export function Gallery() {
             <Donut segments={DONUT_STRESS} total={egp(2799997)} />
           </Panel>
         </div>
+      </Section>
+
+      <Section title="Calendar EventCard — 1 / 2 / 3 lanes (drop order: tags → coach; capacity never truncates)">
+        {[
+          { lanes: 1, w: 150 },
+          { lanes: 2, w: 74 },
+          { lanes: 3, w: 49 },
+        ].map(({ lanes, w }) => (
+          <div key={lanes} className={styles.eventDemo} style={{ width: w }}>
+            <EventCard
+              slot={DEMO_SLOT}
+              lanes={lanes}
+              style={{ top: 0, height: 108, insetInlineStart: 0, width: '100%' }}
+              onClick={() => {}}
+            />
+          </div>
+        ))}
       </Section>
     </div>
   );

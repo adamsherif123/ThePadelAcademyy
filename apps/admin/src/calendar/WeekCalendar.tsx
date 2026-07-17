@@ -1,50 +1,16 @@
-import { cairoWallTimeToInstant, formatInstantTime, formatMonthDay, parseInstant } from '@tpa/core';
+import { cairoWallTimeToInstant, formatInstantTime, formatMonthDay } from '@tpa/core';
 import type { SessionSlot } from '@tpa/types';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 
-import { cairoWallMinutes, slotsForDay, weekColumns, weekHasSlots } from '../data/schedule';
-import { assignLanes } from '../data/lanes';
-import { coachById } from '../data/selectors';
-import { Button, EmptyState, TRAINING_LABEL, groupTags } from '../ui';
+import { layoutDay, slotsForDay, weekColumns, weekHasSlots, weekTimeRange } from '../data/schedule';
+import { Button, EmptyState, TRAINING_LABEL } from '../ui';
+import { EventCard } from './EventCard';
 import styles from './WeekCalendar.module.css';
 
 const WEEKDAY_LABEL = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-const START_MIN = 17 * 60; // 5 PM — the academy opens
-const END_MIN = 23 * 60; // 11 PM — closes
-const HOUR_PX = 92;
-const ms = (i: SessionSlot['startsAt']) => parseInstant(i).getTime();
-
-/** Hour labels down the axis: 5 PM … 10 PM (the 11 PM line closes the grid). */
-const HOURS = Array.from({ length: (END_MIN - START_MIN) / 60 }, (_, i) => START_MIN + i * 60);
-
-function EventCard({ slot, onClick }: { slot: SessionSlot; onClick: () => void }) {
-  const startMin = cairoWallMinutes(slot.startsAt);
-  const endMin = cairoWallMinutes(slot.endsAt);
-  const coach = coachById(slot.coachId);
-  const full = slot.bookedCount >= slot.capacity;
-  const tags = groupTags(slot.gender, slot.level);
-  return (
-    <button
-      type="button"
-      className={styles.event}
-      data-type={slot.trainingType}
-      style={{
-        top: ((startMin - START_MIN) / 60) * HOUR_PX,
-        height: Math.max(28, ((endMin - startMin) / 60) * HOUR_PX - 2),
-      }}
-      onClick={onClick}
-    >
-      <span className={styles.eventTop}>
-        <span className={styles.eventTime}>{formatInstantTime(slot.startsAt)}</span>
-        <span className={styles.cap} data-full={full || undefined}>
-          {slot.bookedCount}/{slot.capacity}
-        </span>
-      </span>
-      <span className={styles.eventCoach}>{coach ? coach.name.split(' ')[0] : TRAINING_LABEL[slot.trainingType]}</span>
-      <span className={styles.eventTags}>{tags || TRAINING_LABEL[slot.trainingType]}</span>
-    </button>
-  );
-}
+const HOUR_PX = 84;
+const OPEN_MIN = 17 * 60; // 5 PM — default the scroll here so the normal view opens on it
 
 export function WeekCalendar({
   now,
@@ -64,6 +30,16 @@ export function WeekCalendar({
   const last = columns[6]!;
   const rangeLabel = `${formatMonthDay(first.dayStart)} – ${formatMonthDay(last.dayStart)}, ${last.date.year}`;
   const hasSlots = weekHasSlots(columns);
+
+  const { startMin, endMin } = weekTimeRange(columns);
+  const gridPx = ((endMin - startMin) / 60) * HOUR_PX;
+  const hours = Array.from({ length: (endMin - startMin) / 60 }, (_, i) => startMin + i * 60);
+
+  // Open scrolled to the operating window (5 PM) so the normal case is what you see.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = ((OPEN_MIN - startMin) / 60) * HOUR_PX;
+  }, [startMin, weekOffset]);
 
   return (
     <div className={styles.card}>
@@ -95,37 +71,35 @@ export function WeekCalendar({
         </div>
       </div>
 
-      <div className={styles.dayHeads}>
-        <div className={styles.axisSpacer} />
-        {columns.map((col) => (
-          <div key={col.weekday} className={styles.dayHead}>
-            <span className={styles.dayName}>{WEEKDAY_LABEL[col.weekday]}</span>
-            <span className={styles.dayNum} data-today={col.isToday || undefined}>
-              {col.date.day}
-            </span>
-          </div>
-        ))}
-      </div>
-
       {hasSlots ? (
-        <div className={styles.grid}>
-          <div className={styles.axis}>
-            {HOURS.map((min) => (
-              <div key={min} className={styles.axisHour} style={{ height: HOUR_PX }}>
-                <span className={styles.axisLabel}>
-                  {formatInstantTime(
-                    cairoWallTimeToInstant(first.date.year, first.date.month, first.date.day, min / 60, 0),
-                  )}
+        <div className={styles.scroll} ref={scrollRef}>
+          <div className={styles.dayHeads}>
+            <div className={styles.axisSpacer} />
+            {columns.map((col) => (
+              <div key={col.weekday} className={styles.dayHead}>
+                <span className={styles.dayName}>{WEEKDAY_LABEL[col.weekday]}</span>
+                <span className={styles.dayNum} data-today={col.isToday || undefined}>
+                  {col.date.day}
                 </span>
               </div>
             ))}
           </div>
-          {columns.map((col) => {
-            const slots = slotsForDay(col.dayStart);
-            const placed = assignLanes(slots, (s) => ({ startMs: ms(s.startsAt), endMs: ms(s.endsAt) }));
-            return (
+
+          <div className={styles.grid} style={{ height: gridPx }}>
+            <div className={styles.axis}>
+              {hours.map((min) => (
+                <div key={min} className={styles.axisHour} style={{ height: HOUR_PX }}>
+                  <span className={styles.axisLabel}>
+                    {formatInstantTime(
+                      cairoWallTimeToInstant(first.date.year, first.date.month, first.date.day, min / 60, 0),
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {columns.map((col) => (
               <div key={col.weekday} className={styles.dayCol} data-closed={col.isClosed || undefined}>
-                {HOURS.map((min) => (
+                {hours.map((min) => (
                   <div key={min} className={styles.gridLine} style={{ height: HOUR_PX }} />
                 ))}
                 {col.isClosed ? (
@@ -133,19 +107,24 @@ export function WeekCalendar({
                     <span className={styles.closedLabel}>CLOSED</span>
                   </div>
                 ) : (
-                  placed.map(({ item, lane, lanes }) => (
-                    <div
-                      key={item.id}
-                      className={styles.laneWrap}
-                      style={{ insetInlineStart: `${(lane / lanes) * 100}%`, width: `${(1 / lanes) * 100}%` }}
-                    >
-                      <EventCard slot={item} onClick={() => onSlotClick(item)} />
-                    </div>
+                  layoutDay(slotsForDay(col.dayStart), startMin, HOUR_PX, gridPx).map((p) => (
+                    <EventCard
+                      key={p.slot.id}
+                      slot={p.slot}
+                      lanes={p.lanes}
+                      style={{
+                        top: p.top,
+                        height: p.height,
+                        insetInlineStart: `calc(${p.leftPct}% + 2px)`,
+                        width: `calc(${p.widthPct}% - 4px)`,
+                      }}
+                      onClick={() => onSlotClick(p.slot)}
+                    />
                   ))
                 )}
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
       ) : (
         <EmptyState

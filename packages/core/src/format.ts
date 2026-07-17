@@ -62,6 +62,21 @@ export function formatMonthDay(instant: IsoInstant): string {
   return MONTH_DAY_FMT.format(parseInstant(instant));
 }
 
+const HOUR_FMT = new Intl.DateTimeFormat('en-US', {
+  timeZone: CAIRO_TZ,
+  hour: 'numeric',
+  hour12: true,
+});
+
+/**
+ * Just the Cairo hour, e.g. "6 PM" — for dense calendar cards where "6:00 PM" is
+ * too wide. Drops minutes, so callers must use formatInstantTime when a slot
+ * starts off the hour (e.g. 6:30).
+ */
+export function formatHour(instant: IsoInstant): string {
+  return HOUR_FMT.format(parseInstant(instant));
+}
+
 /** e.g. "Tue, 14 Jul" in Cairo time. */
 export function formatInstantDate(instant: IsoInstant): string {
   return DATE_FMT.format(parseInstant(instant));

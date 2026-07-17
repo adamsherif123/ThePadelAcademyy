@@ -5,6 +5,7 @@ import {
   formatCompactEgp,
   formatDayMonth,
   formatExpiry,
+  formatHour,
   formatInstantDate,
   formatInstantTime,
   formatMonthDay,
@@ -21,6 +22,13 @@ describe('formatCompactEgp', () => {
     expect(formatCompactEgp(egp(1_200_000))).toBe('1.2M');
     expect(formatCompactEgp(egp(750))).toBe('750');
     expect(formatCompactEgp(egp(0))).toBe('0');
+  });
+});
+
+describe('formatHour', () => {
+  it('renders the Cairo hour without minutes', () => {
+    expect(formatHour('2026-07-19T15:00:00.000Z' as IsoInstant)).toBe('6 PM'); // 18:00 Cairo
+    expect(formatHour('2026-07-19T09:00:00.000Z' as IsoInstant)).toBe('12 PM'); // noon Cairo
   });
 });
 

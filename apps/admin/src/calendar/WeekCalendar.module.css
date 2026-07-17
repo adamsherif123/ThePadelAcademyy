@@ -15,13 +15,11 @@
   gap: var(--space-md);
   margin-block-end: var(--space-lg);
 }
-
 .nav {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
 }
-
 .navBtn {
   display: inline-flex;
   align-items: center;
@@ -37,7 +35,6 @@
 .navBtn:hover {
   background: var(--color-bg-canvas);
 }
-
 .range {
   display: flex;
   flex-direction: column;
@@ -53,14 +50,12 @@
   color: var(--color-text-muted);
   font-size: var(--font-size-caption);
 }
-
 .headerEnd {
   display: flex;
   align-items: center;
   gap: var(--space-lg);
   flex-wrap: wrap;
 }
-
 .legend {
   display: flex;
   gap: var(--space-md);
@@ -80,13 +75,38 @@
   height: 8px;
   border-radius: var(--radius-pill);
 }
+.legendDot[data-type='group'] {
+  background: var(--tint-group-fg);
+}
+.legendDot[data-type='duo'] {
+  background: var(--tint-duo-fg);
+}
+.legendDot[data-type='individual'] {
+  background: var(--tint-individual-fg);
+}
+.legendDot[data-type='trial'] {
+  background: var(--tint-trial-fg);
+}
 
-/* ---- Day headers ---- */
+/* ---- Scroll viewport (midday→midnight content; opens scrolled to 5 PM) ---- */
+.scroll {
+  position: relative;
+  max-height: 620px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+}
+
+/* Day headers stay pinned above the scrolling grid. */
 .dayHeads {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
   display: grid;
   grid-template-columns: 56px repeat(7, 1fr);
   align-items: end;
-  margin-block-end: var(--space-sm);
+  background: var(--color-bg-surface);
+  border-block-end: 1px solid var(--color-border-subtle);
 }
 .axisSpacer {
   height: 1px;
@@ -96,7 +116,7 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding-block-end: var(--space-sm);
+  padding-block: var(--space-sm);
 }
 .dayName {
   color: var(--color-text-muted);
@@ -108,8 +128,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 30px;
-  height: 30px;
+  min-width: 28px;
+  height: 28px;
   padding-inline: 6px;
   border-radius: var(--radius-pill);
   color: var(--color-text-primary);
@@ -125,9 +145,7 @@
 .grid {
   display: grid;
   grid-template-columns: 56px repeat(7, 1fr);
-  border-block-start: 1px solid var(--color-border-subtle);
 }
-
 .axis {
   position: relative;
 }
@@ -142,7 +160,6 @@
   font-size: var(--font-size-micro);
   white-space: nowrap;
 }
-
 .dayCol {
   position: relative;
   border-inline-start: 1px solid var(--color-border-subtle);
@@ -170,114 +187,10 @@
   );
 }
 .closedLabel {
+  position: sticky;
+  inset-block-start: 50%;
   color: var(--color-text-muted);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
   letter-spacing: 1px;
-}
-
-/* ---- Events ---- */
-.laneWrap {
-  position: absolute;
-  inset-block: 0;
-}
-
-.event {
-  position: absolute;
-  inset-inline: 3px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  overflow: hidden;
-  padding: var(--space-sm);
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  text-align: start;
-  cursor: pointer;
-}
-.event:hover {
-  filter: brightness(0.98);
-}
-
-.eventTop {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-xs);
-}
-.eventTime {
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-bold);
-}
-.eventCoach {
-  color: var(--color-text-primary);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-semibold);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.eventTags {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-micro);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.cap {
-  flex-shrink: 0;
-  padding-block: 1px;
-  padding-inline: var(--space-xs);
-  border-radius: var(--radius-pill);
-  background: var(--color-bg-surface);
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-micro);
-  font-weight: var(--font-weight-bold);
-}
-.cap[data-full] {
-  background: var(--color-status-danger);
-  color: var(--color-text-inverse);
-}
-
-/* Training-type tints (admin-only trainingTint) for events + legend dots. */
-.event[data-type='group'],
-.legendDot[data-type='group'] {
-  background: var(--tint-group-bg);
-}
-.event[data-type='duo'],
-.legendDot[data-type='duo'] {
-  background: var(--tint-duo-bg);
-}
-.event[data-type='individual'],
-.legendDot[data-type='individual'] {
-  background: var(--tint-individual-bg);
-}
-.event[data-type='trial'],
-.legendDot[data-type='trial'] {
-  background: var(--tint-trial-bg);
-}
-.legendDot[data-type='group'] {
-  background: var(--tint-group-fg);
-}
-.legendDot[data-type='duo'] {
-  background: var(--tint-duo-fg);
-}
-.legendDot[data-type='individual'] {
-  background: var(--tint-individual-fg);
-}
-.legendDot[data-type='trial'] {
-  background: var(--tint-trial-fg);
-}
-.event[data-type='group'] .eventTime {
-  color: var(--tint-group-fg);
-}
-.event[data-type='duo'] .eventTime {
-  color: var(--tint-duo-fg);
-}
-.event[data-type='individual'] .eventTime {
-  color: var(--tint-individual-fg);
-}
-.event[data-type='trial'] .eventTime {
-  color: var(--tint-trial-fg);
 }

@@ -1,6 +1,7 @@
 import { cairoCalendarDate, cairoOffsetMs, cairoWallTimeToInstant, parseInstant } from '@tpa/core';
 import type { IsoInstant, SessionSlot, Weekday } from '@tpa/types';
 
+import { assignLanes } from './lanes';
 import { getSlots, getTemplates } from './store';
 
 /**
@@ -83,4 +84,83 @@ export function slotsForDay(dayStart: IsoInstant): SessionSlot[] {
 /** How many published slots fall in the given columns — for the empty-week state. */
 export function weekHasSlots(columns: readonly DayColumn[]): boolean {
   return columns.some((col) => slotsForDay(col.dayStart).length > 0);
+}
+
+const NOON = 12 * 60;
+const MIDNIGHT = 24 * 60;
+
+/**
+ * The Cairo-minute span the grid covers, in whole hours. DERIVED, not fixed:
+ * midday→midnight as the baseline (the normal view), EXTENDED to include any slot
+ * this week that falls outside it — so an 8 AM one-off shows at its true position
+ * instead of being clamped to an edge. Deriving is more robust than a fixed range
+ * that merely happens to fit today's data.
+ */
+export function weekTimeRange(columns: readonly DayColumn[]): { startMin: number; endMin: number } {
+  let startMin = NOON;
+  let endMin = MIDNIGHT;
+  for (const col of columns) {
+    for (const s of slotsForDay(col.dayStart)) {
+      startMin = Math.min(startMin, cairoWallMinutes(s.startsAt));
+      endMin = Math.max(endMin, cairoWallMinutes(s.endsAt));
+    }
+  }
+  return { startMin: Math.floor(startMin / 60) * 60, endMin: Math.ceil(endMin / 60) * 60 };
+}
+
+/**
+ * Vertical box for an event, CLAMPED into the grid. This is the structural
+ * guarantee that no event can EVER render outside the grid at any range — even a
+ * slot outside the derived span (a computation slip, an out-of-range one-off)
+ * pins to an edge with a minimum height rather than escaping over the page.
+ */
+export function eventBox(
+  startMin: number,
+  endMin: number,
+  gridStartMin: number,
+  hourPx: number,
+  gridPx: number,
+  minPx = 24,
+): { top: number; height: number } {
+  const rawTop = ((startMin - gridStartMin) / 60) * hourPx;
+  const rawHeight = ((endMin - startMin) / 60) * hourPx;
+  const top = Math.max(0, Math.min(rawTop, gridPx - minPx));
+  const height = Math.max(minPx, Math.min(rawHeight, gridPx - top));
+  return { top, height };
+}
+
+export interface PlacedEvent {
+  slot: SessionSlot;
+  top: number;
+  height: number;
+  leftPct: number;
+  widthPct: number;
+  lanes: number;
+}
+
+/**
+ * Lay out one day's slots: horizontal lanes (assignLanes) + vertical clamped
+ * boxes (eventBox). Pure — the calendar just applies each result to ONE element,
+ * so lane geometry and time geometry can't drift onto separate overlapping nodes.
+ */
+export function layoutDay(
+  slots: readonly SessionSlot[],
+  gridStartMin: number,
+  hourPx: number,
+  gridPx: number,
+): PlacedEvent[] {
+  const placed = assignLanes(slots, (s) => ({
+    startMs: parseInstant(s.startsAt).getTime(),
+    endMs: parseInstant(s.endsAt).getTime(),
+  }));
+  return placed.map(({ item, lane, lanes }) => {
+    const box = eventBox(
+      cairoWallMinutes(item.startsAt),
+      cairoWallMinutes(item.endsAt),
+      gridStartMin,
+      hourPx,
+      gridPx,
+    );
+    return { slot: item, top: box.top, height: box.height, leftPct: (lane / lanes) * 100, widthPct: (1 / lanes) * 100, lanes };
+  });
 }

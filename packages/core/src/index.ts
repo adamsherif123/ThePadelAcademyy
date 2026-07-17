@@ -47,6 +47,7 @@ export {
   formatCompactEgp,
   formatDayMonth,
   formatExpiry,
+  formatHour,
   formatInstantDate,
   formatInstantTime,
   formatMonthDay,
