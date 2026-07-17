@@ -10,17 +10,17 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
 import { queryClient } from '../lib/queryClient';
+import { nextRoute } from '../session/authMachine';
 import { SessionProvider, useSession } from '../session/SessionProvider';
 import { interFonts } from '../theme/fonts';
 
 SplashScreen.preventAutoHideAsync();
 
 /**
- * Route guard over the real auth state machine. Three destinations, one per status:
- * signed-out → sign-in; a verified user without a profile → profile-setup; a fully
- * onboarded user → the tabs. The onboarding sub-steps (otp, profile-setup, then the
- * trial-grant celebration) all live in (auth) yet run AFTER a session exists, so a
- * `ready` user is only bounced out of (auth) once they've left those steps behind.
+ * Route guard — a thin shell over the pure `nextRoute` state machine (unit-tested in
+ * session/authMachine.test.ts). It maps (status, current route) to a redirect: an
+ * expression the guard just executes, so the routing rules can be tested without a
+ * device.
  */
 function useAuthGuard() {
   const { status } = useSession();
@@ -28,23 +28,8 @@ function useAuthGuard() {
   const router = useRouter();
 
   useEffect(() => {
-    if (status === 'loading') return;
-    const inAuth = segments[0] === '(auth)';
-    const step = segments[1];
-
-    if (status === 'signed_out') {
-      if (!inAuth) router.replace('/(auth)/sign-in');
-    } else if (status === 'needs_profile') {
-      // Verified but no player yet — always land on profile-setup (this is what
-      // carries a new user off the OTP screen once the session appears).
-      if (step !== 'profile-setup') router.replace('/(auth)/profile-setup');
-    } else if (status === 'ready') {
-      // Onboarding just finished — allow the celebration + the setup screen it
-      // was pushed from; everything else in (auth) means "you're already in".
-      if (inAuth && step !== 'trial-grant' && step !== 'profile-setup') {
-        router.replace('/(tabs)');
-      }
-    }
+    const target = nextRoute(status, segments[0], segments[1]);
+    if (target) router.replace(target as never);
   }, [status, segments, router]);
 }
 

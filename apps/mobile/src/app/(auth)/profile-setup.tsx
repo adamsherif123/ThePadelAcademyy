@@ -17,31 +17,52 @@ const LEVEL_COPY: Record<Level, { title: string; description: string }> = {
   intermediate: { title: 'Intermediate', description: 'Match-ready — tactics, walls and net play' },
 };
 
-/** 03 — Profile setup (light). Gender + level filter which group slots show (S3b). */
+/**
+ * 03 — Profile setup (light). Gender + level filter which group slots show (S3b).
+ *
+ * The guard forces every new player here (session exists, no player yet), so it must
+ * not be a dead end: it carries a sign-out escape. If complete_signup can't succeed
+ * for this session — e.g. an orphaned session whose auth user was removed — the user
+ * can sign out and start over with a different number instead of being bricked.
+ */
 export default function ProfileSetupScreen() {
   const router = useRouter();
-  const { completeProfile } = useSession();
+  const { completeProfile, signOut, phone } = useSession();
   const [name, setName] = useState('');
   const [gender, setGender] = useState<Gender | null>(null);
   const [level, setLevel] = useState<Level | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const complete = name.trim().length > 0 && gender !== null && level !== null;
+  const busy = submitting || leaving;
 
   const onCreate = async () => {
-    if (!complete || submitting) return;
+    if (!complete || busy) return;
     setSubmitting(true);
     setError(null);
-    // complete_signup creates the player and grants the 2 trial credits atomically.
-    const res = await completeProfile({ name: name.trim(), gender, level });
-    if (res.ok) {
-      // Show the trial-grant celebration; the guard allows it for a ready user.
-      router.push('/(auth)/trial-grant');
-    } else {
+    try {
+      // complete_signup creates the player and grants the 2 trial credits atomically.
+      // completeProfile never throws — it returns {ok:false,error} on any failure.
+      const res = await completeProfile({ name: name.trim(), gender, level });
+      if (res.ok) {
+        // Show the trial-grant celebration; the guard allows it for a ready user.
+        router.push('/(auth)/trial-grant');
+        return;
+      }
+      setError('We couldn’t create your profile. If this keeps happening, sign out below and try a different number.');
+    } finally {
+      // A stuck spinner is a bug even when the error is handled: reset on EVERY path
+      // (on success this screen is unmounting anyway, so it's harmless there).
       setSubmitting(false);
-      setError('We couldn’t create your profile. Please try again.');
     }
+  };
+
+  const onSignOut = async () => {
+    if (busy) return;
+    setLeaving(true);
+    await signOut(); // never throws; forces the signed-out state → guard → sign-in
   };
 
   return (
@@ -50,6 +71,11 @@ export default function ProfileSetupScreen() {
         <Text variant="bodySecondary">
           This takes 30 seconds and decides which group sessions you&apos;ll see.
         </Text>
+        {phone ? (
+          <Text variant="caption" tone="muted">
+            {`Signing up as ${phone}`}
+          </Text>
+        ) : null}
 
         <View style={styles.field}>
           <Text variant="label">Your name</Text>
@@ -114,7 +140,7 @@ export default function ProfileSetupScreen() {
         <Button
           label={submitting ? 'Creating…' : 'Create my Profile'}
           onPress={onCreate}
-          disabled={!complete || submitting}
+          disabled={!complete || busy}
         />
         {error ? (
           <Text variant="caption" tone="accent" style={styles.helper}>
@@ -125,6 +151,15 @@ export default function ProfileSetupScreen() {
             Fill in all three fields to continue
           </Text>
         ) : null}
+
+        {/* The escape hatch: this screen is forced by the guard, so it must never be
+            a dead end. Sign out returns to sign-in to start over with another number. */}
+        <Button
+          label={leaving ? 'Signing out…' : 'Sign out / use a different number'}
+          variant="ghost"
+          onPress={onSignOut}
+          disabled={busy}
+        />
     </Screen>
   );
 }

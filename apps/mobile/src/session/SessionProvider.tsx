@@ -16,6 +16,9 @@ import { completeSignupRpc, fetchCurrentPlayer } from '../lib/api';
 import { queryClient, queryKeys } from '../lib/queryClient';
 import { supabase } from '../lib/supabase';
 import { resetMockOverlay } from '../data/mockPayments';
+import { deriveStatus, type SessionStatus } from './authMachine';
+
+export type { SessionStatus } from './authMachine';
 
 /**
  * Real Supabase auth (S9). The mock context is gone: `session` comes from the
@@ -37,8 +40,6 @@ interface ProfileDraft {
   gender: Gender;
   level: Level;
 }
-
-export type SessionStatus = 'loading' | 'signed_out' | 'needs_profile' | 'ready';
 
 interface SessionValue {
   status: SessionStatus;
@@ -98,68 +99,96 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   });
   const player = hasSession ? (playerQuery.data ?? null) : null;
 
-  const status: SessionStatus =
-    session === undefined || (hasSession && playerQuery.isLoading)
-      ? 'loading'
-      : !hasSession
-        ? 'signed_out'
-        : player
-          ? 'ready'
-          : 'needs_profile';
+  const status: SessionStatus = deriveStatus({
+    sessionRestored: session !== undefined,
+    hasSession,
+    playerLoading: playerQuery.isLoading,
+    player,
+  });
+
+  // Every seam below returns a result and NEVER throws — the same contract the SQL
+  // RPCs honour ({ok, reason} as data). A transport/DB failure (offline, a raised
+  // exception like the deleted-auth-user 23502) becomes {ok:false, error}, so a
+  // screen's `if (res.ok)` handles it — it can't escape as an unhandled rejection
+  // that freezes a submit button.
+  const asMessage = (e: unknown, fallback: string): string =>
+    e instanceof Error && e.message ? e.message : fallback;
 
   const sendOtp = useCallback(async (input: string) => {
     const e164 = normalizePhone(input);
     setPhone(e164);
-    const { error } = await supabase.auth.signInWithOtp({ phone: e164 });
-    if (error) return { ok: false, error: error.message };
-    return { ok: true };
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ phone: e164 });
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: asMessage(e, 'Could not send the code. Please try again.') };
+    }
   }, []);
 
   const verifyOtp = useCallback(
     async (code: string) => {
       if (!phone) return { ok: false, error: 'No phone number to verify.' };
-      const { error } = await supabase.auth.verifyOtp({ phone, token: code, type: 'sms' });
-      if (error) return { ok: false, error: error.message };
-      // onAuthStateChange will flip `session`; the player query then decides
-      // needs_profile vs ready.
-      return { ok: true };
+      try {
+        const { error } = await supabase.auth.verifyOtp({ phone, token: code, type: 'sms' });
+        if (error) return { ok: false, error: error.message };
+        // onAuthStateChange will flip `session`; the player query then decides
+        // needs_profile vs ready.
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, error: asMessage(e, 'Could not verify the code. Please try again.') };
+      }
     },
     [phone],
   );
 
   const completeProfile = useCallback(
     async (draft: ProfileDraft) => {
-      const res = await completeSignupRpc(draft);
-      if (!res.ok) return { ok: false, error: res.reason };
-      const nowIso = toInstant(new Date());
-      // Show the trial grant we know the server just minted (same @tpa/core rule).
-      setTrialGrant(buildSignupGrant(res.playerId as Player['id'], nowIso));
-      // SEED the player into the cache SYNCHRONOUSLY. This is the fix for the signup
-      // bounce: `status` derives from this query, so writing it here flips status to
-      // `ready` before profile-setup navigates — the guard then sees a ready user on
-      // the trial-grant route (which it exempts) instead of a needs_profile user it
-      // would replace back. No refetch round-trip, so there is no window to lose the
-      // race in. (createdAt is a placeholder — unused in the UI — and the invalidate
-      // below reconciles the whole row to server truth a moment later.)
-      const e164 = phone ?? (session?.user.phone ? `+${session.user.phone}` : '');
-      queryClient.setQueryData<Player>(queryKeys.player, {
-        id: res.playerId as Player['id'],
-        phone: e164,
-        name: draft.name,
-        gender: draft.gender,
-        level: draft.level,
-        createdAt: nowIso,
-      });
-      // Reconcile the player to the server row + surface the freshly minted credits.
-      await queryClient.invalidateQueries({ queryKey: queryKeys.player });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.creditBatches });
-      return { ok: true };
+      try {
+        const res = await completeSignupRpc(draft);
+        if (!res.ok) return { ok: false, error: res.reason };
+        const nowIso = toInstant(new Date());
+        // Show the trial grant we know the server just minted (same @tpa/core rule).
+        setTrialGrant(buildSignupGrant(res.playerId as Player['id'], nowIso));
+        // SEED the player into the cache SYNCHRONOUSLY. This is the fix for the signup
+        // bounce: `status` derives from this query, so writing it here flips status to
+        // `ready` before profile-setup navigates — the guard then sees a ready user on
+        // the trial-grant route (which it exempts) instead of a needs_profile user it
+        // would replace back. No refetch round-trip, so there is no window to lose the
+        // race in. (createdAt is a placeholder — unused in the UI — and the invalidate
+        // below reconciles the whole row to server truth a moment later.)
+        const e164 = phone ?? (session?.user.phone ? `+${session.user.phone}` : '');
+        queryClient.setQueryData<Player>(queryKeys.player, {
+          id: res.playerId as Player['id'],
+          phone: e164,
+          name: draft.name,
+          gender: draft.gender,
+          level: draft.level,
+          createdAt: nowIso,
+        });
+        // Reconcile the player to the server row + surface the freshly minted credits.
+        await queryClient.invalidateQueries({ queryKey: queryKeys.player });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.creditBatches });
+        return { ok: true };
+      } catch (e) {
+        // e.g. the deleted-auth-user 23502 (a valid JWT whose auth.users row is gone).
+        // The screen shows a friendly error + the sign-out escape rather than a crash.
+        return { ok: false, error: asMessage(e, 'We couldn’t create your profile. Please try again.') };
+      }
     },
     [phone, session],
   );
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    try {
+      // `local` scope clears the stored session without a server round-trip, so a
+      // user holding a JWT for a deleted auth user can still get out (a server-side
+      // logout could reject). This is the escape hatch for a stuck profile-setup.
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch {
+      // Ignore — we force the local signed-out state below regardless.
+    }
+    setSession(null);
     setPhone(null);
     setTrialGrant(null);
     // Drop every cached read + the mock-purchase overlay so the next player starts clean.
