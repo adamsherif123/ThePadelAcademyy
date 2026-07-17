@@ -14,6 +14,13 @@
   transition: background 0.12s ease, opacity 0.12s ease;
 }
 
+.sm {
+  min-height: 30px;
+  padding-block: 4px;
+  padding-inline: var(--space-md);
+  font-size: var(--font-size-caption);
+}
+
 .button:disabled {
   opacity: 0.5;
   cursor: not-allowed;

@@ -196,9 +196,21 @@ const PAST_STATUS: readonly (readonly [BookingStatus, number])[] = [
 
 export const generatedBookings: Booking[] = [];
 let bookingSeq = 0;
+// Occupancy invariants: a slot's ACTIVE (booked) seats never exceed capacity, and
+// a player never holds two active bookings on one slot — so the modal roster is
+// sane (never "5 of 1") and the admin add-player uniqueness guard has real data.
+const bookedPerSlot = new Map<string, number>();
+const bookedPairs = new Set<string>();
 function addBooking(playerId: PlayerId, slot: SessionSlot, status: BookingStatus): void {
   const batchId = batchesByPlayer.get(playerId)?.[0];
   if (!batchId) return; // only players with a purchased batch get bookings (valid credit ref)
+  if (status === 'booked') {
+    const seats = bookedPerSlot.get(slot.id) ?? 0;
+    const pair = `${playerId}|${slot.id}`;
+    if (seats >= slot.capacity || bookedPairs.has(pair)) return; // don't oversell / double-book
+    bookedPerSlot.set(slot.id, seats + 1);
+    bookedPairs.add(pair);
+  }
   const bn = String(++bookingSeq).padStart(4, '0');
   generatedBookings.push({
     id: `bk_g${bn}` as BookingId,

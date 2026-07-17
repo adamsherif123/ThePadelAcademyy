@@ -99,5 +99,28 @@ const handBookings: Booking[] = [
   },
 ];
 
+/**
+ * Enforce the occupancy invariant across the combined set: no slot ever has more
+ * ACTIVE (booked) bookings than its capacity. Hand bookings come first and are
+ * always kept (they're within capacity and locked by tests); a generated booking
+ * that would oversell a slot — e.g. one that landed on an ad-hoc demo slot a hand
+ * booking already fills — is dropped. Keeps the modal roster honest ("2 of 4").
+ */
+function capActiveBookings(all: readonly Booking[]): Booking[] {
+  const capBySlot = new Map(mockSlots.map((s) => [s.id, s.capacity] as const));
+  const seats = new Map<string, number>();
+  const out: Booking[] = [];
+  for (const b of all) {
+    if (b.status === 'booked') {
+      const cap = capBySlot.get(b.slotId) ?? Number.POSITIVE_INFINITY;
+      const used = seats.get(b.slotId) ?? 0;
+      if (used >= cap) continue; // would oversell → drop this generated booking
+      seats.set(b.slotId, used + 1);
+    }
+    out.push(b);
+  }
+  return out;
+}
+
 /** Hand-tuned core bookings (pl_omar, one per status) + academy-scale generated ones. */
-export const mockBookings: Booking[] = [...handBookings, ...generatedBookings];
+export const mockBookings: Booking[] = capActiveBookings([...handBookings, ...generatedBookings]);

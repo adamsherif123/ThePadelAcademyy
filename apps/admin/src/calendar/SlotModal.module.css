@@ -23,6 +23,10 @@
   color: var(--color-accent-default);
   flex-shrink: 0;
 }
+.summaryText {
+  flex: 1;
+  min-width: 0;
+}
 .summaryTitle {
   color: var(--color-text-primary);
   font-size: var(--font-size-body);
@@ -36,6 +40,183 @@
 .pills {
   display: flex;
   gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+/* ---- Roster ---- */
+.roster {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.rosterRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding-block: var(--space-sm);
+  padding-inline: var(--space-md);
+  border-block-end: 1px solid var(--color-border-subtle);
+}
+.rosterRow:last-child {
+  border-block-end: none;
+}
+.rosterInfo {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+}
+.rosterName {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rosterSub {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* A subtle, per-row action — deliberately not a big red button. */
+.removeLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+.removeLink:hover {
+  background: var(--expiry-expired-bg);
+  color: var(--expiry-expired-fg);
+}
+.emptySeat {
+  padding-block: var(--space-sm);
+  padding-inline: var(--space-md);
+  border-block-end: 1px dashed var(--color-border-subtle);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+}
+.emptySeat:last-child {
+  border-block-end: none;
+}
+.emptyState {
+  padding: var(--space-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+/* ---- Previously-booked history ---- */
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.historyToggle {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-accent-default);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+.historyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 4px;
+}
+.historyName {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+/* ---- Add view ---- */
+.addHint {
+  margin-block-end: var(--space-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+.credit {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+.overrideBtn {
+  color: var(--expiry-expiring_soon-fg);
+  border-color: var(--expiry-expiring_soon-fg);
+}
+.blocked {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
+/* ---- Remove view ---- */
+.removeHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-block-end: var(--space-lg);
+}
+.removeName {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-bold);
+}
+.removeSub {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+.removeQ {
+  margin-block-end: var(--space-sm);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+.choice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: start;
+  margin-block-end: var(--space-sm);
+  padding: var(--space-md);
+  border: 1.5px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  cursor: pointer;
+}
+.choice[data-on='true'] {
+  border-color: var(--color-accent-default);
+  background: var(--color-accent-soft);
+}
+.choiceTitle {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+.choiceBody {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
 }
 
 .fields {

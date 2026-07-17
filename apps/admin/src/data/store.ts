@@ -34,9 +34,22 @@ import { useSyncExternalStore } from 'react';
  * without touching selectors or screens. This session is read-only; the cancel /
  * attendance mutation seams land with their screens (S4c onward).
  */
+/**
+ * Seed slots with their bookedCount RECONCILED to the actual active bookings, so
+ * the admin has one truth for occupancy — the roster, "X of Y", the calendar
+ * badge, and fill rate all agree. (The mobile store keeps the fixtures' preset
+ * counts; only the admin, which shows the roster, reconciles.) The seams keep the
+ * two in step after every add/remove.
+ */
+function seededSlots(): SessionSlot[] {
+  const seats = new Map<string, number>();
+  for (const b of mockBookings) if (b.status === 'booked') seats.set(b.slotId, (seats.get(b.slotId) ?? 0) + 1);
+  return mockSlots.map((s) => ({ ...s, bookedCount: seats.get(s.id) ?? 0 }));
+}
+
 let coaches: Coach[] = [...mockCoaches];
 let players: Player[] = [...mockPlayers];
-let slots: SessionSlot[] = [...mockSlots];
+let slots: SessionSlot[] = seededSlots();
 let templates: AvailabilityTemplate[] = [...mockTemplates];
 let bookings: Booking[] = [...mockBookings];
 let packages: Package[] = [...mockPackages];
@@ -87,6 +100,39 @@ export function commitSlotUpdate(updatedSlot: SessionSlot): void {
   emit();
 }
 
+/**
+ * Commit an admin-initiated booking atomically: prepend the new booking, replace
+ * the spent batch (decremented), and replace the slot (one more seat taken). The
+ * seam computes the next-state; this is a dumb write. S10 replaces the seam body
+ * with a DB RPC and this disappears with the in-memory store.
+ */
+export function commitAdminBooking(
+  booking: Booking,
+  updatedBatch: CreditBatch,
+  updatedSlot: SessionSlot,
+): void {
+  bookings = [booking, ...bookings];
+  batches = batches.map((b) => (b.id === updatedBatch.id ? updatedBatch : b));
+  slots = slots.map((s) => (s.id === updatedSlot.id ? updatedSlot : s));
+  emit();
+}
+
+/**
+ * Commit a single-booking removal: the booking → cancelled, the slot's seat freed,
+ * and — only on the refund path — the batch replaced (credit returned). `updatedBatch`
+ * is omitted on a forfeit.
+ */
+export function commitBookingRemoval(
+  cancelledBooking: Booking,
+  updatedSlot: SessionSlot,
+  updatedBatch?: CreditBatch,
+): void {
+  bookings = bookings.map((b) => (b.id === cancelledBooking.id ? cancelledBooking : b));
+  slots = slots.map((s) => (s.id === updatedSlot.id ? updatedSlot : s));
+  if (updatedBatch) batches = batches.map((b) => (b.id === updatedBatch.id ? updatedBatch : b));
+  emit();
+}
+
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
@@ -105,7 +151,7 @@ export function useAdminStore(): number {
 export function __resetStoreForTests(): void {
   coaches = [...mockCoaches];
   players = [...mockPlayers];
-  slots = [...mockSlots];
+  slots = seededSlots();
   templates = [...mockTemplates];
   bookings = [...mockBookings];
   packages = [...mockPackages];

@@ -16,6 +16,7 @@ import {
   Modal,
   PageHeader,
   Panel,
+  PlayerSearch,
   SearchInput,
   SegmentedTabs,
   Select,
@@ -244,6 +245,19 @@ export function Gallery() {
             />
           </div>
         ))}
+      </Section>
+
+      <Section title="PlayerSearch (reusable — search name/phone, trailing slot per row)">
+        <div className={styles.pickerDemo}>
+          <PlayerSearch
+            players={allPlayers()}
+            renderTrailing={(p) => (
+              <Button size="sm" variant="secondary">
+                {p.gender === 'men' ? "Men's" : "Ladies'"}
+              </Button>
+            )}
+          />
+        </div>
       </Section>
     </div>
   );

@@ -1,17 +1,21 @@
+import { isBatchUsable } from '@tpa/core';
 import type {
   AvailabilityTemplate,
   Booking,
   Coach,
   CoachId,
+  IsoInstant,
   Package,
   PackageId,
   Player,
   PlayerId,
   SessionSlot,
   SlotId,
+  TrainingType,
 } from '@tpa/types';
 
 import {
+  getBatches,
   getBookings,
   getCoaches,
   getPackages,
@@ -49,6 +53,26 @@ export const bookingsForSlot = (slotId: SlotId): Booking[] =>
   getBookings().filter((b) => b.slotId === slotId);
 export const bookingsForPlayer = (playerId: PlayerId): Booking[] =>
   getBookings().filter((b) => b.playerId === playerId);
+/** Bookings currently holding a seat on the slot (status 'booked'), earliest first. */
+export const activeBookingsForSlot = (slotId: SlotId): Booking[] =>
+  getBookings()
+    .filter((b) => b.slotId === slotId && b.status === 'booked')
+    .sort((a, b) => new Date(a.bookedAt).getTime() - new Date(b.bookedAt).getTime());
+
+// Credit
+/** Every credit batch a player holds (for the admin add-player verdict). */
+export const batchesForPlayer = (playerId: PlayerId) =>
+  getBatches().filter((b) => b.playerId === playerId);
+
+/** Usable (unexpired, non-zero, type-matched) credits a player holds for a type. */
+export const usableCreditFor = (
+  playerId: PlayerId,
+  trainingType: TrainingType,
+  now: IsoInstant,
+): number =>
+  getBatches()
+    .filter((b) => b.playerId === playerId && isBatchUsable(b, trainingType, now))
+    .reduce((sum, b) => sum + b.quantityRemaining, 0);
 
 // Packages
 export const allPackages = (): Package[] => getPackages();

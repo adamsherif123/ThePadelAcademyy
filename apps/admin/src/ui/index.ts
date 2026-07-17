@@ -10,6 +10,7 @@ export { LineChart, type LinePoint } from './LineChart';
 export { Modal } from './Modal';
 export { PageHeader } from './PageHeader';
 export { Panel } from './Panel';
+export { PlayerSearch } from './PlayerSearch';
 export { SearchInput } from './SearchInput';
 export { SegmentedTabs, type SegmentTab } from './SegmentedTabs';
 export { Select } from './Select';
