@@ -138,7 +138,7 @@ export function Gallery() {
         <SegmentedTabs
           tabs={[
             { value: 'calendar', label: 'Week calendar' },
-            { value: 'templates', label: 'Availability templates' },
+            { value: 'templates', label: 'Recurring sessions' },
           ]}
           value={tab}
           onChange={setTab}
@@ -190,7 +190,7 @@ export function Gallery() {
           <EmptyState
             icon={Plus}
             title="No sessions scheduled"
-            message="Add a one-off slot or generate this week from the availability templates."
+            message="Add a one-off slot or generate this week from your recurring sessions."
             action={<Button icon={Plus}>Add one-off slot</Button>}
           />
         </Card>

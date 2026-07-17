@@ -132,7 +132,7 @@ export function WeekCalendar({
         <EmptyState
           icon={Plus}
           title="No sessions this week"
-          message="Nothing is scheduled. Generate slots from the availability templates, or add a one-off slot."
+          message="Nothing is scheduled. Generate slots from your recurring sessions, or add a one-off slot."
         />
       )}
     </div>

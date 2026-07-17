@@ -18,7 +18,7 @@ const ERROR_TEXT: Record<string, string> = {
   end_not_after_start: 'End time must be after the start time.',
   capacity_below_one: 'Capacity must be at least 1.',
   group_requires_gender_level: 'Group sessions need a gender and a level.',
-  template_missing: 'That template no longer exists.',
+  template_missing: 'That recurring session no longer exists.',
 };
 
 /**
@@ -72,7 +72,7 @@ export function TemplateModal({
     if (res.ok) {
       onClose();
     } else {
-      setError(ERROR_TEXT[res.reason] ?? 'Could not save the template.');
+      setError(ERROR_TEXT[res.reason] ?? 'Could not save the recurring session.');
     }
   };
 
@@ -80,15 +80,15 @@ export function TemplateModal({
     <Modal
       open
       onClose={onClose}
-      eyebrow="Availability"
-      title={editing ? 'Edit availability template' : 'New availability template'}
+      eyebrow="Recurring session"
+      title={editing ? 'Edit recurring session' : 'New recurring session'}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
           <Button onClick={onSubmit} disabled={!canSave}>
-            {editing ? 'Save template' : 'Create template'}
+            {editing ? 'Save recurring session' : 'Create recurring session'}
           </Button>
         </>
       }
@@ -159,7 +159,7 @@ export function TemplateModal({
                   : 'Paused — generates nothing until resumed. Existing sessions are untouched.'}
               </span>
             </div>
-            <Toggle checked={isActive} onChange={setIsActive} label="Template active" />
+            <Toggle checked={isActive} onChange={setIsActive} label="Recurring session active" />
           </div>
         ) : null}
 

@@ -123,21 +123,24 @@ export function slotFillRate(now: IsoInstant): number {
 
 // --- KPI 5: credit liability ("sold, not yet used") ---
 /**
- * Monetary value of the credits remaining in one purchased batch. The per-session
- * value is the package price ÷ session count; to keep integer piastres and one
- * rounding step, multiply price × remaining FIRST, then divide, then round to the
- * NEAREST piastre. Today's packages divide evenly (no rounding), but the admin can
- * set an odd price in S4e; nearest-piastre is unbiased and the error is ≤ 0.5
- * piastre per batch.
+ * Monetary value of the credits remaining in one purchased batch, derived from
+ * what the player ACTUALLY PAID — `purchase.amount`, captured at purchase time —
+ * and the batch's own `quantityTotal`, NEVER the live catalog. This is the
+ * "repricing immunity" the schema (S5) designs for: editing a package's price in
+ * S4e changes only future purchases, so a batch bought at the old price must keep
+ * that old per-session value here. To stay in integer piastres with one rounding
+ * step, multiply amount × remaining FIRST, then divide by quantityTotal, then round
+ * to the NEAREST piastre — unbiased, error ≤ 0.5 piastre per batch. (Params kept
+ * positionally identical to the old price/sessionCount form, which for any real
+ * purchase equalled amount/quantityTotal.)
  */
-export function batchLiability(price: number, sessionCount: number, remaining: number): Piastres {
-  if (sessionCount <= 0) return 0 as Piastres;
-  return Math.round((price * remaining) / sessionCount) as Piastres;
+export function batchLiability(amountPaid: number, quantityTotal: number, remaining: number): Piastres {
+  if (quantityTotal <= 0) return 0 as Piastres;
+  return Math.round((amountPaid * remaining) / quantityTotal) as Piastres;
 }
 
 export function creditLiability(now: IsoInstant): Piastres {
   const nowMs = ms(now);
-  const pkgById = new Map(getPackages().map((p) => [p.id, p]));
   const purchaseById = new Map(getPurchases().map((p) => [p.id, p]));
   let total = 0;
   for (const b of getBatches()) {
@@ -147,9 +150,10 @@ export function creditLiability(now: IsoInstant): Piastres {
     // Expired credits are revenue the academy kept, not a liability.
     if (ms(b.expiresAt) <= nowMs) continue;
     const purchase = b.purchaseId ? purchaseById.get(b.purchaseId) : undefined;
-    const pkg = purchase ? pkgById.get(purchase.packageId) : undefined;
-    if (!pkg) continue; // the value depends on the batch → purchase → package link
-    total += batchLiability(pkg.price, pkg.sessionCount, b.quantityRemaining);
+    if (!purchase) continue; // liability follows the captured purchase, not the package
+    // Captured amount + quantityTotal only — the live package is never read, so a
+    // later price edit cannot retroactively move this figure.
+    total += batchLiability(purchase.amount, b.quantityTotal, b.quantityRemaining);
   }
   return total as Piastres;
 }

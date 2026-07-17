@@ -32,14 +32,14 @@ export function Schedule() {
       <PageHeader
         eyebrow="Operations"
         title="Schedule"
-        subtitle="Manage the training calendar and the recurring availability templates that generate bookable slots. The academy runs Sunday–Wednesday, 5–11 PM."
+        subtitle="Manage the training calendar and the recurring weekly sessions that generate bookable slots. The academy runs Sunday–Wednesday, 5–11 PM."
       />
 
       <div className={styles.tabs}>
         <SegmentedTabs
           tabs={[
             { value: 'calendar', label: 'Week calendar', icon: CalendarDays },
-            { value: 'templates', label: 'Availability templates', icon: Repeat },
+            { value: 'templates', label: 'Recurring sessions', icon: Repeat },
           ]}
           value={tab}
           onChange={setTab}

@@ -77,7 +77,7 @@ export function GenerateModal({ onClose }: { onClose: () => void }) {
     >
       <div className={styles.body}>
         <p className={styles.intro}>
-          Materialize bookable sessions from active templates across a date range. Nothing is created
+          Materialize bookable slots from active recurring sessions across a date range. Nothing is created
           until you confirm — and a session that already exists, is booked, or clashes is skipped, so
           re-running is always safe.
         </p>
@@ -106,8 +106,9 @@ export function GenerateModal({ onClose }: { onClose: () => void }) {
               </div>
             ) : (
               <p className={styles.empty}>
-                Nothing new to create in this range. Everything the active templates would produce is
-                already on the calendar (or in the past). Widen the range to schedule further ahead.
+                Nothing new to create in this range. Everything the active recurring sessions would
+                produce is already on the calendar (or in the past). Widen the range to schedule further
+                ahead.
               </p>
             )}
 

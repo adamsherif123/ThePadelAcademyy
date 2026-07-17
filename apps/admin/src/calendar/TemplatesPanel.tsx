@@ -38,16 +38,16 @@ export function TemplatesPanel({
     <div className={styles.panel}>
       <div className={styles.head}>
         <p className={styles.explainer}>
-          Recurring weekly rules. Slots are generated from active templates for open days
-          (Sunday–Wednesday, 5–11 PM). Editing a template never changes sessions that are already
-          booked.
+          Each rule is ONE repeating session at a set time — a 6–8 PM rule makes a single two-hour
+          session, not a window that gets divided up. A slot is generated per open day
+          (Sunday–Wednesday, 5–11 PM). Editing a rule never changes sessions that are already booked.
         </p>
         <div className={styles.headActions}>
           <Button variant="secondary" icon={CalendarPlus} onClick={onGenerate}>
             Generate slots
           </Button>
           <Button icon={Plus} onClick={onNew}>
-            New template
+            New recurring session
           </Button>
         </div>
       </div>
@@ -56,11 +56,11 @@ export function TemplatesPanel({
         <Card>
           <EmptyState
             icon={Repeat}
-            title="No availability templates yet"
-            message="Templates are the weekly rules that generate bookable sessions. Create your first one to get the calendar going."
+            title="No recurring sessions yet"
+            message="Recurring sessions are the weekly rules that generate bookable slots — one session each. Create your first to get the calendar going."
             action={
               <Button icon={Plus} onClick={onNew}>
-                New template
+                New recurring session
               </Button>
             }
           />
@@ -81,7 +81,7 @@ export function TemplatesPanel({
                 </div>
 
                 {rules.length === 0 ? (
-                  <p className={styles.coachEmpty}>No templates for this coach yet.</p>
+                  <p className={styles.coachEmpty}>No recurring sessions for this coach yet.</p>
                 ) : (
                   <div className={styles.rows}>
                     {rules.map((t) => {
@@ -103,7 +103,7 @@ export function TemplatesPanel({
                             <button
                               type="button"
                               className={styles.iconBtn}
-                              aria-label={`Edit ${DAY_SHORT[t.weekday]} ${t.trainingType} template`}
+                              aria-label={`Edit ${DAY_SHORT[t.weekday]} ${t.trainingType} recurring session`}
                               onClick={() => onEdit(t)}
                             >
                               <Pencil size={15} aria-hidden />
@@ -111,7 +111,7 @@ export function TemplatesPanel({
                             <button
                               type="button"
                               className={`${styles.iconBtn} ${styles.danger}`}
-                              aria-label={`Delete ${DAY_SHORT[t.weekday]} ${t.trainingType} template`}
+                              aria-label={`Delete ${DAY_SHORT[t.weekday]} ${t.trainingType} recurring session`}
                               onClick={() => setDeleting(t)}
                             >
                               <Trash2 size={15} aria-hidden />
@@ -154,8 +154,8 @@ function DeleteTemplateConfirm({
     <Modal
       open
       onClose={onClose}
-      eyebrow="Availability"
-      title="Delete this template?"
+      eyebrow="Recurring session"
+      title="Delete this recurring session?"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -180,14 +180,14 @@ function DeleteTemplateConfirm({
               onClose();
             }}
           >
-            Delete template
+            Delete recurring session
           </Button>
         </>
       }
     >
       <div className={styles.confirm}>
         <p className={styles.confirmLead}>
-          Deleting removes the recurring rule so it stops generating new sessions. It does not remove
+          Deleting removes the recurring session so it stops generating new slots. It does not remove
           any session already on the calendar.
         </p>
         {generated.length > 0 ? (

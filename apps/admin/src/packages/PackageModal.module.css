@@ -1,0 +1,59 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-lg);
+}
+.span2 {
+  grid-column: 1 / -1;
+}
+
+.lockHint {
+  margin-block-start: calc(-1 * var(--space-md) + 2px);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+}
+
+.perSession {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.activeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+}
+.activeText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.activeTitle {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+.activeSub {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--expiry-expired-fg);
+  background: var(--expiry-expired-bg);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-caption);
+}

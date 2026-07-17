@@ -167,6 +167,32 @@ export function commitBookingRemoval(
   emit();
 }
 
+/**
+ * Insert-or-replace a coach by id (create appends, edit replaces in place).
+ * Coaches are never deleted — they hold historical slots and bookings, and the FK
+ * would reject it — so "remove" is always isActive:false. S10 → is_admin-gated
+ * INSERT/UPDATE (config, not money: no RPC).
+ */
+export function commitCoachSave(coach: Coach): void {
+  coaches = coaches.some((c) => c.id === coach.id)
+    ? coaches.map((c) => (c.id === coach.id ? coach : c))
+    : [...coaches, coach];
+  emit();
+}
+
+/**
+ * Insert-or-replace a package by id. Packages are never deleted either — sold
+ * credits reference them and stay valid — so "retire" is isActive:false (Hidden).
+ * Editing price/name/sellable is captured-immune downstream (see creditLiability).
+ * S10 → is_admin-gated INSERT/UPDATE.
+ */
+export function commitPackageSave(pkg: Package): void {
+  packages = packages.some((p) => p.id === pkg.id)
+    ? packages.map((p) => (p.id === pkg.id ? pkg : p))
+    : [...packages, pkg];
+  emit();
+}
+
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);

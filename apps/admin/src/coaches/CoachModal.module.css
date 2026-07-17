@@ -1,0 +1,112 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.photoRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+}
+.photoActions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  align-items: flex-start;
+}
+.photoButtons {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.removeLink {
+  padding: 4px 6px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+.removeLink:hover {
+  color: var(--expiry-expired-fg);
+}
+.photoHint {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.label {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+}
+.textarea {
+  width: 100%;
+  min-height: 88px;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--font-size-body);
+  resize: vertical;
+}
+.textarea:focus {
+  outline: none;
+  border-color: var(--color-accent-default);
+}
+
+.activeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+}
+.activeText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.activeTitle {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+.activeSub {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--expiry-expiring_soon-bg);
+  color: var(--expiry-expiring_soon-fg);
+  font-size: var(--font-size-caption);
+  line-height: 1.5;
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--expiry-expired-fg);
+  background: var(--expiry-expired-bg);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-caption);
+}

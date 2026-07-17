@@ -1,0 +1,201 @@
+.statRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-lg);
+  margin-block: var(--space-xl) var(--space-xxl);
+}
+@media (max-width: 900px) {
+  .statRow {
+    grid-template-columns: 1fr;
+  }
+}
+.statCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-lg);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+.statEyebrow {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.statValue {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.1;
+}
+.statCaption {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.section {
+  margin-block-end: var(--space-xl);
+}
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-block-end: var(--space-md);
+}
+.sectionDot {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+.sectionDot[data-type='group'] {
+  background: var(--tint-group-fg);
+}
+.sectionDot[data-type='duo'] {
+  background: var(--tint-duo-fg);
+}
+.sectionDot[data-type='individual'] {
+  background: var(--tint-individual-fg);
+}
+.sectionLabel {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+.sectionHint {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-lg);
+}
+@media (max-width: 900px) {
+  .cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-lg);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+.card[data-hidden='true'] {
+  background: var(--color-bg-canvas);
+  opacity: 0.72;
+}
+.cardTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.count {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-display);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+.countLabel {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.price {
+  margin-block-start: var(--space-md);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-bold);
+}
+.perSession {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.perks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-block: var(--space-md);
+}
+.perk {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+.perkIcon {
+  color: var(--color-status-success);
+  flex-shrink: 0;
+}
+
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-block-start: auto;
+  padding-block-start: var(--space-md);
+  border-block-start: 1px solid var(--color-border-subtle);
+}
+.footLabel {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+.footEnd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.editBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.editBtn:hover {
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+}
+
+/* Footer card */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+  margin-block-start: var(--space-lg);
+  padding: var(--space-lg) var(--space-xl);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+.footerTitle {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+.footerBody {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
