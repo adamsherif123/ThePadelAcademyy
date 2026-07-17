@@ -54,7 +54,12 @@ export function Sidebar() {
             <span className={styles.userName}>{admin.name}</span>
             <span className={styles.userRole}>{admin.role}</span>
           </div>
-          <button type="button" className={styles.signout} aria-label="Sign out" onClick={signOut}>
+          <button
+            type="button"
+            className={styles.signout}
+            aria-label="Sign out"
+            onClick={() => void signOut()}
+          >
             <LogOut size={18} aria-hidden />
           </button>
         </div>

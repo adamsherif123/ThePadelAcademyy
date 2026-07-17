@@ -1,7 +1,9 @@
-import { ID_PREFIXES, TRAINING_TYPES, newId } from '@tpa/core';
+import { TRAINING_TYPES } from '@tpa/core';
 import type { Package, PackageId, Piastres, TrainingType } from '@tpa/types';
 
-import { commitPackageSave, getPackages } from './store';
+import { insertPackage, updatePackage as updatePackageApi } from '../lib/api';
+import { TOUCHED } from '../lib/queryClient';
+import { runWrite } from './queries';
 
 /**
  * Package selectors + the package CRUD seam. Writes are is_admin-gated config (not
@@ -35,8 +37,8 @@ export function perSessionPrice(pkg: Package): Piastres {
  * if the type isn't sold at all. Read live on purpose: it's an at-a-glance "worth ~X
  * EGP" for a grant happening now, not a captured figure.
  */
-export function sessionRetailValue(type: TrainingType): Piastres | null {
-  const active = getPackages().filter((p) => p.isActive && p.trainingType === type);
+export function sessionRetailValue(packages: Package[], type: TrainingType): Piastres | null {
+  const active = packages.filter((p) => p.isActive && p.trainingType === type);
   if (active.length === 0) return null;
   const single = active.find((p) => p.sessionCount === 1);
   if (single) return single.price;
@@ -59,8 +61,8 @@ export interface CatalogStats {
 }
 
 /** The three headline stats — all derived from the active catalog, never hardcoded. */
-export function catalogStats(): CatalogStats {
-  const all = getPackages();
+export function catalogStats(packages: Package[]): CatalogStats {
+  const all = packages;
   const active = all.filter((p) => p.isActive);
   if (active.length === 0) {
     return { activeCount: 0, totalCount: all.length, lowestEntry: null, bestValue: null };
@@ -77,8 +79,8 @@ export function catalogStats(): CatalogStats {
 }
 
 /** Active-and-inactive packages of a type, cheapest bundle first (for the sections). */
-export function packagesForType(type: TrainingType): Package[] {
-  return getPackages()
+export function packagesForType(packages: Package[], type: TrainingType): Package[] {
+  return packages
     .filter((p) => p.trainingType === type)
     .sort((a, b) => a.sessionCount - b.sessionCount);
 }
@@ -97,7 +99,9 @@ export type SavePackageResult =
   | { ok: true; pkg: Package }
   | {
       ok: false;
-      reason: 'name_required' | 'price_below_one' | 'sessions_below_one' | 'trial_not_sellable' | 'package_missing';
+      reason:
+        | 'name_required' | 'price_below_one' | 'sessions_below_one'
+        | 'trial_not_sellable' | 'package_missing' | 'network';
     };
 
 function validate(draft: PackageDraft): SavePackageResult | null {
@@ -108,42 +112,37 @@ function validate(draft: PackageDraft): SavePackageResult | null {
   return null;
 }
 
-export function createPackage(draft: PackageDraft): SavePackageResult {
+export async function createPackage(draft: PackageDraft): Promise<SavePackageResult> {
   const invalid = validate(draft);
   if (invalid) return invalid;
-  const pkg: Package = {
-    id: newId(ID_PREFIXES.package) as PackageId,
-    trainingType: draft.trainingType,
-    sessionCount: Math.floor(draft.sessionCount),
-    price: draft.price,
-    name: draft.name.trim(),
-    isActive: draft.isActive,
-  };
-  commitPackageSave(pkg);
-  return { ok: true, pkg };
+  const res = await runWrite(
+    () => insertPackage({
+      trainingType: draft.trainingType, sessionCount: Math.floor(draft.sessionCount),
+      price: draft.price, name: draft.name.trim(), isActive: draft.isActive,
+    }),
+    TOUCHED.packages,
+  );
+  return res.ok ? { ok: true, pkg: res.value } : { ok: false, reason: 'network' };
 }
 
 /**
  * Edit price / name / sellability only. trainingType and sessionCount are the
- * bundle's identity and are taken from the EXISTING package, not the draft — a
- * "Group 8-pack" that already sold credits can't quietly become a 6-pack. Price
- * edits affect only future purchases (existing batches carry captured amounts).
+ * bundle's IDENTITY and are never sent — a "Group 8-pack" that already sold credits
+ * can't quietly become a 6-pack. Price edits affect only future purchases (existing
+ * batches carry captured amounts).
  */
-export function updatePackage(id: PackageId, draft: PackageDraft): SavePackageResult {
-  const current = getPackages().find((p) => p.id === id);
-  if (!current) return { ok: false, reason: 'package_missing' };
+export async function updatePackage(id: PackageId, draft: PackageDraft): Promise<SavePackageResult> {
   if (draft.name.trim() === '') return { ok: false, reason: 'name_required' };
   if (draft.price < 1) return { ok: false, reason: 'price_below_one' };
-  const updated: Package = { ...current, price: draft.price, name: draft.name.trim(), isActive: draft.isActive };
-  commitPackageSave(updated);
-  return { ok: true, pkg: updated };
+  const res = await runWrite(
+    () => updatePackageApi(id, { price: draft.price, name: draft.name.trim(), isActive: draft.isActive }),
+    TOUCHED.packages,
+  );
+  return res.ok ? { ok: true, pkg: res.value } : { ok: false, reason: 'network' };
 }
 
 /** Toggle Sellable/Hidden. Hiding never affects credits already sold — they stay valid. */
-export function setPackageSellable(id: PackageId, isActive: boolean): SavePackageResult {
-  const current = getPackages().find((p) => p.id === id);
-  if (!current) return { ok: false, reason: 'package_missing' };
-  const updated: Package = { ...current, isActive };
-  commitPackageSave(updated);
-  return { ok: true, pkg: updated };
+export async function setPackageSellable(id: PackageId, isActive: boolean): Promise<SavePackageResult> {
+  const res = await runWrite(() => updatePackageApi(id, { isActive }), TOUCHED.packages);
+  return res.ok ? { ok: true, pkg: res.value } : { ok: false, reason: 'network' };
 }

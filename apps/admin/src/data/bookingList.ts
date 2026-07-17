@@ -1,7 +1,5 @@
 import type { Booking, BookingStatus, Coach, Player, SessionSlot } from '@tpa/types';
 
-import { getBookings, getCoaches, getPlayers, getSlots } from './store';
-
 /**
  * The Bookings-screen read model: every booking joined to its player, session, and
  * coach, plus the status counts for the cards. Pure over the store; S10 swaps the
@@ -18,11 +16,16 @@ export interface BookingRow {
 const ms = (i: string): number => new Date(i).getTime();
 
 /** Every booking as an enriched row, most recent session first. */
-export function bookingRows(): BookingRow[] {
-  const playerById = new Map(getPlayers().map((p) => [p.id, p]));
-  const slotById = new Map(getSlots().map((s) => [s.id, s]));
-  const coachById = new Map(getCoaches().map((c) => [c.id, c]));
-  return getBookings()
+export function bookingRows(
+  bookings: Booking[],
+  slots: SessionSlot[],
+  players: Player[],
+  coaches: Coach[],
+): BookingRow[] {
+  const playerById = new Map(players.map((p) => [p.id, p]));
+  const slotById = new Map(slots.map((s) => [s.id, s]));
+  const coachById = new Map(coaches.map((c) => [c.id, c]));
+  return bookings
     .map((booking) => {
       const slot = slotById.get(booking.slotId);
       return {
@@ -38,8 +41,8 @@ export function bookingRows(): BookingRow[] {
 export type BookingStatusCounts = Record<BookingStatus, number>;
 
 /** All-time counts per status, for the four count cards. */
-export function bookingStatusCounts(): BookingStatusCounts {
+export function bookingStatusCounts(bookings: Booking[]): BookingStatusCounts {
   const counts: BookingStatusCounts = { booked: 0, attended: 0, cancelled: 0, no_show: 0 };
-  for (const b of getBookings()) counts[b.status] += 1;
+  for (const b of bookings) counts[b.status] += 1;
   return counts;
 }

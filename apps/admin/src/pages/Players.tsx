@@ -4,15 +4,16 @@ import { ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { creditBreakdown } from '../data/players';
-import { allPlayers } from '../data/selectors';
-import { useAdminStore } from '../data/store';
+import { useAdminData } from '../data/queries';
 import { PlayerDetailModal } from '../players/PlayerDetailModal';
 import { useSession } from '../session/SessionProvider';
 import {
   Avatar,
   Badge,
+  ErrorView,
   GENDER_LABEL,
   LEVEL_LABEL,
+  LoadingView,
   matchesPlayerQuery,
   PageHeader,
   SearchInput,
@@ -25,14 +26,14 @@ type GenderFilter = 'all' | 'men' | 'ladies';
 
 /** Players route: search + gender/level filters over the roster, opening detail. */
 export function Players() {
-  useAdminStore();
   const { now } = useSession();
+  const data = useAdminData();
   const [query, setQuery] = useState('');
   const [gender, setGender] = useState<GenderFilter>('all');
   const [level, setLevel] = useState<Level | 'all'>('all');
   const [selected, setSelected] = useState<Player | null>(null);
 
-  const players = allPlayers();
+  const players = data.players;
   const filtered = useMemo(
     () =>
       players.filter(
@@ -43,6 +44,9 @@ export function Players() {
       ),
     [players, query, gender, level],
   );
+
+  if (data.isPending) return <LoadingView />;
+  if (data.isError) return <ErrorView onRetry={data.refetch} />;
 
   return (
     <div>
@@ -85,7 +89,7 @@ export function Players() {
       ) : (
         <div className={styles.list}>
           {filtered.map((p) => {
-            const bd = creditBreakdown(p.id, now);
+            const bd = creditBreakdown(data.batches, p.id, now);
             return (
               <button key={p.id} type="button" className={styles.row} onClick={() => setSelected(p)}>
                 <Avatar name={p.name} size={40} />
@@ -112,7 +116,18 @@ export function Players() {
         </div>
       )}
 
-      {selected ? <PlayerDetailModal player={selected} onClose={() => setSelected(null)} /> : null}
+      {selected ? (
+        <PlayerDetailModal
+          player={selected}
+          batches={data.batches}
+          purchases={data.purchases}
+          bookings={data.bookings}
+          slots={data.slots}
+          coaches={data.coaches}
+          packages={data.packages}
+          onClose={() => setSelected(null)}
+        />
+      ) : null}
     </div>
   );
 }

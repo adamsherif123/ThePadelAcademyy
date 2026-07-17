@@ -1,5 +1,14 @@
-import { cairoCalendarDate, formatInstantDate, formatInstantTime } from '@tpa/core';
-import type { Booking, CoachId, Player, SessionSlot, Weekday } from '@tpa/types';
+import { cairoCalendarDate, formatInstantDate, formatInstantTime, parseInstant } from '@tpa/core';
+import type {
+  AvailabilityTemplate,
+  Booking,
+  Coach,
+  CoachId,
+  CreditBatch,
+  Player,
+  SessionSlot,
+  Weekday,
+} from '@tpa/types';
 import { AlertTriangle, ArrowLeft, Ban, CalendarClock, Check, Trash2, UserPlus, Users, X } from 'lucide-react';
 import { useState } from 'react';
 
@@ -19,8 +28,6 @@ import {
 } from '../data/schedule';
 import {
   activeBookingsForSlot,
-  allCoaches,
-  allPlayers,
   batchesForPlayer,
   bookingsForSlot,
   coachById,
@@ -29,7 +36,6 @@ import {
   usableCreditFor,
 } from '../data/selectors';
 import { updateSlotDetails } from '../data/slots';
-import { useAdminStore } from '../data/store';
 import { useSession } from '../session/SessionProvider';
 import {
   Avatar,
@@ -56,6 +62,30 @@ const BLOCK_TEXT: Record<string, string> = {
   slot_cancelled: 'Session cancelled',
 };
 
+/** Seam reason → admin-facing copy. Always has a fallback (network / unknown). */
+const REASON_COPY: Record<string, string> = {
+  not_admin: "You don't have permission.",
+  slot_missing: 'That session no longer exists.',
+  player_missing: 'That player no longer exists.',
+  booking_missing: 'That booking no longer exists.',
+  already_cancelled: 'That was already cancelled.',
+  slot_cancelled: 'That session was cancelled.',
+  slot_in_past: 'That session has already started.',
+  slot_full: 'This session is full.',
+  already_booked: 'That player is already booked on this session.',
+  no_usable_credit: 'That player has no usable credit for this session.',
+  gender_mismatch: "That player is outside this session's gender filter.",
+  level_mismatch: "That player is outside this session's level filter.",
+  capacity_below_booked: 'Capacity can’t be below the number already booked.',
+  end_before_start: 'The session must end after it starts.',
+  in_past: 'That start time is in the past.',
+  coach_conflict: 'That coach is already booked at this time.',
+  invalid_status: 'That attendance status isn’t allowed.',
+  session_not_started: 'That session hasn’t started yet.',
+  network: 'Something went wrong. Please try again.',
+};
+const copyFor = (reason: string): string => REASON_COPY[reason] ?? 'Something went wrong. Please try again.';
+
 const pad = (n: number) => String(n).padStart(2, '0');
 /** Sane session durations (a padel session isn't 12 hours — the select IS the guard). */
 const DURATIONS: readonly { value: number; label: string }[] = [
@@ -81,10 +111,29 @@ type View =
  * change coach/capacity, or cancel the whole session. Each DESTRUCTIVE action gets
  * its own dedicated confirm view naming its exact target, so they're unconfusable.
  */
-export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClose: () => void }) {
+export function SlotModal({
+  slot: initial,
+  slots,
+  bookings,
+  players,
+  batches,
+  coaches,
+  templates,
+  onClose,
+}: {
+  slot: SessionSlot;
+  slots: SessionSlot[];
+  bookings: Booking[];
+  players: Player[];
+  batches: CreditBatch[];
+  coaches: Coach[];
+  templates: AvailabilityTemplate[];
+  onClose: () => void;
+}) {
   const { now } = useSession();
-  useAdminStore(); // re-render as the roster/seats change
-  const slot = slotById(initial.id) ?? initial;
+  // The query cache re-renders us as the roster/seats change; re-derive the live slot.
+  const slot = slotById(slots, initial.id) ?? initial;
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const startWall0 = cairoWallMinutes(slot.startsAt);
   const endWall0 = cairoWallMinutes(slot.endsAt);
@@ -101,16 +150,18 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
   const [showHistory, setShowHistory] = useState(false);
 
   const isGroup = slot.gender !== null && slot.level !== null;
-  const activeRoster = activeBookingsForSlot(slot.id);
+  const activeRoster = activeBookingsForSlot(bookings, slot.id);
   const occupied = activeRoster.length;
   const emptySeats = Math.max(0, slot.capacity - occupied);
 
   // Attendance is taken per session, once it has happened. On a PAST session the
   // roster shows everyone who held a seat (booked/attended/no_show) with attendance
   // controls; on a FUTURE one it's the live booked roster with a Remove action.
-  const isPast = new Date(slot.startsAt).getTime() <= new Date(now).getTime();
+  // TASK 7: cancel-session is offered ONLY when the session is in the FUTURE.
+  const isFuture = parseInstant(slot.startsAt).getTime() > parseInstant(now).getTime();
+  const isPast = !isFuture;
   const rosterBookings = isPast
-    ? bookingsForSlot(slot.id)
+    ? bookingsForSlot(bookings, slot.id)
         .filter((b) => b.status !== 'cancelled')
         .sort((a, b) => new Date(a.bookedAt).getTime() - new Date(b.bookedAt).getTime())
     : activeRoster;
@@ -119,7 +170,7 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
   const unmarkedCount = rosterBookings.filter((b) => b.status === 'booked').length;
   // "Previously booked" now means players who were REMOVED (cancelled) — the
   // attended/no_show ones live in the roster on a past session.
-  const history = bookingsForSlot(slot.id).filter((b) => b.status === 'cancelled');
+  const history = bookingsForSlot(bookings, slot.id).filter((b) => b.status === 'cancelled');
 
   const eyebrow = `${formatInstantDate(slot.startsAt)} · ${formatInstantTime(slot.startsAt)} – ${formatInstantTime(slot.endsAt)}`;
   const title = `${TRAINING_LABEL[slot.trainingType]} session`;
@@ -135,21 +186,23 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
   const startMoved = newStart !== slot.startsAt;
   const inPast = startMoved && new Date(newStart).getTime() <= new Date(now).getTime();
   const newWeekday = timeValid ? new Date(Date.UTC(yy!, mm! - 1, dd!)).getUTCDay() : -1;
-  const closedDay = newWeekday >= 0 && closedWeekdays().has(newWeekday as Weekday);
-  const conflict = timeChanged ? findCoachConflict(coachId, newStart, newEnd, slot.id) : undefined;
-  const conflictCoach = coachById(coachId)?.name ?? 'this coach';
+  const closedDay = newWeekday >= 0 && closedWeekdays(templates).has(newWeekday as Weekday);
+  const conflict = timeChanged ? findCoachConflict(slots, coachId, newStart, newEnd, slot.id) : undefined;
+  const conflictCoach = coachById(coaches, coachId)?.name ?? 'this coach';
 
   const capacityTooLow = capacity < occupied;
   const coachChanged = coachId !== slot.coachId;
   const warnCoachChange = coachChanged && occupied > 0;
-  const originalCoach = coachById(slot.coachId)?.name ?? 'the coach';
-  const newCoach = coachById(coachId)?.name ?? 'another coach';
+  const originalCoach = coachById(coaches, slot.coachId)?.name ?? 'the coach';
+  const newCoach = coachById(coaches, coachId)?.name ?? 'another coach';
 
   const canSave = !capacityTooLow && timeValid && !inPast;
 
-  const applyEdit = () => {
-    updateSlotDetails(slot.id, { coachId, capacity, startsAt: newStart, endsAt: newEnd }, now);
-    onClose();
+  const applyEdit = async () => {
+    setActionError(null);
+    const res = await updateSlotDetails(slot, { coachId, capacity, startsAt: newStart, endsAt: newEnd }, now);
+    if (res.ok) onClose();
+    else setActionError(copyFor(res.reason));
   };
   const onSave = () => {
     if (!canSave) return;
@@ -159,18 +212,23 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
       setView({ k: 'reschedule' });
       return;
     }
-    applyEdit();
+    void applyEdit();
   };
 
   // ---- ADD view: a searchable roster of bookable players ----
+  const book = async (playerId: Player['id'], override: boolean) => {
+    setActionError(null);
+    const res = await addPlayerToSlot(slot.id, playerId, override);
+    if (!res.ok) setActionError(copyFor(res.reason));
+  };
   function AddTrailing({ player }: { player: Player }) {
-    const credit = usableCreditFor(player.id, slot.trainingType, now);
+    const credit = usableCreditFor(batches, player.id, slot.trainingType, now);
     const verdict = classifyAdminBooking(
       slot,
       player,
-      batchesForPlayer(player.id),
+      batchesForPlayer(batches, player.id),
       now,
-      isActivelyBooked(slot.id, player.id),
+      isActivelyBooked(bookings, slot.id, player.id),
     );
     return (
       <>
@@ -178,7 +236,7 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
           {credit} credit{credit === 1 ? '' : 's'}
         </span>
         {verdict.kind === 'ok' ? (
-          <Button size="sm" onClick={() => addPlayerToSlot(slot.id, player.id, now)}>
+          <Button size="sm" onClick={() => void book(player.id, false)}>
             Book
           </Button>
         ) : verdict.kind === 'override' ? (
@@ -187,7 +245,7 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
             variant="secondary"
             className={styles.overrideBtn}
             title={`${verdict.reason === 'gender_mismatch' ? GENDER_LABEL[player.gender] : LEVEL_LABEL[player.level]} — outside this slot's filter`}
-            onClick={() => addPlayerToSlot(slot.id, player.id, now)}
+            onClick={() => void book(player.id, true)}
           >
             <AlertTriangle size={13} aria-hidden />
             Book anyway
@@ -209,18 +267,29 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
           Record a WhatsApp or phone booking. Gender/level can be overridden; players with no usable
           credit must be granted credit first (Players).
         </p>
-        <PlayerSearch players={allPlayers()} renderTrailing={(p) => <AddTrailing player={p} />} />
+        {actionError ? (
+          <p className={styles.error}>
+            <AlertTriangle size={15} aria-hidden />
+            {actionError}
+          </p>
+        ) : null}
+        <PlayerSearch players={players} renderTrailing={(p) => <AddTrailing player={p} />} />
       </Modal>
     );
   }
 
   // ---- REMOVE view: one player, refund vs forfeit ----
   if (view.k === 'remove') {
-    const player = playerById(view.booking.playerId);
-    const onConfirm = () => {
-      removeBooking(view.booking.id, now, refund);
-      setView({ k: 'main' });
-      setRefund(true);
+    const player = playerById(players, view.booking.playerId);
+    const onConfirm = async () => {
+      setActionError(null);
+      const res = await removeBooking(view.booking.id, refund);
+      if (res.ok) {
+        setView({ k: 'main' });
+        setRefund(true);
+      } else {
+        setActionError(copyFor(res.reason));
+      }
     };
     return (
       <Modal
@@ -233,7 +302,7 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
             <Button variant="secondary" icon={ArrowLeft} onClick={() => setView({ k: 'main' })}>
               Back
             </Button>
-            <Button variant="destructive" icon={Trash2} onClick={onConfirm}>
+            <Button variant="destructive" icon={Trash2} onClick={() => void onConfirm()}>
               Remove {player ? player.name.split(' ')[0] : 'player'}
             </Button>
           </>
@@ -255,15 +324,23 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
           <span className={styles.choiceTitle}>Forfeit it</span>
           <span className={styles.choiceBody}>The player asked out too late — the same outcome as cancelling in the app.</span>
         </button>
+        {actionError ? (
+          <p className={styles.error}>
+            <AlertTriangle size={15} aria-hidden />
+            {actionError}
+          </p>
+        ) : null}
       </Modal>
     );
   }
 
   // ---- CANCEL view: the whole session ----
   if (view.k === 'cancel') {
-    const onConfirm = () => {
-      cancelSession(slot.id, now);
-      onClose();
+    const onConfirm = async () => {
+      setActionError(null);
+      const res = await cancelSession(slot.id);
+      if (res.ok) onClose();
+      else setActionError(copyFor(res.reason));
     };
     return (
       <Modal
@@ -276,7 +353,7 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
             <Button variant="secondary" icon={ArrowLeft} onClick={() => setView({ k: 'main' })}>
               Back
             </Button>
-            <Button variant="destructive" icon={Trash2} onClick={onConfirm}>
+            <Button variant="destructive" icon={Trash2} onClick={() => void onConfirm()}>
               Cancel session &amp; refund
             </Button>
           </>
@@ -293,6 +370,12 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
               : `All ${occupied} booked player${occupied === 1 ? '' : 's'} will be refunded to their original credit — regardless of the 3-hour window, since the academy is cancelling.`}
           </p>
         </div>
+        {actionError ? (
+          <p className={styles.error}>
+            <AlertTriangle size={15} aria-hidden />
+            {actionError}
+          </p>
+        ) : null}
       </Modal>
     );
   }
@@ -312,7 +395,7 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
             <Button variant="secondary" icon={ArrowLeft} onClick={() => setView({ k: 'main' })}>
               Back
             </Button>
-            <Button icon={CalendarClock} onClick={applyEdit}>
+            <Button icon={CalendarClock} onClick={() => void applyEdit()}>
               Reschedule anyway
             </Button>
           </>
@@ -341,16 +424,25 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
             {formatInstantTime(conflict.endsAt)} — that overlaps, and they can’t be in two places.
           </p>
         ) : null}
+        {actionError ? (
+          <p className={styles.error}>
+            <AlertTriangle size={15} aria-hidden />
+            {actionError}
+          </p>
+        ) : null}
       </Modal>
     );
   }
 
   // ---- MAIN view ----
+  // TASK 7: only offer Cancel session on a FUTURE session; a past one is for attendance.
   const footer = (
     <>
-      <Button className={styles.cancelBtn} variant="destructive" icon={Ban} onClick={() => setView({ k: 'cancel' })}>
-        Cancel session
-      </Button>
+      {isFuture ? (
+        <Button className={styles.cancelBtn} variant="destructive" icon={Ban} onClick={() => setView({ k: 'cancel' })}>
+          Cancel session
+        </Button>
+      ) : null}
       <Button variant="secondary" onClick={onClose}>
         Close
       </Button>
@@ -388,9 +480,13 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
         {/* Roster */}
         <div className={styles.roster}>
           {rosterBookings.map((b) => {
-            const player = playerById(b.playerId);
+            const player = playerById(players, b.playerId);
             const tags = player && isGroup ? groupTags(player.gender, player.level) : '';
-            const setStatus = (status: AttendanceStatus) => markAttendance(b.id, status, now);
+            const setStatus = async (status: AttendanceStatus) => {
+              setActionError(null);
+              const res = await markAttendance(b.id, status);
+              if (!res.ok) setActionError(copyFor(res.reason));
+            };
             return (
               <div key={b.id} className={styles.rosterRow}>
                 <Avatar name={player?.name ?? 'Player'} size={36} />
@@ -410,7 +506,7 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
                       data-kind="attended"
                       data-on={b.status === 'attended'}
                       aria-pressed={b.status === 'attended'}
-                      onClick={() => setStatus(b.status === 'attended' ? 'booked' : 'attended')}
+                      onClick={() => void setStatus(b.status === 'attended' ? 'booked' : 'attended')}
                     >
                       <Check size={13} aria-hidden />
                       Attended
@@ -421,7 +517,7 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
                       data-kind="no_show"
                       data-on={b.status === 'no_show'}
                       aria-pressed={b.status === 'no_show'}
-                      onClick={() => setStatus(b.status === 'no_show' ? 'booked' : 'no_show')}
+                      onClick={() => void setStatus(b.status === 'no_show' ? 'booked' : 'no_show')}
                     >
                       No-show
                     </button>
@@ -469,7 +565,7 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
             </button>
             {showHistory
               ? history.map((b) => {
-                  const player = playerById(b.playerId);
+                  const player = playerById(players, b.playerId);
                   return (
                     <div key={b.id} className={styles.historyRow}>
                       <span className={styles.historyName}>{player?.name ?? 'Player'}</span>
@@ -502,7 +598,7 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
             label="Coach"
             value={coachId}
             onChange={(e) => setCoachId(e.target.value as CoachId)}
-            options={allCoaches().map((c) => ({ value: c.id, label: c.name }))}
+            options={coaches.map((c) => ({ value: c.id, label: c.name }))}
           />
           <Input
             label="Capacity"
@@ -541,6 +637,12 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
           <p className={styles.note}>
             <CalendarClock size={15} aria-hidden />
             That’s normally a closed day (Thu–Sat) — allowed for a one-off, but worth a glance.
+          </p>
+        ) : null}
+        {actionError ? (
+          <p className={styles.error}>
+            <AlertTriangle size={15} aria-hidden />
+            {actionError}
           </p>
         ) : null}
       </div>

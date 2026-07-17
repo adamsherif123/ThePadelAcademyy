@@ -1,8 +1,7 @@
-import type { AvailabilityTemplate, CoachId, LocalTime, Weekday } from '@tpa/types';
+import type { AvailabilityTemplate, Coach, CoachId, LocalTime, Weekday } from '@tpa/types';
 import { AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 
-import { allCoaches } from '../data/selectors';
 import { createTemplate, updateTemplate, type SaveTemplateResult } from '../data/templates';
 import { Button, Input, Modal, Select, Toggle, TYPE_PLAYERS } from '../ui';
 import {
@@ -19,6 +18,7 @@ const ERROR_TEXT: Record<string, string> = {
   capacity_below_one: 'Capacity must be at least 1.',
   group_requires_gender_level: 'Group sessions need a gender and a level.',
   template_missing: 'That recurring session no longer exists.',
+  network: 'Something went wrong. Please try again.',
 };
 
 /**
@@ -30,13 +30,15 @@ const ERROR_TEXT: Record<string, string> = {
  */
 export function TemplateModal({
   template,
+  coaches,
   onClose,
 }: {
   template?: AvailabilityTemplate;
+  coaches: Coach[];
   onClose: () => void;
 }) {
   const editing = template !== undefined;
-  const firstCoach = allCoaches()[0]?.id ?? ('co_hany' as CoachId);
+  const firstCoach = coaches[0]?.id ?? ('co_hany' as CoachId);
 
   const draft = useSessionDraft({
     coachId: template?.coachId ?? firstCoach,
@@ -54,7 +56,7 @@ export function TemplateModal({
   const timeInvalid = startTime !== '' && endTime !== '' && endTime <= startTime;
   const canSave = startTime !== '' && endTime !== '' && !timeInvalid && draft.capacity >= 1;
 
-  const onSubmit = () => {
+  const onSubmit = async () => {
     const payload = {
       coachId: draft.coachId,
       weekday,
@@ -67,8 +69,8 @@ export function TemplateModal({
       isActive,
     };
     const res: SaveTemplateResult = editing
-      ? updateTemplate(template.id, payload)
-      : createTemplate(payload);
+      ? await updateTemplate(template.id, payload)
+      : await createTemplate(payload);
     if (res.ok) {
       onClose();
     } else {
@@ -87,7 +89,7 @@ export function TemplateModal({
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={onSubmit} disabled={!canSave}>
+          <Button onClick={() => void onSubmit()} disabled={!canSave}>
             {editing ? 'Save recurring session' : 'Create recurring session'}
           </Button>
         </>
@@ -100,7 +102,7 @@ export function TemplateModal({
               label="Coach"
               value={draft.coachId}
               onChange={(e) => draft.setCoachId(e.target.value as CoachId)}
-              options={allCoaches().map((c) => ({ value: c.id, label: c.name }))}
+              options={coaches.map((c) => ({ value: c.id, label: c.name }))}
             />
           </div>
 

@@ -20,6 +20,12 @@ importers:
       '@fontsource/inter':
         specifier: ^5.2.8
         version: 5.2.8
+      '@supabase/supabase-js':
+        specifier: ^2.110.6
+        version: 2.110.6
+      '@tanstack/react-query':
+        specifier: ^5.101.2
+        version: 5.101.2(react@19.2.3)
       '@tpa/core':
         specifier: workspace:*
         version: link:../../packages/core

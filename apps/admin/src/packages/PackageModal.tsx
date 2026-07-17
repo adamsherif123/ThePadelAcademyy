@@ -18,6 +18,7 @@ const ERROR_TEXT: Record<string, string> = {
   sessions_below_one: 'A package must grant at least one session.',
   trial_not_sellable: 'Trial credits are only granted at signup — they can’t be sold.',
   package_missing: 'That package no longer exists.',
+  network: 'Something went wrong. Please try again.',
 };
 
 const suggestName = (type: TrainingType, sessions: number): string =>
@@ -38,6 +39,7 @@ export function PackageModal({ pkg, onClose }: { pkg?: Package; onClose: () => v
   const [isActive, setIsActive] = useState<boolean>(pkg?.isActive ?? true);
   // Track whether the name was hand-edited; if not, keep it in step with type/count.
   const [nameTouched, setNameTouched] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const price = Math.round(priceEgp * PIASTRES_PER_EGP) as Piastres;
@@ -49,11 +51,17 @@ export function PackageModal({ pkg, onClose }: { pkg?: Package; onClose: () => v
     if (!nameTouched) setName(suggestName(type, count));
   };
 
-  const onSubmit = () => {
+  const onSubmit = async () => {
+    setSaving(true);
+    setError(null);
     const draft = { trainingType, sessionCount, price, name, isActive };
-    const res: SavePackageResult = editing ? updatePackage(pkg.id, draft) : createPackage(draft);
-    if (res.ok) onClose();
-    else setError(ERROR_TEXT[res.reason] ?? 'Could not save the package.');
+    const res: SavePackageResult = editing ? await updatePackage(pkg.id, draft) : await createPackage(draft);
+    if (res.ok) {
+      onClose();
+      return;
+    }
+    setError(ERROR_TEXT[res.reason] ?? 'Could not save the package.');
+    setSaving(false);
   };
 
   return (
@@ -67,8 +75,8 @@ export function PackageModal({ pkg, onClose }: { pkg?: Package; onClose: () => v
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={onSubmit} disabled={!canSave}>
-            {editing ? 'Save package' : 'Create package'}
+          <Button onClick={() => void onSubmit()} disabled={!canSave || saving}>
+            {saving ? 'Saving…' : editing ? 'Save package' : 'Create package'}
           </Button>
         </>
       }

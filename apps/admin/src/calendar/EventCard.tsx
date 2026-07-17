@@ -1,5 +1,5 @@
 import { formatHour, formatInstantTime } from '@tpa/core';
-import type { SessionSlot } from '@tpa/types';
+import type { Coach, SessionSlot } from '@tpa/types';
 import type { CSSProperties } from 'react';
 
 import { cairoWallMinutes } from '../data/schedule';
@@ -16,18 +16,22 @@ import styles from './EventCard.module.css';
  */
 export function EventCard({
   slot,
+  coaches = [],
   lanes,
   style,
   onClick,
 }: {
   slot: SessionSlot;
+  /** Optional so the design gallery can render a tile without the dataset; the live
+   * calendar always passes the real array, so coach names resolve there. */
+  coaches?: Coach[];
   lanes: number;
   style?: CSSProperties;
   onClick?: () => void;
 }) {
   const startMin = cairoWallMinutes(slot.startsAt);
   const timeLabel = startMin % 60 === 0 ? formatHour(slot.startsAt) : formatInstantTime(slot.startsAt);
-  const coach = coachById(slot.coachId);
+  const coach = coachById(coaches, slot.coachId);
   const full = slot.bookedCount >= slot.capacity;
   const tags = groupTags(slot.gender, slot.level) || TRAINING_LABEL[slot.trainingType];
 

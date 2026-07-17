@@ -1,11 +1,11 @@
 import { cairoCalendarDate, formatInstantTime } from '@tpa/core';
-import type { CoachId, SlotId, Weekday } from '@tpa/types';
+import type { AvailabilityTemplate, Coach, CoachId, SessionSlot, SlotId, Weekday } from '@tpa/types';
 import { AlertTriangle, CalendarClock } from 'lucide-react';
 import { useState } from 'react';
 
 import { createOneOffSlot } from '../data/generate';
 import { closedWeekdays, findCoachConflict, slotTimesFromWall } from '../data/schedule';
-import { allCoaches, coachById } from '../data/selectors';
+import { coachById } from '../data/selectors';
 import { useSession } from '../session/SessionProvider';
 import { Button, Input, Modal, Select, TYPE_PLAYERS } from '../ui';
 import {
@@ -24,6 +24,8 @@ const ERROR_TEXT: Record<string, string> = {
   in_past: 'That start time is in the past — a session can’t have already happened.',
   capacity_below_one: 'Capacity must be at least 1.',
   group_requires_gender_level: 'Group sessions need a gender and a level.',
+  coach_conflict: 'That coach is already booked at this time.',
+  network: 'Something went wrong. Please try again.',
 };
 
 /**
@@ -33,10 +35,20 @@ const ERROR_TEXT: Record<string, string> = {
  * conversion with slot editing (slotTimesFromWall, DST-correct). Coach overlap is a
  * WARNING, not a block — consistent with rescheduling.
  */
-export function OneOffModal({ onClose }: { onClose: () => void }) {
+export function OneOffModal({
+  coaches,
+  slots,
+  templates,
+  onClose,
+}: {
+  coaches: Coach[];
+  slots: SessionSlot[];
+  templates: AvailabilityTemplate[];
+  onClose: () => void;
+}) {
   const { now } = useSession();
   const today = cairoCalendarDate(now);
-  const firstCoach = allCoaches()[0]?.id ?? ('co_hany' as CoachId);
+  const firstCoach = coaches[0]?.id ?? ('co_hany' as CoachId);
 
   const draft = useSessionDraft({
     coachId: firstCoach,
@@ -60,16 +72,16 @@ export function OneOffModal({ onClose }: { onClose: () => void }) {
 
   const inPast = timeValid && new Date(startsAt).getTime() <= new Date(now).getTime();
   const newWeekday = timeValid ? new Date(Date.UTC(yy!, mm! - 1, dd!)).getUTCDay() : -1;
-  const closedDay = newWeekday >= 0 && closedWeekdays().has(newWeekday as Weekday);
+  const closedDay = newWeekday >= 0 && closedWeekdays(templates).has(newWeekday as Weekday);
   const conflict = timeValid
-    ? findCoachConflict(draft.coachId, startsAt, endsAt, 'sl_oneoff_probe' as SlotId)
+    ? findCoachConflict(slots, draft.coachId, startsAt, endsAt, 'sl_oneoff_probe' as SlotId)
     : undefined;
-  const conflictCoach = coachById(draft.coachId)?.name ?? 'this coach';
+  const conflictCoach = coachById(coaches, draft.coachId)?.name ?? 'this coach';
 
   const canSave = timeValid && !inPast && draft.capacity >= 1;
 
-  const onSubmit = () => {
-    const res = createOneOffSlot(
+  const onSubmit = async () => {
+    const res = await createOneOffSlot(
       {
         coachId: draft.coachId,
         trainingType: draft.trainingType,
@@ -96,7 +108,7 @@ export function OneOffModal({ onClose }: { onClose: () => void }) {
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button icon={CalendarClock} onClick={onSubmit} disabled={!canSave}>
+          <Button icon={CalendarClock} onClick={() => void onSubmit()} disabled={!canSave}>
             Add session
           </Button>
         </>
@@ -109,7 +121,7 @@ export function OneOffModal({ onClose }: { onClose: () => void }) {
               label="Coach"
               value={draft.coachId}
               onChange={(e) => draft.setCoachId(e.target.value as CoachId)}
-              options={allCoaches().map((c) => ({ value: c.id, label: c.name }))}
+              options={coaches.map((c) => ({ value: c.id, label: c.name }))}
             />
           </div>
 

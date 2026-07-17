@@ -2,58 +2,71 @@ import type { Coach } from '@tpa/types';
 import { AlertTriangle, ImagePlus } from 'lucide-react';
 import { useRef, useState } from 'react';
 
-import { createCoach, updateCoach, uploadCoachPhoto, type SaveCoachResult } from '../data/coaches';
-import { allTemplates } from '../data/selectors';
+import { createCoach, updateCoach, type SaveCoachResult } from '../data/coaches';
+import { useTemplates } from '../data/queries';
 import { Avatar, Button, Input, Modal, Toggle } from '../ui';
 import styles from './CoachModal.module.css';
 
 const ERROR_TEXT: Record<string, string> = {
   name_required: 'A coach needs a name.',
   coach_missing: 'That coach no longer exists.',
-  photo_failed: 'Could not read that image — try another file.',
+  network: 'Something went wrong. Please try again.',
 };
 
 /**
  * Add or edit a coach. `coach` present → edit; absent → create. A coach is never
  * deleted (they own historical slots/bookings) — "remove" is the On-leave toggle,
  * which also pauses their active recurring sessions so nothing new generates. The
- * photo goes through the uploadCoachPhoto seam; a coach with no photo is a
- * first-class state (Avatar falls back to initials).
+ * photo is a File chosen locally: while editing we show a preview via
+ * URL.createObjectURL and pass the File to the seam on save (null keeps the
+ * existing photo). A coach with no photo is a first-class state (Avatar falls back
+ * to initials).
  */
 export function CoachModal({ coach, onClose }: { coach?: Coach; onClose: () => void }) {
   const editing = coach !== undefined;
   const [name, setName] = useState(coach?.name ?? '');
   const [bio, setBio] = useState(coach?.bio ?? '');
-  const [photoUrl, setPhotoUrl] = useState<string | null>(coach?.photoUrl ?? null);
   const [isActive, setIsActive] = useState(coach?.isActive ?? true);
-  const [uploading, setUploading] = useState(false);
+  // The File the admin picked this session (null = keep the existing photo on save).
+  const [photo, setPhoto] = useState<File | null>(null);
+  // What the Avatar shows: a local object URL for a freshly-picked file, else the saved photo.
+  const [preview, setPreview] = useState<string | null>(coach?.photoUrl ?? null);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
+  const templates = useTemplates();
   // Going on leave pauses this coach's currently-active recurring sessions.
   const activeTemplates = editing
-    ? allTemplates().filter((t) => t.coachId === coach.id && t.isActive).length
+    ? (templates.data ?? []).filter((t) => t.coachId === coach.id && t.isActive).length
     : 0;
   const goingOnLeave = editing && coach.isActive && !isActive;
 
-  const onPick = async (file: File | undefined) => {
+  const onPick = (file: File | undefined) => {
     if (!file) return;
-    setUploading(true);
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+    const url = URL.createObjectURL(file);
+    objectUrlRef.current = url;
+    setPhoto(file);
+    setPreview(url);
     setError(null);
-    try {
-      setPhotoUrl(await uploadCoachPhoto(file));
-    } catch {
-      setError(ERROR_TEXT.photo_failed ?? 'Could not read that image.');
-    } finally {
-      setUploading(false);
-    }
   };
 
-  const onSubmit = () => {
-    const draft = { name, bio, photoUrl, isActive };
-    const res: SaveCoachResult = editing ? updateCoach(coach.id, draft) : createCoach(draft);
-    if (res.ok) onClose();
-    else setError(ERROR_TEXT[res.reason] ?? 'Could not save the coach.');
+  const onSubmit = async () => {
+    setSaving(true);
+    setError(null);
+    const draft = { name, bio, isActive };
+    const res: SaveCoachResult = editing
+      ? await updateCoach(coach.id, draft, photo)
+      : await createCoach(draft, photo);
+    if (res.ok) {
+      if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
+      onClose();
+      return;
+    }
+    setError(ERROR_TEXT[res.reason] ?? 'Could not save the coach.');
+    setSaving(false);
   };
 
   return (
@@ -67,15 +80,15 @@ export function CoachModal({ coach, onClose }: { coach?: Coach; onClose: () => v
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={onSubmit} disabled={name.trim() === '' || uploading}>
-            {editing ? 'Save coach' : 'Add coach'}
+          <Button onClick={() => void onSubmit()} disabled={name.trim() === '' || saving}>
+            {saving ? 'Saving…' : editing ? 'Save coach' : 'Add coach'}
           </Button>
         </>
       }
     >
       <div className={styles.body}>
         <div className={styles.photoRow}>
-          <Avatar name={name || 'Coach'} photoUrl={photoUrl} size={64} />
+          <Avatar name={name || 'Coach'} photoUrl={preview} size={64} />
           <div className={styles.photoActions}>
             <div className={styles.photoButtons}>
               <Button
@@ -83,15 +96,10 @@ export function CoachModal({ coach, onClose }: { coach?: Coach; onClose: () => v
                 variant="secondary"
                 icon={ImagePlus}
                 onClick={() => fileRef.current?.click()}
-                disabled={uploading}
+                disabled={saving}
               >
-                {uploading ? 'Uploading…' : photoUrl ? 'Change photo' : 'Upload photo'}
+                {preview ? 'Change photo' : 'Upload photo'}
               </Button>
-              {photoUrl ? (
-                <button type="button" className={styles.removeLink} onClick={() => setPhotoUrl(null)}>
-                  Remove
-                </button>
-              ) : null}
             </div>
             <span className={styles.photoHint}>PNG or JPG. Optional — no photo shows initials.</span>
           </div>
@@ -101,7 +109,7 @@ export function CoachModal({ coach, onClose }: { coach?: Coach; onClose: () => v
             accept="image/*"
             hidden
             onChange={(e) => {
-              void onPick(e.target.files?.[0]);
+              onPick(e.target.files?.[0]);
               e.target.value = ''; // allow re-picking the same file
             }}
           />

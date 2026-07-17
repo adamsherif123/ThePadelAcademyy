@@ -11,40 +11,35 @@ import {
 import type {
   CreditBatch,
   IsoInstant,
+  Package,
   Piastres,
   Purchase,
   SessionSlot,
   TrainingType,
 } from '@tpa/types';
 
-import { getBatches, getBookings, getPackages, getPurchases, getSlots } from './store';
-
 /**
- * Dashboard aggregates — pure functions of (…, now) over the store, so S11 can
- * move them server-side unchanged and they're unit-testable. Money stays in
- * integer piastres (formatted only at the edge, via @tpa/core). All date
- * bucketing is in Africa/Cairo: a UTC month/week boundary is 2–3 hours off and
- * would misfile purchases at the edges.
+ * Dashboard aggregates — pure functions of (fetched rows, …, now). S10b killed the
+ * store, so each takes the array it reads instead of a store getter; the logic is
+ * unchanged, so the KPIs are identical. Money stays in integer piastres (formatted
+ * only at the edge, via @tpa/core). All date bucketing is in Africa/Cairo: a UTC
+ * month/week boundary is 2–3 hours off and would misfile purchases at the edges.
  */
 
 const DAY_MS = 86_400_000;
 const ms = (i: IsoInstant): number => parseInstant(i).getTime();
 
-// Cairo week/day/midnight arithmetic lives in @tpa/core (cairoMidnight,
-// addCairoDays, cairoWeekStart) — the single canonical version. Only the
-// dashboard-specific month arithmetic stays local.
 function addMonths(d: CairoDate, delta: number): CairoDate {
-  const idx = (d.year * 12 + (d.month - 1)) + delta;
+  const idx = d.year * 12 + (d.month - 1) + delta;
   return { year: Math.floor(idx / 12), month: (idx % 12) + 1, day: 1 };
 }
 
-/** Cairo-midnight of the first day of `now`'s Cairo month. */
 const monthStart = (now: IsoInstant): IsoInstant => {
   const c = cairoCalendarDate(now);
   return cairoMidnight({ year: c.year, month: c.month, day: 1 });
 };
 
-const succeeded = (): Purchase[] => getPurchases().filter((p) => p.status === 'succeeded');
+const succeeded = (purchases: Purchase[]): Purchase[] => purchases.filter((p) => p.status === 'succeeded');
 const sumAmount = (purchases: readonly Purchase[]): Piastres =>
   purchases.reduce((s, p) => s + p.amount, 0) as Piastres;
 const inRange = (i: IsoInstant, startMs: number, endMs: number): boolean =>
@@ -54,16 +49,15 @@ const inRange = (i: IsoInstant, startMs: number, endMs: number): boolean =>
 export interface RevenueMonth {
   current: Piastres;
   previous: Piastres;
-  /** Signed % change vs last month, or null when last month had no revenue. */
   deltaPct: number | null;
 }
 
-export function revenueThisMonth(now: IsoInstant): RevenueMonth {
+export function revenueThisMonth(purchases: Purchase[], now: IsoInstant): RevenueMonth {
   const cThis = cairoCalendarDate(now);
   const start = ms(monthStart(now));
   const next = ms(cairoMidnight(addMonths({ year: cThis.year, month: cThis.month, day: 1 }, 1)));
   const prev = ms(cairoMidnight(addMonths({ year: cThis.year, month: cThis.month, day: 1 }, -1)));
-  const paid = succeeded();
+  const paid = succeeded(purchases);
   const current = sumAmount(paid.filter((p) => inRange(p.createdAt, start, next)));
   const previous = sumAmount(paid.filter((p) => inRange(p.createdAt, prev, start)));
   const deltaPct = previous === 0 ? null : Math.round(((current - previous) / previous) * 100);
@@ -71,68 +65,53 @@ export function revenueThisMonth(now: IsoInstant): RevenueMonth {
 }
 
 // --- KPI 2: active players (usable credit OR a booked/attended session) ---
-export function activePlayerCount(now: IsoInstant): number {
+export function activePlayerCount(batches: CreditBatch[], bookings: import('@tpa/types').Booking[], now: IsoInstant): number {
   const active = new Set<string>();
   const nowMs = ms(now);
-  for (const b of getBatches()) {
+  for (const b of batches) {
     if (b.quantityRemaining > 0 && ms(b.expiresAt) > nowMs) active.add(b.playerId);
   }
-  for (const bk of getBookings()) {
+  for (const bk of bookings) {
     if (bk.status === 'booked' || bk.status === 'attended') active.add(bk.playerId);
   }
   return active.size;
 }
 
-/** Published slots that start within `now`'s Cairo week (the academy runs Sun–Wed). */
-function slotsThisWeek(now: IsoInstant): SessionSlot[] {
+/** Published slots that start within `now`'s Cairo week. */
+function slotsThisWeek(slots: SessionSlot[], now: IsoInstant): SessionSlot[] {
   const start = ms(cairoWeekStart(now));
   const end = start + 7 * DAY_MS;
-  return getSlots().filter((s) => s.status === 'published' && inRange(s.startsAt, start, end));
+  return slots.filter((s) => s.status === 'published' && inRange(s.startsAt, start, end));
 }
 
 // --- KPI 3: sessions this week ---
-export const sessionsThisWeek = (now: IsoInstant): number => slotsThisWeek(now).length;
+export const sessionsThisWeek = (slots: SessionSlot[], now: IsoInstant): number =>
+  slotsThisWeek(slots, now).length;
 
 // --- KPI 4: slot fill rate (booked seats ÷ capacity), 0–100 integer ---
-export function slotFillRate(now: IsoInstant): number {
-  const week = slotsThisWeek(now);
+export function slotFillRate(slots: SessionSlot[], now: IsoInstant): number {
+  const week = slotsThisWeek(slots, now);
   const capacity = week.reduce((s, x) => s + x.capacity, 0);
   const booked = week.reduce((s, x) => s + x.bookedCount, 0);
   return capacity === 0 ? 0 : Math.round((booked / capacity) * 100);
 }
 
 // --- KPI 5: credit liability ("sold, not yet used") ---
-/**
- * Monetary value of the credits remaining in one purchased batch, derived from
- * what the player ACTUALLY PAID — `purchase.amount`, captured at purchase time —
- * and the batch's own `quantityTotal`, NEVER the live catalog. This is the
- * "repricing immunity" the schema (S5) designs for: editing a package's price in
- * S4e changes only future purchases, so a batch bought at the old price must keep
- * that old per-session value here. To stay in integer piastres with one rounding
- * step, multiply amount × remaining FIRST, then divide by quantityTotal, then round
- * to the NEAREST piastre — unbiased, error ≤ 0.5 piastre per batch. (Params kept
- * positionally identical to the old price/sessionCount form, which for any real
- * purchase equalled amount/quantityTotal.)
- */
 export function batchLiability(amountPaid: number, quantityTotal: number, remaining: number): Piastres {
   if (quantityTotal <= 0) return 0 as Piastres;
   return Math.round((amountPaid * remaining) / quantityTotal) as Piastres;
 }
 
-export function creditLiability(now: IsoInstant): Piastres {
+export function creditLiability(batches: CreditBatch[], purchases: Purchase[], now: IsoInstant): Piastres {
   const nowMs = ms(now);
-  const purchaseById = new Map(getPurchases().map((p) => [p.id, p]));
+  const purchaseById = new Map(purchases.map((p) => [p.id, p]));
   let total = 0;
-  for (const b of getBatches()) {
-    // Grants cost the player nothing → no financial liability. Only purchases count.
+  for (const b of batches) {
     if (b.source !== 'purchase') continue;
     if (b.quantityRemaining <= 0) continue;
-    // Expired credits are revenue the academy kept, not a liability.
     if (ms(b.expiresAt) <= nowMs) continue;
     const purchase = b.purchaseId ? purchaseById.get(b.purchaseId) : undefined;
-    if (!purchase) continue; // liability follows the captured purchase, not the package
-    // Captured amount + quantityTotal only — the live package is never read, so a
-    // later price edit cannot retroactively move this figure.
+    if (!purchase) continue;
     total += batchLiability(purchase.amount, b.quantityTotal, b.quantityRemaining);
   }
   return total as Piastres;
@@ -144,10 +123,10 @@ export interface TypeRevenue {
   amount: Piastres;
 }
 
-export function revenueByType(): { rows: TypeRevenue[]; total: Piastres } {
-  const pkgById = new Map(getPackages().map((p) => [p.id, p]));
+export function revenueByType(purchases: Purchase[], packages: Package[]): { rows: TypeRevenue[]; total: Piastres } {
+  const pkgById = new Map(packages.map((p) => [p.id, p]));
   const totals = new Map<TrainingType, number>();
-  for (const p of succeeded()) {
+  for (const p of succeeded(purchases)) {
     const pkg = pkgById.get(p.packageId);
     if (!pkg) continue;
     totals.set(pkg.trainingType, (totals.get(pkg.trainingType) ?? 0) + p.amount);
@@ -167,10 +146,10 @@ export interface WeekBucket {
   revenue: Piastres;
 }
 
-export function revenueOverTime(now: IsoInstant, weeks = 8): WeekBucket[] {
+export function revenueOverTime(purchases: Purchase[], now: IsoInstant, weeks = 8): WeekBucket[] {
   const sunday = cairoCalendarDate(cairoWeekStart(now));
   const base: CairoDate = { year: sunday.year, month: sunday.month, day: sunday.day };
-  const paid = succeeded();
+  const paid = succeeded(purchases);
   const buckets: WeekBucket[] = [];
   for (let w = weeks - 1; w >= 0; w -= 1) {
     const start = cairoMidnight(addCairoDays(base, -w * 7));
@@ -182,9 +161,9 @@ export function revenueOverTime(now: IsoInstant, weeks = 8): WeekBucket[] {
 }
 
 // --- Bottom card 1: today's sessions (Cairo), earliest first ---
-export function todaysSessions(now: IsoInstant): SessionSlot[] {
+export function todaysSessions(slots: SessionSlot[], now: IsoInstant): SessionSlot[] {
   const c = cairoCalendarDate(now);
-  return getSlots()
+  return slots
     .filter((s) => {
       if (s.status !== 'published') return false;
       const d = cairoCalendarDate(s.startsAt);
@@ -193,18 +172,18 @@ export function todaysSessions(now: IsoInstant): SessionSlot[] {
     .sort((a, b) => ms(a.startsAt) - ms(b.startsAt));
 }
 
-// --- Bottom card 2: credits expiring in the next `windowDays` (colour via creditExpiryState) ---
-export function creditsExpiringSoon(now: IsoInstant, windowDays = 7): CreditBatch[] {
+// --- Bottom card 2: credits expiring in the next `windowDays` ---
+export function creditsExpiringSoon(batches: CreditBatch[], now: IsoInstant, windowDays = 7): CreditBatch[] {
   const nowMs = ms(now);
   const horizon = nowMs + windowDays * DAY_MS;
-  return getBatches()
+  return batches
     .filter((b) => b.quantityRemaining > 0 && ms(b.expiresAt) > nowMs && ms(b.expiresAt) <= horizon)
     .sort((a, b) => ms(a.expiresAt) - ms(b.expiresAt));
 }
 
-// --- Bottom card 3: recent succeeded purchases, newest first (date-agnostic) ---
-export function recentPurchases(n = 4): Purchase[] {
-  return succeeded()
+// --- Bottom card 3: recent succeeded purchases, newest first ---
+export function recentPurchases(purchases: Purchase[], n = 4): Purchase[] {
+  return succeeded(purchases)
     .slice()
     .sort((a, b) => ms(b.createdAt) - ms(a.createdAt))
     .slice(0, n);

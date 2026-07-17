@@ -1,5 +1,5 @@
 import { cairoCalendarDate, formatInstantTime, formatMonthDay } from '@tpa/core';
-import type { CoachId, IsoInstant } from '@tpa/types';
+import type { AvailabilityTemplate, Coach, CoachId, IsoInstant, SessionSlot } from '@tpa/types';
 import { useState } from 'react';
 
 import { commitGeneration, generateSlots, type SkipReason } from '../data/generate';
@@ -33,13 +33,26 @@ const SKIP_ORDER: SkipReason[] = ['already_exists', 'coach_conflict', 'in_past']
  * in the past). Only on confirm are the slots written. Re-opening after a run shows
  * everything as "already on the calendar" — idempotency, made visible.
  */
-export function GenerateModal({ onClose }: { onClose: () => void }) {
+export function GenerateModal({
+  templates,
+  slots,
+  coaches,
+  onClose,
+}: {
+  templates: AvailabilityTemplate[];
+  slots: SessionSlot[];
+  coaches: Coach[];
+  onClose: () => void;
+}) {
   const { now } = useSession();
   const [fromDate, setFromDate] = useState(() => cairoDatePlus(now, 0));
   const [toDate, setToDate] = useState(() => cairoDatePlus(now, 14));
+  const [committing, setCommitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [createdCount, setCreatedCount] = useState<number | null>(null);
 
   const invalidRange = fromDate === '' || toDate === '' || toDate < fromDate;
-  const plan = invalidRange ? null : generateSlots({ fromDate, toDate }, now);
+  const plan = invalidRange ? null : generateSlots(templates, slots, { fromDate, toDate }, now);
 
   const created = plan?.toCreate ?? [];
   const days = new Set(created.map((p) => p.date)).size;
@@ -52,11 +65,49 @@ export function GenerateModal({ onClose }: { onClose: () => void }) {
     items: (plan?.skipped ?? []).filter((s) => s.reason === reason),
   })).filter((g) => g.items.length > 0);
 
-  const onCommit = () => {
+  const onCommit = async () => {
     if (!plan || plan.toCreate.length === 0) return;
-    commitGeneration(plan);
-    onClose();
+    setCommitting(true);
+    setError(null);
+    const res = await commitGeneration(plan);
+    setCommitting(false);
+    if (res.ok) {
+      setCreatedCount(res.count);
+    } else {
+      setError(
+        res.reason === 'coach_conflict'
+          ? 'The schedule changed since you previewed — refresh and try again.'
+          : 'Something went wrong. Please try again.',
+      );
+    }
   };
+
+  // After a successful commit, the calendar has the new slots — show the count and close.
+  if (createdCount !== null) {
+    return (
+      <Modal
+        open
+        onClose={onClose}
+        eyebrow="Schedule"
+        title="Slots generated"
+        footer={
+          <Button onClick={onClose}>Done</Button>
+        }
+      >
+        <div className={styles.body}>
+          <div className={styles.summary}>
+            <span className={styles.summaryNum}>{createdCount}</span>
+            <div>
+              <div className={styles.summaryText}>
+                session{createdCount === 1 ? '' : 's'} created
+              </div>
+              <div className={styles.summarySub}>They’re on the calendar now.</div>
+            </div>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal
@@ -69,8 +120,12 @@ export function GenerateModal({ onClose }: { onClose: () => void }) {
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={onCommit} disabled={!plan || created.length === 0}>
-            {created.length === 0 ? 'Nothing to create' : `Create ${created.length} session${created.length === 1 ? '' : 's'}`}
+          <Button onClick={() => void onCommit()} disabled={!plan || created.length === 0 || committing}>
+            {committing
+              ? 'Creating…'
+              : created.length === 0
+                ? 'Nothing to create'
+                : `Create ${created.length} session${created.length === 1 ? '' : 's'}`}
           </Button>
         </>
       }
@@ -86,6 +141,8 @@ export function GenerateModal({ onClose }: { onClose: () => void }) {
           <Input label="From" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
           <Input label="To" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
         </div>
+
+        {error ? <p className={styles.error}>{error}</p> : null}
 
         {invalidRange ? (
           <p className={styles.error}>Pick a valid date range — the end can’t be before the start.</p>
@@ -119,7 +176,7 @@ export function GenerateModal({ onClose }: { onClose: () => void }) {
                   {[...perCoach.entries()].map(([id, count]) => (
                     <span key={id} className={styles.coachChip}>
                       <span className={styles.coachChipNum}>{count}</span>
-                      {coachById(id)?.name ?? 'Coach'}
+                      {coachById(coaches, id)?.name ?? 'Coach'}
                     </span>
                   ))}
                 </div>
@@ -132,7 +189,7 @@ export function GenerateModal({ onClose }: { onClose: () => void }) {
                 <div className={styles.skips}>
                   {skipsByReason.map(({ reason, items }) => {
                     const eg = items[0]!;
-                    const egCoach = coachById(eg.template.coachId)?.name ?? 'Coach';
+                    const egCoach = coachById(coaches, eg.template.coachId)?.name ?? 'Coach';
                     const example =
                       reason === 'coach_conflict'
                         ? `${egCoach}, ${formatMonthDay(eg.startsAt)} ${formatInstantTime(eg.startsAt)}${eg.conflictWith ? ` overlaps ${formatInstantTime(eg.conflictWith)}` : ''}`

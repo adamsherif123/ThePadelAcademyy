@@ -1,9 +1,8 @@
-import type { CoachId, Piastres, SessionSlot, SlotId } from '@tpa/types';
+import type { Coach, CoachId, IsoInstant, Piastres, Player, PlayerId, SessionSlot, SlotId } from '@tpa/types';
 import { DollarSign, Gauge, Plus, Users } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 import { EventCard } from '../calendar/EventCard';
-import { allCoaches, allPlayers } from '../data/selectors';
 import {
   Avatar,
   Badge,
@@ -47,6 +46,22 @@ const DEMO_SLOT: SessionSlot = {
   templateId: null,
 };
 
+/** Self-contained fixtures so the dev gallery renders without live data. */
+const DEMO_COACH: Coach = {
+  id: 'co_mariam' as CoachId,
+  name: 'Mariam Hassan',
+  bio: 'Group and ladies-only specialist.',
+  photoUrl: null,
+  isActive: true,
+};
+
+const DEMO_PLAYERS: Player[] = [
+  { id: 'pl_rania' as PlayerId, name: 'Rania Adham', phone: '+20 100 111 2222', gender: 'ladies', level: 'intermediate', createdAt: '2026-01-04T09:00:00.000Z' as IsoInstant },
+  { id: 'pl_karim' as PlayerId, name: 'Karim Adel', phone: '+20 100 333 4444', gender: 'men', level: 'beginner', createdAt: '2026-02-11T09:00:00.000Z' as IsoInstant },
+  { id: 'pl_nour' as PlayerId, name: 'Nour El-Sayed', phone: '+20 100 555 6666', gender: 'ladies', level: 'adv_beginner', createdAt: '2026-03-20T09:00:00.000Z' as IsoInstant },
+  { id: 'pl_hany' as PlayerId, name: 'Hany Farouk', phone: '+20 100 777 8888', gender: 'men', level: 'intermediate', createdAt: '2026-04-02T09:00:00.000Z' as IsoInstant },
+];
+
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className={styles.section}>
@@ -69,8 +84,8 @@ export function Gallery() {
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
 
-  const coach = allCoaches()[0];
-  const players = allPlayers().slice(0, 4);
+  const coach = DEMO_COACH;
+  const players = DEMO_PLAYERS.slice(0, 4);
   const columns: readonly Column<PlayerRow>[] = [
     {
       key: 'player',
@@ -250,7 +265,7 @@ export function Gallery() {
       <Section title="PlayerSearch (reusable — search name/phone, trailing slot per row)">
         <div className={styles.pickerDemo}>
           <PlayerSearch
-            players={allPlayers()}
+            players={DEMO_PLAYERS}
             renderTrailing={(p) => (
               <Button size="sm" variant="secondary">
                 {p.gender === 'men' ? "Men's" : "Ladies'"}

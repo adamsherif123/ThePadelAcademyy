@@ -1,21 +1,24 @@
-import type { Coach, IsoInstant } from '@tpa/types';
+import type { Booking, Coach, IsoInstant, SessionSlot } from '@tpa/types';
 import { CalendarDays, Pencil, Plus, Star, Users } from 'lucide-react';
 import { useState } from 'react';
 
 import { CoachModal } from '../coaches/CoachModal';
 import { coachWeekStats } from '../data/coaches';
-import { allCoaches } from '../data/selectors';
-import { useAdminStore } from '../data/store';
+import { useAdminData } from '../data/queries';
 import { useSession } from '../session/SessionProvider';
-import { Avatar, Badge, Button, PageHeader, TRAINING_LABEL } from '../ui';
+import { Avatar, Badge, Button, ErrorView, LoadingView, PageHeader, TRAINING_LABEL } from '../ui';
 import styles from './Coaches.module.css';
 
-/** Coaches route: one card per coach with store-computed stats + add/edit. */
+/** Coaches route: one card per coach with query-computed stats + add/edit. */
 export function Coaches() {
-  useAdminStore(); // re-render after a coach or template mutation
   const { now } = useSession();
-  const coaches = allCoaches();
+  const data = useAdminData();
   const [editing, setEditing] = useState<Coach | 'new' | null>(null);
+
+  if (data.isPending) return <LoadingView />;
+  if (data.isError) return <ErrorView onRetry={data.refetch} />;
+
+  const coaches = data.coaches;
 
   return (
     <div>
@@ -32,7 +35,14 @@ export function Coaches() {
 
       <div className={styles.grid}>
         {coaches.map((coach) => (
-          <CoachCard key={coach.id} coach={coach} now={now} onEdit={() => setEditing(coach)} />
+          <CoachCard
+            key={coach.id}
+            coach={coach}
+            slots={data.slots}
+            bookings={data.bookings}
+            now={now}
+            onEdit={() => setEditing(coach)}
+          />
         ))}
       </div>
 
@@ -43,8 +53,20 @@ export function Coaches() {
   );
 }
 
-function CoachCard({ coach, now, onEdit }: { coach: Coach; now: IsoInstant; onEdit: () => void }) {
-  const stats = coachWeekStats(coach.id, now);
+function CoachCard({
+  coach,
+  slots,
+  bookings,
+  now,
+  onEdit,
+}: {
+  coach: Coach;
+  slots: SessionSlot[];
+  bookings: Booking[];
+  now: IsoInstant;
+  onEdit: () => void;
+}) {
+  const stats = coachWeekStats(slots, bookings, coach.id, now);
 
   return (
     <div className={styles.card} data-inactive={!coach.isActive}>

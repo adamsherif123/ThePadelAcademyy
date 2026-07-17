@@ -1,6 +1,9 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
+
+import { queryClient } from './lib/queryClient';
 
 // Self-hosted Inter (no external request, no layout shift). Only the weights the
 // theme uses — regular…extrabold. 900/black was deleted in S3e.2; don't ship it.
@@ -22,10 +25,12 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <BrowserRouter>
-      <SessionProvider>
-        <App />
-      </SessionProvider>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <SessionProvider>
+          <App />
+        </SessionProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   </StrictMode>,
 );

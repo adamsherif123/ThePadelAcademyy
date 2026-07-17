@@ -18,8 +18,10 @@ import type {
   Weekday,
 } from '@tpa/types';
 
+import { insertSlots } from '../lib/api';
+import { TOUCHED } from '../lib/queryClient';
+import { runWrite } from './queries';
 import { findCoachConflict } from './schedule';
-import { commitNewSlots, getSlots, getTemplates } from './store';
 
 /**
  * "Generate slots" — the most consequential action in the admin — as a PURE,
@@ -138,9 +140,13 @@ function eachDate(range: GenerateRange): { date: CairoDate; weekday: Weekday }[]
  * Only active templates are considered, and a weekday only has active templates on
  * "open" days, so "open days only" falls out for free.
  */
-export function generateSlots(range: GenerateRange, now: IsoInstant): GenerationPlan {
-  const templates = getTemplates().filter((t) => t.isActive);
-  const existing = getSlots();
+export function generateSlots(
+  allTemplates: AvailabilityTemplate[],
+  existing: SessionSlot[],
+  range: GenerateRange,
+  now: IsoInstant,
+): GenerationPlan {
+  const templates = allTemplates.filter((t) => t.isActive);
   const existingKeys = new Set(existing.map(slotIdentityKey).filter((k): k is string => k !== null));
   const nowMs = ms(now);
 
@@ -161,7 +167,7 @@ export function generateSlots(range: GenerateRange, now: IsoInstant): Generation
         skipped.push({ ...base, reason: 'in_past' });
         continue;
       }
-      const clashExisting = findCoachConflict(template.coachId, startsAt, endsAt, 'sl_generate_probe' as SlotId);
+      const clashExisting = findCoachConflict(existing, template.coachId, startsAt, endsAt, 'sl_generate_probe' as SlotId);
       const clashPlanned = clashExisting
         ? undefined
         : toCreate.find(
@@ -196,10 +202,22 @@ export function generateSlots(range: GenerateRange, now: IsoInstant): Generation
   return { range, toCreate, skipped };
 }
 
-/** Commit a plan's new slots in one additive write. Returns how many were created. */
-export function commitGeneration(plan: GenerationPlan): number {
-  commitNewSlots(plan.toCreate.map((p) => p.slot));
-  return plan.toCreate.length;
+export type CommitGenerationResult =
+  | { ok: true; count: number }
+  | { ok: false; reason: 'coach_conflict' | 'network' };
+
+/**
+ * Commit a plan's new slots as ONE all-or-nothing bulk INSERT. The plan already
+ * excluded conflicts (the preview), so a 23P01 here means the schedule CHANGED since
+ * the admin previewed (a race or a stale preview) — we surface 'coach_conflict' and
+ * let them re-preview (a fresh plan skips the now-existing slots). All-or-nothing is
+ * the safe default: the admin reviewed the batch as a unit, so we don't want to land
+ * a partial calendar they never saw.
+ */
+export async function commitGeneration(plan: GenerationPlan): Promise<CommitGenerationResult> {
+  if (plan.toCreate.length === 0) return { ok: true, count: 0 };
+  const res = await runWrite(() => insertSlots(plan.toCreate.map((p) => p.slot)), TOUCHED.slots);
+  return res.ok ? { ok: true, count: res.value } : { ok: false, reason: res.reason };
 }
 
 /**
@@ -223,10 +241,12 @@ export type OneOffResult =
   | { ok: true; slot: SessionSlot }
   | {
       ok: false;
-      reason: 'end_before_start' | 'in_past' | 'capacity_below_one' | 'group_requires_gender_level';
+      reason:
+        | 'end_before_start' | 'in_past' | 'capacity_below_one'
+        | 'group_requires_gender_level' | 'coach_conflict' | 'network';
     };
 
-export function createOneOffSlot(draft: OneOffDraft, now: IsoInstant): OneOffResult {
+export async function createOneOffSlot(draft: OneOffDraft, now: IsoInstant): Promise<OneOffResult> {
   if (ms(draft.endsAt) <= ms(draft.startsAt)) return { ok: false, reason: 'end_before_start' };
   if (ms(draft.startsAt) <= ms(now)) return { ok: false, reason: 'in_past' };
   if (draft.capacity < 1) return { ok: false, reason: 'capacity_below_one' };
@@ -249,6 +269,7 @@ export function createOneOffSlot(draft: OneOffDraft, now: IsoInstant): OneOffRes
     status: 'published',
     templateId: null,
   };
-  commitNewSlots([slot]);
-  return { ok: true, slot };
+  // The DB EXCLUDE constraint is the real coach-overlap guard (the modal only warns).
+  const res = await runWrite(() => insertSlots([slot]), TOUCHED.slots);
+  return res.ok ? { ok: true, slot } : { ok: false, reason: res.reason };
 }

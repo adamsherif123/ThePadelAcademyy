@@ -1,12 +1,24 @@
-import type { Gender, IsoInstant, Level, Player, PlayerId, Purchase } from '@tpa/types';
+import type {
+  Booking,
+  CreditBatch,
+  Gender,
+  IsoInstant,
+  Level,
+  Player,
+  PlayerId,
+  Purchase,
+  SessionSlot,
+} from '@tpa/types';
 
 import { usableCreditFor } from './selectors';
-import { commitPlayerSave, getBatches, getBookings, getPlayers, getPurchases, getSlots } from './store';
 
 /**
- * Player selectors + the profile-edit seam. Pure reads over the store; S10 swaps
- * the store internals for Supabase unchanged. The profile write is is_admin-gated
- * config (not money), so S10 replaces it with a plain UPDATE.
+ * Player read selectors (pure, over fetched rows). NOTE: editing another player's
+ * profile is intentionally NOT wired in S10b — the only players UPDATE policy is
+ * `players_update_self` (a player edits their OWN row); there is no admin-edit-other
+ * policy, and Task 4 doesn't list a player-edit write. So updatePlayerProfile below
+ * is a no-op stub that reports `not_supported`; the admin can grant credits and
+ * manage bookings, but not rewrite a player's name/gender/level from here.
  */
 
 const ms = (i: IsoInstant): number => new Date(i).getTime();
@@ -20,22 +32,22 @@ export interface CreditBreakdown {
 }
 
 /** The G · D · I usable-credit breakdown shown on the Players list. */
-export function creditBreakdown(playerId: PlayerId, now: IsoInstant): CreditBreakdown {
-  const group = usableCreditFor(playerId, 'group', now);
-  const duo = usableCreditFor(playerId, 'duo', now);
-  const individual = usableCreditFor(playerId, 'individual', now);
+export function creditBreakdown(batches: CreditBatch[], playerId: PlayerId, now: IsoInstant): CreditBreakdown {
+  const group = usableCreditFor(batches, playerId, 'group', now);
+  const duo = usableCreditFor(batches, playerId, 'duo', now);
+  const individual = usableCreditFor(batches, playerId, 'individual', now);
   return { total: group + duo + individual, group, duo, individual };
 }
 
 /** Every credit batch a player holds, newest first (for the wallet in player detail). */
-export const batchesForPlayerSorted = (playerId: PlayerId) =>
-  getBatches()
+export const batchesForPlayerSorted = (batches: CreditBatch[], playerId: PlayerId) =>
+  batches
     .filter((b) => b.playerId === playerId)
     .sort((a, b) => ms(b.createdAt) - ms(a.createdAt));
 
 /** A player's purchases, newest first (for purchase history). */
-export const purchasesForPlayer = (playerId: PlayerId): Purchase[] =>
-  getPurchases()
+export const purchasesForPlayer = (purchases: Purchase[], playerId: PlayerId): Purchase[] =>
+  purchases
     .filter((p) => p.playerId === playerId)
     .sort((a, b) => ms(b.createdAt) - ms(a.createdAt));
 
@@ -45,12 +57,14 @@ export const purchasesForPlayer = (playerId: PlayerId): Purchase[] =>
  * change is made with eyes open. The bookings themselves are never touched.
  */
 export function mismatchedActiveBookings(
+  bookings: Booking[],
+  slots: SessionSlot[],
   playerId: PlayerId,
   gender: Gender,
   level: Level,
 ): number {
-  const slotById = new Map(getSlots().map((s) => [s.id, s]));
-  return getBookings().filter((b) => {
+  const slotById = new Map(slots.map((s) => [s.id, s]));
+  return bookings.filter((b) => {
     if (b.playerId !== playerId || b.status !== 'booked') return false;
     const slot = slotById.get(b.slotId);
     if (!slot || slot.trainingType !== 'group') return false;
@@ -68,27 +82,17 @@ export interface PlayerProfilePatch {
 
 export type UpdatePlayerResult =
   | { ok: true; player: Player }
-  | { ok: false; reason: 'player_missing' | 'name_required' | 'phone_required' };
+  | { ok: false; reason: 'not_supported' };
 
 /**
- * Edit a player's profile. Gender/level are editable — a player mis-signed-up, or
- * got re-assessed — and this changes which group slots they SEE going forward. It
- * does NOT touch bookings they already hold: a seat already taken (credit already
- * spent) stays valid even if the slot no longer matches the new profile. The UI
- * surfaces mismatchedActiveBookings so the owner sees that before saving.
+ * NOT wired in S10b: there is no admin policy to UPDATE another player's row (only
+ * `players_update_self`), and Task 4 doesn't include a player-edit write — so this
+ * reports `not_supported` rather than silently doing nothing or reaching for a
+ * privilege the RLS design withholds. If the academy later needs admin profile
+ * edits, it's a new column-scoped policy + an RPC, not a client workaround.
  */
 export function updatePlayerProfile(playerId: PlayerId, patch: PlayerProfilePatch): UpdatePlayerResult {
-  const current = getPlayers().find((p) => p.id === playerId);
-  if (!current) return { ok: false, reason: 'player_missing' };
-  if (patch.name.trim() === '') return { ok: false, reason: 'name_required' };
-  if (patch.phone.trim() === '') return { ok: false, reason: 'phone_required' };
-  const updated: Player = {
-    ...current,
-    name: patch.name.trim(),
-    phone: patch.phone.trim(),
-    gender: patch.gender,
-    level: patch.level,
-  };
-  commitPlayerSave(updated);
-  return { ok: true, player: updated };
+  void playerId;
+  void patch;
+  return { ok: false, reason: 'not_supported' };
 }

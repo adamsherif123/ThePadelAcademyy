@@ -7,10 +7,9 @@ import {
   parseInstant,
   type CairoDate,
 } from '@tpa/core';
-import type { CoachId, IsoInstant, SessionSlot, SlotId, Weekday } from '@tpa/types';
+import type { AvailabilityTemplate, CoachId, IsoInstant, SessionSlot, SlotId, Weekday } from '@tpa/types';
 
 import { assignLanes } from './lanes';
-import { getSlots, getTemplates } from './store';
 
 /**
  * Week-calendar selectors — pure, Cairo-correct (a UTC grid would shift every
@@ -33,9 +32,9 @@ export function cairoWallMinutes(instant: IsoInstant): number {
  * availability data, never hardcoded (the same rule the client app's date strip
  * uses). Add a Thursday template and Thursday opens with no code change.
  */
-export function closedWeekdays(): Set<Weekday> {
+export function closedWeekdays(templates: AvailabilityTemplate[]): Set<Weekday> {
   const open = new Set<Weekday>();
-  for (const t of getTemplates()) if (t.isActive) open.add(t.weekday);
+  for (const t of templates) if (t.isActive) open.add(t.weekday);
   return new Set(([0, 1, 2, 3, 4, 5, 6] as Weekday[]).filter((w) => !open.has(w)));
 }
 
@@ -50,10 +49,10 @@ export interface DayColumn {
 }
 
 /** The 7 Sun–Sat columns of the week `weekOffset` weeks from now's Cairo week. */
-export function weekColumns(now: IsoInstant, weekOffset: number): DayColumn[] {
+export function weekColumns(templates: AvailabilityTemplate[], now: IsoInstant, weekOffset: number): DayColumn[] {
   const c = cairoCalendarDate(now);
   const sunday = addCairoDays({ year: c.year, month: c.month, day: c.day }, -c.weekday + weekOffset * 7);
-  const closed = closedWeekdays();
+  const closed = closedWeekdays(templates);
   return Array.from({ length: 7 }, (_, i) => {
     const date = addCairoDays(sunday, i);
     const isToday = date.year === c.year && date.month === c.month && date.day === c.day && weekOffset === 0;
@@ -68,17 +67,17 @@ export function weekColumns(now: IsoInstant, weekOffset: number): DayColumn[] {
 }
 
 /** Published slots that start on the Cairo day beginning at `dayStart`, earliest first. */
-export function slotsForDay(dayStart: IsoInstant): SessionSlot[] {
+export function slotsForDay(slots: SessionSlot[], dayStart: IsoInstant): SessionSlot[] {
   const start = ms(dayStart);
   const end = start + DAY_MS;
-  return getSlots()
+  return slots
     .filter((s) => s.status === 'published' && ms(s.startsAt) >= start && ms(s.startsAt) < end)
     .sort((a, b) => ms(a.startsAt) - ms(b.startsAt));
 }
 
 /** How many published slots fall in the given columns — for the empty-week state. */
-export function weekHasSlots(columns: readonly DayColumn[]): boolean {
-  return columns.some((col) => slotsForDay(col.dayStart).length > 0);
+export function weekHasSlots(slots: SessionSlot[], columns: readonly DayColumn[]): boolean {
+  return columns.some((col) => slotsForDay(slots, col.dayStart).length > 0);
 }
 
 /**
@@ -114,6 +113,7 @@ export function slotTimesFromWall(
  * app-level detection; the durable fix is a DB EXCLUDE constraint (see report).
  */
 export function findCoachConflict(
+  slots: SessionSlot[],
   coachId: CoachId,
   startsAt: IsoInstant,
   endsAt: IsoInstant,
@@ -121,7 +121,7 @@ export function findCoachConflict(
 ): SessionSlot | undefined {
   const s = parseInstant(startsAt).getTime();
   const e = parseInstant(endsAt).getTime();
-  return getSlots().find(
+  return slots.find(
     (slot) =>
       slot.id !== excludeSlotId &&
       slot.coachId === coachId &&
@@ -141,11 +141,11 @@ const MIDNIGHT = 24 * 60;
  * instead of being clamped to an edge. Deriving is more robust than a fixed range
  * that merely happens to fit today's data.
  */
-export function weekTimeRange(columns: readonly DayColumn[]): { startMin: number; endMin: number } {
+export function weekTimeRange(slots: SessionSlot[], columns: readonly DayColumn[]): { startMin: number; endMin: number } {
   let startMin = NOON;
   let endMin = MIDNIGHT;
   for (const col of columns) {
-    for (const s of slotsForDay(col.dayStart)) {
+    for (const s of slotsForDay(slots, col.dayStart)) {
       startMin = Math.min(startMin, cairoWallMinutes(s.startsAt));
       endMin = Math.max(endMin, cairoWallMinutes(s.endsAt));
     }

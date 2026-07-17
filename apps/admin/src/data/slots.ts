@@ -1,21 +1,18 @@
 import { parseInstant } from '@tpa/core';
 import type { CoachId, IsoInstant, SessionSlot, SlotId } from '@tpa/types';
 
-import { commitSlotUpdate, getSlots } from './store';
+import { updateSlot } from '../lib/api';
+import { TOUCHED } from '../lib/queryClient';
+import { runWrite } from './queries';
 
 /**
- * Edit a slot — coach, capacity, and start/end time — in one "edit this slot"
- * seam (S10 replaces the body). It re-validates EVERYTHING, since a seam never
- * trusts its caller:
- *  - capacity below the current bookedCount is impossible (can't seat fewer than
- *    are already booked);
- *  - end must be after start;
- *  - the start can't be MOVED into the past (a session can't have already happened
- *    at a time you just chose); an unchanged start that's already past is fine —
- *    editing a past session's coach isn't rescheduling it.
- * Coach overlap is deliberately NOT enforced here (warn, don't block — see report).
- * Rescheduling changes only the slot's fields; bookings and bookedCount are left
- * untouched, so moving a session never silently drops anyone.
+ * Edit a slot — coach, capacity, start/end time — via the column-limited UPDATE
+ * (coach_id, capacity, starts_at, ends_at, status only; booked_count is not
+ * grantable, by design). Client re-validation stays (a seam never trusts its
+ * caller): capacity can't drop below the seats already booked, end must follow
+ * start, and a start can't be MOVED into the past. Coach overlap is NOT blocked here
+ * (warn, don't block) — but the DB EXCLUDE constraint is the real guard, so a
+ * reschedule that collides returns 'coach_conflict' (23P01) instead of a raw error.
  */
 export interface SlotEdit {
   coachId: CoachId;
@@ -26,11 +23,13 @@ export interface SlotEdit {
 
 export type UpdateSlotResult =
   | { ok: true; slot: SessionSlot }
-  | { ok: false; reason: 'slot_missing' | 'capacity_below_booked' | 'end_before_start' | 'in_past' };
+  | { ok: false; reason: 'capacity_below_booked' | 'end_before_start' | 'in_past' | 'coach_conflict' | 'network' };
 
-export function updateSlotDetails(slotId: SlotId, edit: SlotEdit, now: IsoInstant): UpdateSlotResult {
-  const slot = getSlots().find((s) => s.id === slotId);
-  if (!slot) return { ok: false, reason: 'slot_missing' };
+export async function updateSlotDetails(
+  slot: SessionSlot,
+  edit: SlotEdit,
+  now: IsoInstant,
+): Promise<UpdateSlotResult> {
   if (edit.capacity < slot.bookedCount) return { ok: false, reason: 'capacity_below_booked' };
   if (parseInstant(edit.endsAt).getTime() <= parseInstant(edit.startsAt).getTime()) {
     return { ok: false, reason: 'end_before_start' };
@@ -39,13 +38,12 @@ export function updateSlotDetails(slotId: SlotId, edit: SlotEdit, now: IsoInstan
   if (startMoved && parseInstant(edit.startsAt).getTime() <= parseInstant(now).getTime()) {
     return { ok: false, reason: 'in_past' };
   }
-  const updated: SessionSlot = {
-    ...slot,
-    coachId: edit.coachId,
-    capacity: edit.capacity,
-    startsAt: edit.startsAt,
-    endsAt: edit.endsAt,
-  };
-  commitSlotUpdate(updated); // bookedCount + bookings untouched — the slot just moves
-  return { ok: true, slot: updated };
+  const res = await runWrite(
+    () => updateSlot(slot.id, { coachId: edit.coachId, capacity: edit.capacity, startsAt: edit.startsAt, endsAt: edit.endsAt }),
+    TOUCHED.slots,
+  );
+  return res.ok ? { ok: true, slot: res.value } : { ok: false, reason: res.reason };
 }
+
+/** Re-export the slot id type callers used from here. */
+export type { SlotId };

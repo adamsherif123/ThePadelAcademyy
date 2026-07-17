@@ -10,16 +10,20 @@ import {
   perSessionPrice,
   setPackageSellable,
 } from '../data/packages';
-import { useAdminStore } from '../data/store';
+import { useAdminData } from '../data/queries';
 import { PackageModal } from '../packages/PackageModal';
-import { Button, PageHeader, Toggle, TRAINING_LABEL, TYPE_PLAYERS } from '../ui';
+import { Button, ErrorView, LoadingView, PageHeader, Toggle, TRAINING_LABEL, TYPE_PLAYERS } from '../ui';
 import styles from './Packages.module.css';
 
 /** Packages route: catalog stats, a section per training type, and package CRUD. */
 export function Packages() {
-  useAdminStore(); // re-render after a package mutation
-  const stats = catalogStats();
+  const data = useAdminData();
   const [editing, setEditing] = useState<Package | 'new' | null>(null);
+
+  if (data.isPending) return <LoadingView />;
+  if (data.isError) return <ErrorView onRetry={data.refetch} />;
+
+  const stats = catalogStats(data.packages);
 
   return (
     <div>
@@ -48,7 +52,7 @@ export function Packages() {
       </div>
 
       {SELLABLE_TYPES.map((type) => {
-        const list = packagesForType(type);
+        const list = packagesForType(data.packages, type);
         if (list.length === 0) return null;
         return (
           <section key={type} className={styles.section}>
@@ -114,7 +118,7 @@ function PackageCard({ pkg, onEdit }: { pkg: Package; onEdit: () => void }) {
           </button>
           <Toggle
             checked={pkg.isActive}
-            onChange={(v) => setPackageSellable(pkg.id, v)}
+            onChange={(v) => void setPackageSellable(pkg.id, v)}
             label={`${pkg.name} sellable`}
           />
         </div>

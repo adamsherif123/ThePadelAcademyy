@@ -1,5 +1,5 @@
 import { cairoWallTimeToInstant, formatInstantTime, formatMonthDay } from '@tpa/core';
-import type { SessionSlot } from '@tpa/types';
+import type { AvailabilityTemplate, Coach, SessionSlot } from '@tpa/types';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
@@ -15,6 +15,9 @@ const OPEN_MIN = 17 * 60; // 5 PM — default the scroll here so the normal view
 export function WeekCalendar({
   now,
   weekOffset,
+  templates,
+  slots,
+  coaches,
   onPrevWeek,
   onNextWeek,
   onSlotClick,
@@ -22,18 +25,21 @@ export function WeekCalendar({
 }: {
   now: SessionSlot['startsAt'];
   weekOffset: number;
+  templates: AvailabilityTemplate[];
+  slots: SessionSlot[];
+  coaches: Coach[];
   onPrevWeek: () => void;
   onNextWeek: () => void;
   onSlotClick: (slot: SessionSlot) => void;
   onAddOneOff: () => void;
 }) {
-  const columns = weekColumns(now, weekOffset);
+  const columns = weekColumns(templates, now, weekOffset);
   const first = columns[0]!;
   const last = columns[6]!;
   const rangeLabel = `${formatMonthDay(first.dayStart)} – ${formatMonthDay(last.dayStart)}, ${last.date.year}`;
-  const hasSlots = weekHasSlots(columns);
+  const hasSlots = weekHasSlots(slots, columns);
 
-  const { startMin, endMin } = weekTimeRange(columns);
+  const { startMin, endMin } = weekTimeRange(slots, columns);
   const gridPx = ((endMin - startMin) / 60) * HOUR_PX;
   const hours = Array.from({ length: (endMin - startMin) / 60 }, (_, i) => startMin + i * 60);
 
@@ -109,10 +115,11 @@ export function WeekCalendar({
                     <span className={styles.closedLabel}>CLOSED</span>
                   </div>
                 ) : (
-                  layoutDay(slotsForDay(col.dayStart), startMin, HOUR_PX, gridPx).map((p) => (
+                  layoutDay(slotsForDay(slots, col.dayStart), startMin, HOUR_PX, gridPx).map((p) => (
                     <EventCard
                       key={p.slot.id}
                       slot={p.slot}
+                      coaches={coaches}
                       lanes={p.lanes}
                       style={{
                         top: p.top,

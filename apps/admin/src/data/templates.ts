@@ -7,59 +7,49 @@ import {
 } from '@tpa/core';
 import type { AvailabilityTemplate, AvailabilityTemplateId } from '@tpa/types';
 
-import { commitTemplateDelete, commitTemplateSave, getTemplates } from './store';
+import { deleteTemplate as deleteTemplateApi, insertTemplate, updateTemplate as updateTemplateApi } from '../lib/api';
+import { TOUCHED } from '../lib/queryClient';
+import { runWrite } from './queries';
 
 /**
- * The availability-template CRUD seam. Every write goes through @tpa/core's
- * buildAvailabilityTemplate, which validates and normalizes the draft so a row
- * that would fail the DB's gender/level CHECK can never be committed. S10 replaces
- * these bodies with INSERT/UPDATE/DELETE (or one RPC); the screens don't change.
+ * Availability-template CRUD. @tpa/core's buildAvailabilityTemplate still validates
+ * + normalizes the draft client-side (so a row that would fail the DB's gender/level
+ * CHECK is caught early); the write itself is an is_admin()-gated INSERT/UPDATE/DELETE
+ * (config, not money → no RPC). Never throws — returns a result.
  */
-
 export type SaveTemplateResult =
   | { ok: true; template: AvailabilityTemplate }
-  | { ok: false; reason: TemplateInvalidReason | 'template_missing' };
+  | { ok: false; reason: TemplateInvalidReason | 'template_missing' | 'network' };
 
-/** Create a new template with a fresh id. */
-export function createTemplate(draft: TemplateDraft): SaveTemplateResult {
-  const built = buildAvailabilityTemplate(
-    newId(ID_PREFIXES.availabilityTemplate) as AvailabilityTemplateId,
-    draft,
-  );
-  if (!built.ok) return built;
-  commitTemplateSave(built.template);
-  return built;
+function fields(t: AvailabilityTemplate) {
+  return {
+    coachId: t.coachId, weekday: t.weekday, startTime: t.startTime, endTime: t.endTime,
+    trainingType: t.trainingType, capacity: t.capacity, gender: t.gender, level: t.level, isActive: t.isActive,
+  };
 }
 
-/** Edit an existing template IN PLACE (id preserved → its generated slots stay linked). */
-export function updateTemplate(id: AvailabilityTemplateId, draft: TemplateDraft): SaveTemplateResult {
-  if (!getTemplates().some((t) => t.id === id)) return { ok: false, reason: 'template_missing' };
+export async function createTemplate(draft: TemplateDraft): Promise<SaveTemplateResult> {
+  const built = buildAvailabilityTemplate(newId(ID_PREFIXES.availabilityTemplate) as AvailabilityTemplateId, draft);
+  if (!built.ok) return built;
+  const res = await runWrite(() => insertTemplate(fields(built.template)), TOUCHED.templates);
+  return res.ok ? { ok: true, template: res.value } : { ok: false, reason: 'network' };
+}
+
+export async function updateTemplate(id: AvailabilityTemplateId, draft: TemplateDraft): Promise<SaveTemplateResult> {
   const built = buildAvailabilityTemplate(id, draft);
   if (!built.ok) return built;
-  commitTemplateSave(built.template);
-  return built;
+  const res = await runWrite(() => updateTemplateApi(id, fields(built.template)), TOUCHED.templates);
+  return res.ok ? { ok: true, template: res.value } : { ok: false, reason: 'network' };
 }
 
-/**
- * Pause or resume a rule. Pausing stops it from generating FUTURE slots; resuming
- * lets it generate again. Already-generated sessions are never touched either way —
- * this is the safe, reversible alternative to deleting.
- */
-export function setTemplateActive(id: AvailabilityTemplateId, isActive: boolean): SaveTemplateResult {
-  const current = getTemplates().find((t) => t.id === id);
-  if (!current) return { ok: false, reason: 'template_missing' };
-  const updated = { ...current, isActive };
-  commitTemplateSave(updated);
-  return { ok: true, template: updated };
+/** Pause/resume a rule (stops/starts FUTURE generation; existing sessions untouched). */
+export async function setTemplateActive(id: AvailabilityTemplateId, isActive: boolean): Promise<SaveTemplateResult> {
+  const res = await runWrite(() => updateTemplateApi(id, { isActive }), TOUCHED.templates);
+  return res.ok ? { ok: true, template: res.value } : { ok: false, reason: 'network' };
 }
 
-/**
- * Delete a rule entirely. The sessions it already generated remain on the calendar
- * (see the report on delete-vs-deactivate) — deletion only removes the recurring
- * rule, never a scheduled or booked session.
- */
-export function deleteTemplate(id: AvailabilityTemplateId): { ok: boolean } {
-  if (!getTemplates().some((t) => t.id === id)) return { ok: false };
-  commitTemplateDelete(id);
-  return { ok: true };
+/** Delete a rule; its already-generated sessions stay on the calendar. */
+export async function deleteTemplate(id: AvailabilityTemplateId): Promise<{ ok: boolean }> {
+  const res = await runWrite(() => deleteTemplateApi(id), TOUCHED.templates);
+  return { ok: res.ok };
 }

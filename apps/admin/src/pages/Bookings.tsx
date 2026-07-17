@@ -3,10 +3,12 @@ import type { BookingStatus, Player, TrainingType } from '@tpa/types';
 import { useMemo, useState } from 'react';
 
 import { bookingRows, bookingStatusCounts, type BookingRow } from '../data/bookingList';
-import { useAdminStore } from '../data/store';
+import { useAdminData } from '../data/queries';
 import { PlayerDetailModal } from '../players/PlayerDetailModal';
 import {
   Avatar,
+  ErrorView,
+  LoadingView,
   PageHeader,
   SearchInput,
   Select,
@@ -30,14 +32,14 @@ const STATUS_LABEL: Record<BookingStatus, string> = {
 
 /** Bookings route: count cards + filters + the all-bookings table. */
 export function Bookings() {
-  useAdminStore();
+  const data = useAdminData();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
   const [type, setType] = useState<TypeFilter>('all');
   const [selected, setSelected] = useState<Player | null>(null);
 
-  const counts = bookingStatusCounts();
-  const rows = bookingRows();
+  const counts = bookingStatusCounts(data.bookings);
+  const rows = bookingRows(data.bookings, data.slots, data.players, data.coaches);
   const anyBookings = rows.length > 0;
 
   const filtered = useMemo(() => {
@@ -49,6 +51,9 @@ export function Bookings() {
       return (r.player?.name.toLowerCase().includes(q) ?? false) || (r.coach?.name.toLowerCase().includes(q) ?? false);
     });
   }, [rows, query, status, type]);
+
+  if (data.isPending) return <LoadingView />;
+  if (data.isError) return <ErrorView onRetry={data.refetch} />;
 
   const columns: Column<BookingRow>[] = [
     {
@@ -134,7 +139,18 @@ export function Bookings() {
         </div>
       )}
 
-      {selected ? <PlayerDetailModal player={selected} onClose={() => setSelected(null)} /> : null}
+      {selected ? (
+        <PlayerDetailModal
+          player={selected}
+          batches={data.batches}
+          purchases={data.purchases}
+          bookings={data.bookings}
+          slots={data.slots}
+          coaches={data.coaches}
+          packages={data.packages}
+          onClose={() => setSelected(null)}
+        />
+      ) : null}
     </div>
   );
 }

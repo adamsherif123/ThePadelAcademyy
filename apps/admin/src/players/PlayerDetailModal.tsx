@@ -6,6 +6,9 @@ import {
   formatPiastres,
 } from '@tpa/core';
 import type {
+  Booking,
+  Coach,
+  CreditBatch,
   CreditSource,
   Gender,
   IsoInstant,
@@ -15,6 +18,8 @@ import type {
   PaymentMethod,
   Piastres,
   Player,
+  Purchase,
+  SessionSlot,
   TrainingType,
 } from '@tpa/types';
 import { AlertTriangle, ArrowLeft, Banknote, Gift, Pencil } from 'lucide-react';
@@ -27,10 +32,8 @@ import {
   batchesForPlayerSorted,
   mismatchedActiveBookings,
   purchasesForPlayer,
-  updatePlayerProfile,
 } from '../data/players';
-import { allPackages, bookingsForPlayer, coachById, packageById, slotById } from '../data/selectors';
-import { useAdminStore } from '../data/store';
+import { bookingsForPlayer, coachById, packageById, slotById } from '../data/selectors';
 import { useSession } from '../session/SessionProvider';
 import {
   Avatar,
@@ -57,7 +60,39 @@ const SOURCE_LABEL: Record<CreditSource, string> = {
 
 const METHOD_LABEL: Record<PaymentMethod, string> = { paymob: 'Card', cash: 'Cash' };
 
+/** Shared fallback for transport failures and any reason a view doesn't name. */
+const GENERIC_ERROR = 'Something went wrong. Please try again.';
+
+const GRANT_ERROR: Record<string, string> = {
+  reason_required: 'Say why you’re comping this — it has to be explicable in an audit later.',
+  quantity_below_one: 'Grant at least one credit.',
+  player_missing: 'That player no longer exists.',
+  not_admin: 'You don’t have permission.',
+  network: GENERIC_ERROR,
+};
+
+const CASH_ERROR: Record<string, string> = {
+  amount_below_one: 'The amount received must be above zero.',
+  package_missing: 'Pick a package.',
+  player_missing: 'That player no longer exists.',
+  trial_not_sellable: 'Trials can’t be sold.',
+  package_inactive: 'That package is hidden.',
+  not_admin: 'You don’t have permission.',
+  network: GENERIC_ERROR,
+};
+
 type View = 'main' | 'edit' | 'grant' | 'cash';
+
+interface PlayerDetailProps {
+  player: Player;
+  batches: CreditBatch[];
+  purchases: Purchase[];
+  bookings: Booking[];
+  slots: SessionSlot[];
+  coaches: Coach[];
+  packages: Package[];
+  onClose: () => void;
+}
 
 /**
  * Player detail — what the owner opens when someone messages him. Profile, the full
@@ -66,20 +101,31 @@ type View = 'main' | 'edit' | 'grant' | 'cash';
  * level change which slots they see), record a cash payment (money IN — a real
  * purchase), and grant comp credits (money OUT — an admin_grant).
  */
-export function PlayerDetailModal({ player, onClose }: { player: Player; onClose: () => void }) {
+export function PlayerDetailModal({
+  player,
+  batches,
+  purchases,
+  bookings,
+  slots,
+  coaches,
+  packages,
+  onClose,
+}: PlayerDetailProps) {
   const { now } = useSession();
-  useAdminStore();
   const [view, setView] = useState<View>('main');
 
-  if (view === 'edit') return <EditView player={player} onBack={() => setView('main')} onClose={onClose} />;
-  if (view === 'grant') return <GrantView player={player} now={now} onBack={() => setView('main')} onClose={onClose} />;
-  if (view === 'cash') return <CashView player={player} now={now} onBack={() => setView('main')} onClose={onClose} />;
+  if (view === 'edit')
+    return <EditView player={player} bookings={bookings} slots={slots} onBack={() => setView('main')} onClose={onClose} />;
+  if (view === 'grant')
+    return <GrantView player={player} packages={packages} onBack={() => setView('main')} onClose={onClose} />;
+  if (view === 'cash')
+    return <CashView player={player} now={now} packages={packages} onBack={() => setView('main')} onClose={onClose} />;
 
-  const batches = batchesForPlayerSorted(player.id);
-  const bookings = bookingsForPlayer(player.id)
-    .map((b) => ({ booking: b, slot: slotById(b.slotId) }))
+  const walletBatches = batchesForPlayerSorted(batches, player.id);
+  const bookingRows = bookingsForPlayer(bookings, player.id)
+    .map((b) => ({ booking: b, slot: slotById(slots, b.slotId) }))
     .sort((a, b) => (b.slot ? new Date(b.slot.startsAt).getTime() : 0) - (a.slot ? new Date(a.slot.startsAt).getTime() : 0));
-  const purchases = purchasesForPlayer(player.id);
+  const playerPurchases = purchasesForPlayer(purchases, player.id);
 
   return (
     <Modal
@@ -125,11 +171,11 @@ export function PlayerDetailModal({ player, onClose }: { player: Player; onClose
               </Button>
             </div>
           </div>
-          {batches.length === 0 ? (
+          {walletBatches.length === 0 ? (
             <p className={styles.empty}>No credits yet.</p>
           ) : (
             <div className={styles.list}>
-              {batches.map((b) => {
+              {walletBatches.map((b) => {
                 const state = creditExpiryState(b.expiresAt, now);
                 return (
                   <div key={b.id} className={styles.row}>
@@ -158,11 +204,11 @@ export function PlayerDetailModal({ player, onClose }: { player: Player; onClose
         {/* Bookings */}
         <div className={styles.section}>
           <span className={styles.sectionTitle}>Bookings</span>
-          {bookings.length === 0 ? (
+          {bookingRows.length === 0 ? (
             <p className={styles.empty}>No bookings yet.</p>
           ) : (
             <div className={styles.list}>
-              {bookings.map(({ booking, slot }) => (
+              {bookingRows.map(({ booking, slot }) => (
                 <div key={booking.id} className={styles.row}>
                   {slot ? <TypePill type={slot.trainingType} /> : null}
                   <div className={styles.rowMain}>
@@ -170,7 +216,7 @@ export function PlayerDetailModal({ player, onClose }: { player: Player; onClose
                       {slot ? formatInstantDate(slot.startsAt) : 'Session'}
                     </span>
                     <span className={styles.rowSub}>
-                      {slot ? coachById(slot.coachId)?.name ?? 'Coach' : ''}
+                      {slot ? coachById(coaches, slot.coachId)?.name ?? 'Coach' : ''}
                     </span>
                   </div>
                   <div className={styles.rowEnd}>
@@ -185,12 +231,12 @@ export function PlayerDetailModal({ player, onClose }: { player: Player; onClose
         {/* Purchases */}
         <div className={styles.section}>
           <span className={styles.sectionTitle}>Purchases</span>
-          {purchases.length === 0 ? (
+          {playerPurchases.length === 0 ? (
             <p className={styles.empty}>No purchases yet.</p>
           ) : (
             <div className={styles.list}>
-              {purchases.map((p) => {
-                const pkg = packageById(p.packageId);
+              {playerPurchases.map((p) => {
+                const pkg = packageById(packages, p.packageId);
                 return (
                   <div key={p.id} className={styles.row}>
                     <div className={styles.rowMain}>
@@ -216,29 +262,30 @@ export function PlayerDetailModal({ player, onClose }: { player: Player; onClose
   );
 }
 
-// ---- EDIT ----
-function EditView({ player, onBack, onClose }: { player: Player; onBack: () => void; onClose: () => void }) {
+// ---- EDIT (read-only) ----
+// Profile edits aren't wired in the admin: the only players UPDATE policy is
+// `players_update_self`, so there's no way to rewrite another player's row from here.
+// The form is shown for reference; Save is disabled.
+function EditView({
+  player,
+  bookings,
+  slots,
+  onBack,
+  onClose,
+}: {
+  player: Player;
+  bookings: Booking[];
+  slots: SessionSlot[];
+  onBack: () => void;
+  onClose: () => void;
+}) {
   const [name, setName] = useState(player.name);
   const [phone, setPhone] = useState(player.phone);
   const [gender, setGender] = useState<Gender>(player.gender);
   const [level, setLevel] = useState<Level>(player.level);
-  const [error, setError] = useState<string | null>(null);
 
-  const mismatch = mismatchedActiveBookings(player.id, gender, level);
+  const mismatch = mismatchedActiveBookings(bookings, slots, player.id, gender, level);
   const profileChanged = gender !== player.gender || level !== player.level;
-
-  const onSave = () => {
-    const res = updatePlayerProfile(player.id, { name, phone, gender, level });
-    if (res.ok) onBack();
-    else
-      setError(
-        res.reason === 'name_required'
-          ? 'A player needs a name.'
-          : res.reason === 'phone_required'
-            ? 'A player needs a phone number.'
-            : 'That player no longer exists.',
-      );
-  };
 
   return (
     <Modal
@@ -251,27 +298,35 @@ function EditView({ player, onBack, onClose }: { player: Player; onBack: () => v
           <Button variant="secondary" icon={ArrowLeft} onClick={onBack}>
             Back
           </Button>
-          <Button onClick={onSave} disabled={name.trim() === '' || phone.trim() === ''}>
+          <Button onClick={onBack} disabled>
             Save changes
           </Button>
         </>
       }
     >
       <div className={styles.form}>
+        <p className={styles.note}>
+          <AlertTriangle size={15} aria-hidden />
+          Profile edits aren’t available in the admin — a player’s name, gender, and level can only be
+          changed by the player themselves. You can still grant credits and record payments below.
+        </p>
+
         <div className={styles.grid}>
-          <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} />
-          <Input label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} disabled />
+          <Input label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} disabled />
           <Select
             label="Gender"
             value={gender}
             onChange={(e) => setGender(e.target.value as Gender)}
             options={GENDER_OPTIONS}
+            disabled
           />
           <Select
             label="Level"
             value={level}
             onChange={(e) => setLevel(e.target.value as Level)}
             options={LEVEL_OPTIONS}
+            disabled
           />
         </div>
 
@@ -283,40 +338,31 @@ function EditView({ player, onBack, onClose }: { player: Player; onBack: () => v
             affects which sessions they can book from here on.
           </p>
         ) : null}
-
-        {error ? (
-          <p className={styles.error}>
-            <AlertTriangle size={15} aria-hidden />
-            {error}
-          </p>
-        ) : null}
       </div>
     </Modal>
   );
 }
 
 // ---- GRANT ----
-function GrantView({ player, now, onBack, onClose }: { player: Player; now: IsoInstant; onBack: () => void; onClose: () => void }) {
+function GrantView({ player, packages, onBack, onClose }: { player: Player; packages: Package[]; onBack: () => void; onClose: () => void }) {
   const [trainingType, setTrainingType] = useState<TrainingType>('group');
   const [quantity, setQuantity] = useState(1);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const unit = sessionRetailValue(trainingType);
+  const unit = sessionRetailValue(packages, trainingType);
   const totalValue = unit != null ? ((unit * Math.max(1, quantity)) as typeof unit) : null;
-  const canSave = reason.trim() !== '' && quantity >= 1;
+  const canSave = reason.trim() !== '' && quantity >= 1 && !saving;
 
-  const onSave = () => {
-    const res = grantCredits(player.id, trainingType, quantity, reason, now);
+  const onSave = async () => {
+    setError(null);
+    setSaving(true);
+    // Seam returns { ok, reason } and self-invalidates the cache — never throws.
+    const res = await grantCredits(player.id, trainingType, quantity, reason);
+    setSaving(false);
     if (res.ok) onBack();
-    else
-      setError(
-        res.reason === 'reason_required'
-          ? 'Say why you’re comping this — it has to be explicable in an audit later.'
-          : res.reason === 'quantity_below_one'
-            ? 'Grant at least one credit.'
-            : 'That player no longer exists.',
-      );
+    else setError(GRANT_ERROR[res.reason] ?? GENERIC_ERROR);
   };
 
   return (
@@ -330,7 +376,7 @@ function GrantView({ player, now, onBack, onClose }: { player: Player; now: IsoI
           <Button variant="secondary" icon={ArrowLeft} onClick={onBack}>
             Back
           </Button>
-          <Button icon={Gift} onClick={onSave} disabled={!canSave}>
+          <Button icon={Gift} onClick={() => void onSave()} disabled={!canSave}>
             Grant {quantity} credit{quantity === 1 ? '' : 's'}
           </Button>
         </>
@@ -389,22 +435,35 @@ function GrantView({ player, now, onBack, onClose }: { player: Player; now: IsoI
 }
 
 // ---- CASH ----
-const sellablePackages = (): Package[] =>
-  allPackages()
+const sellablePackages = (packages: Package[]): Package[] =>
+  packages
     .filter((p) => p.isActive && p.trainingType !== 'trial')
     .sort((a, b) => a.trainingType.localeCompare(b.trainingType) || a.sessionCount - b.sessionCount);
 
-function CashView({ player, now, onBack, onClose }: { player: Player; now: IsoInstant; onBack: () => void; onClose: () => void }) {
-  const packages = sellablePackages();
+function CashView({
+  player,
+  now,
+  packages: allPkgs,
+  onBack,
+  onClose,
+}: {
+  player: Player;
+  now: IsoInstant;
+  packages: Package[];
+  onBack: () => void;
+  onClose: () => void;
+}) {
+  const packages = sellablePackages(allPkgs);
   const [packageId, setPackageId] = useState<PackageId | ''>(packages[0]?.id ?? '');
   const selected = packages.find((p) => p.id === packageId) ?? null;
   const [amountEgp, setAmountEgp] = useState<number>(selected ? selected.price / 100 : 0);
   const [error, setError] = useState<string | null>(null);
 
+  const [saving, setSaving] = useState(false);
   const amount = Math.round(amountEgp * 100) as Piastres;
   const list = selected?.price ?? (0 as Piastres);
   const delta = amount - list;
-  const canSave = selected !== null && amount >= 1;
+  const canSave = selected !== null && amount >= 1 && !saving;
   const expiryDate = formatInstantDate(
     new Date(new Date(now).getTime() + CREDIT_EXPIRY_DAYS * 86_400_000).toISOString() as IsoInstant,
   );
@@ -415,18 +474,15 @@ function CashView({ player, now, onBack, onClose }: { player: Player; now: IsoIn
     if (pkg) setAmountEgp(pkg.price / 100); // amount follows the picked package's list price
   };
 
-  const onSave = () => {
+  const onSave = async () => {
     if (!selected) return;
-    const res = recordCashPurchase(player.id, selected.id, amount, now);
+    setError(null);
+    setSaving(true);
+    // Seam returns { ok, reason } and self-invalidates the cache — never throws.
+    const res = await recordCashPurchase(player.id, selected.id, amount);
+    setSaving(false);
     if (res.ok) onBack();
-    else
-      setError(
-        res.reason === 'amount_below_one'
-          ? 'The amount received must be above zero.'
-          : res.reason === 'package_missing'
-            ? 'Pick a package.'
-            : 'That player no longer exists.',
-      );
+    else setError(CASH_ERROR[res.reason] ?? GENERIC_ERROR);
   };
 
   return (
@@ -440,7 +496,7 @@ function CashView({ player, now, onBack, onClose }: { player: Player; now: IsoIn
           <Button variant="secondary" icon={ArrowLeft} onClick={onBack}>
             Back
           </Button>
-          <Button icon={Banknote} onClick={onSave} disabled={!canSave}>
+          <Button icon={Banknote} onClick={() => void onSave()} disabled={!canSave}>
             Record payment
           </Button>
         </>

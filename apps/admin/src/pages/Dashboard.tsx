@@ -6,7 +6,16 @@ import {
   formatInstantTime,
   formatPiastres,
 } from '@tpa/core';
-import type { CreditBatch, IsoInstant, Purchase, SessionSlot, TrainingType } from '@tpa/types';
+import type {
+  Coach,
+  CreditBatch,
+  IsoInstant,
+  Package,
+  Player,
+  Purchase,
+  SessionSlot,
+  TrainingType,
+} from '@tpa/types';
 import { AlertTriangle, CalendarCheck, DollarSign, Gauge, Users, Wallet } from 'lucide-react';
 
 import {
@@ -22,13 +31,15 @@ import {
   todaysSessions,
 } from '../data/dashboard';
 import { coachById, packageById, playerById } from '../data/selectors';
-import { useAdminStore } from '../data/store';
+import { useAdminData } from '../data/queries';
 import { useSession } from '../session/SessionProvider';
 import {
   Badge,
   Donut,
   EmptyState,
+  ErrorView,
   LineChart,
+  LoadingView,
   PageHeader,
   Panel,
   StatCard,
@@ -61,7 +72,7 @@ function shortExpiry(expiresAt: IsoInstant, now: IsoInstant): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function SessionRow({ slot }: { slot: SessionSlot }) {
+function SessionRow({ slot, coaches }: { slot: SessionSlot; coaches: Coach[] }) {
   const full = slot.bookedCount >= slot.capacity;
   return (
     <div className={styles.row}>
@@ -73,7 +84,7 @@ function SessionRow({ slot }: { slot: SessionSlot }) {
       </div>
       <div className={styles.midCol}>
         <TypePill type={slot.trainingType} />
-        <span className={styles.sub}>{coachById(slot.coachId)?.name ?? 'Coach'}</span>
+        <span className={styles.sub}>{coachById(coaches, slot.coachId)?.name ?? 'Coach'}</span>
       </div>
       <Badge tone={full ? 'danger' : 'neutral'}>
         {slot.bookedCount}/{slot.capacity}
@@ -82,8 +93,8 @@ function SessionRow({ slot }: { slot: SessionSlot }) {
   );
 }
 
-function ExpiringRow({ batch, now }: { batch: CreditBatch; now: IsoInstant }) {
-  const player = playerById(batch.playerId);
+function ExpiringRow({ batch, players, now }: { batch: CreditBatch; players: Player[]; now: IsoInstant }) {
+  const player = playerById(players, batch.playerId);
   const tone = creditExpiryState(batch.expiresAt, now) === 'expiring_soon' ? 'warning' : 'neutral';
   return (
     <div className={styles.row}>
@@ -99,9 +110,17 @@ function ExpiringRow({ batch, now }: { batch: CreditBatch; now: IsoInstant }) {
   );
 }
 
-function PurchaseRow({ purchase }: { purchase: Purchase }) {
-  const player = playerById(purchase.playerId);
-  const pkg = packageById(purchase.packageId);
+function PurchaseRow({
+  purchase,
+  players,
+  packages,
+}: {
+  purchase: Purchase;
+  players: Player[];
+  packages: Package[];
+}) {
+  const player = playerById(players, purchase.playerId);
+  const pkg = packageById(packages, purchase.packageId);
   return (
     <div className={styles.row}>
       <div className={styles.midCol}>
@@ -120,14 +139,16 @@ function PurchaseRow({ purchase }: { purchase: Purchase }) {
 
 /** Dashboard — every figure computed from the store via pure (…, now) aggregates. */
 export function Dashboard() {
-  useAdminStore();
   const { now } = useSession();
+  const data = useAdminData();
+  if (data.isPending) return <LoadingView />;
+  if (data.isError) return <ErrorView onRetry={data.refetch} />;
 
   const cNow = cairoCalendarDate(now);
   const monthName = MONTHS[cNow.month - 1] ?? '';
-  const rev = revenueThisMonth(now);
-  const rbt = revenueByType();
-  const line = revenueOverTime(now).map((b) => ({ label: b.label, value: b.revenue }));
+  const rev = revenueThisMonth(data.purchases, now);
+  const rbt = revenueByType(data.purchases, data.packages);
+  const line = revenueOverTime(data.purchases, now).map((b) => ({ label: b.label, value: b.revenue }));
   const donutSegments: DonutSegment[] = rbt.rows.map((r) => ({
     key: r.type,
     label: TRAINING_LABEL[r.type],
@@ -135,9 +156,9 @@ export function Dashboard() {
     color: DONUT_COLOR[r.type],
   }));
 
-  const today = todaysSessions(now);
-  const expiring = creditsExpiringSoon(now, 7);
-  const recent = recentPurchases(4);
+  const today = todaysSessions(data.slots, now);
+  const expiring = creditsExpiringSoon(data.batches, now, 7);
+  const recent = recentPurchases(data.purchases, 4);
 
   return (
     <div>
@@ -156,10 +177,10 @@ export function Dashboard() {
           delta={rev.deltaPct}
           caption="vs last month"
         />
-        <StatCard eyebrow="Active players" icon={Users} value={String(activePlayerCount(now))} caption="with credits or bookings" />
-        <StatCard eyebrow="Sessions this week" icon={CalendarCheck} value={String(sessionsThisWeek(now))} caption="booked, Sun–Wed" />
-        <StatCard eyebrow="Slot fill rate" icon={Gauge} value={`${slotFillRate(now)}%`} caption="capacity booked this week" />
-        <StatCard eyebrow="Credit liability" icon={Wallet} value={formatPiastres(creditLiability(now))} caption="sold, not yet used" />
+        <StatCard eyebrow="Active players" icon={Users} value={String(activePlayerCount(data.batches, data.bookings, now))} caption="with credits or bookings" />
+        <StatCard eyebrow="Sessions this week" icon={CalendarCheck} value={String(sessionsThisWeek(data.slots, now))} caption="booked, Sun–Wed" />
+        <StatCard eyebrow="Slot fill rate" icon={Gauge} value={`${slotFillRate(data.slots, now)}%`} caption="capacity booked this week" />
+        <StatCard eyebrow="Credit liability" icon={Wallet} value={formatPiastres(creditLiability(data.batches, data.purchases, now))} caption="sold, not yet used" />
       </div>
 
       <div className={styles.charts}>
@@ -178,7 +199,7 @@ export function Dashboard() {
           ) : (
             <div className={styles.list}>
               {today.map((slot) => (
-                <SessionRow key={slot.id} slot={slot} />
+                <SessionRow key={slot.id} slot={slot} coaches={data.coaches} />
               ))}
             </div>
           )}
@@ -190,7 +211,7 @@ export function Dashboard() {
           ) : (
             <div className={styles.list}>
               {expiring.slice(0, 5).map((batch) => (
-                <ExpiringRow key={batch.id} batch={batch} now={now} />
+                <ExpiringRow key={batch.id} batch={batch} players={data.players} now={now} />
               ))}
             </div>
           )}
@@ -199,7 +220,7 @@ export function Dashboard() {
         <Panel eyebrow="Latest sales" title="Recent purchases" link={{ label: 'Packages', to: '/packages' }}>
           <div className={styles.list}>
             {recent.map((purchase) => (
-              <PurchaseRow key={purchase.id} purchase={purchase} />
+              <PurchaseRow key={purchase.id} purchase={purchase} players={data.players} packages={data.packages} />
             ))}
           </div>
         </Panel>

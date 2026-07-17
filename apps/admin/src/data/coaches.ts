@@ -1,23 +1,24 @@
 import {
-  ID_PREFIXES,
   TRAINING_TYPES,
   addCairoDays,
   cairoCalendarDate,
   cairoMidnight,
   cairoWeekStart,
-  newId,
   parseInstant,
 } from '@tpa/core';
-import type { Coach, CoachId, IsoInstant, TrainingType } from '@tpa/types';
+import type { AvailabilityTemplate, Booking, Coach, CoachId, IsoInstant, SessionSlot, TrainingType } from '@tpa/types';
 
-import { commitCoachSave, commitTemplateSave, getBookings, getCoaches, getSlots, getTemplates } from './store';
+import { insertCoach, updateCoach as updateCoachApi, updateTemplate, uploadCoachPhoto as uploadPhotoApi } from '../lib/api';
+import { queryClient, queryKeys, TOUCHED } from '../lib/queryClient';
+import { runWrite } from './queries';
+
+export { uploadCoachPhoto } from '../lib/api';
 
 /**
- * Coach selectors + the coach CRUD seam. Stats are computed from the store (never
- * hardcoded); the writes are is_admin-gated config, not money, so S10 swaps them
- * for plain INSERT/UPDATE. A coach is NEVER deleted — historical slots/bookings
- * reference them and the FK would reject it — so "remove" is always on-leave
- * (isActive:false).
+ * Coach stats (pure, over fetched rows) + the coach CRUD seam. Writes are
+ * is_admin()-gated config (not money → no RPC): plain INSERT/UPDATE. A coach is
+ * NEVER deleted — historical slots/bookings reference them and the FK would reject
+ * it — so "remove" is on-leave (isActive:false). Photos live in Supabase Storage.
  */
 
 const ms = (i: IsoInstant): number => parseInstant(i).getTime();
@@ -50,9 +51,14 @@ export interface CoachWeekStats {
  * attendance is all-time (a rate needs history the week rarely has) and is null —
  * rendered as "—" — until at least one session has been marked attended/no-show.
  */
-export function coachWeekStats(coachId: CoachId, now: IsoInstant): CoachWeekStats {
+export function coachWeekStats(
+  slots: SessionSlot[],
+  bookings: Booking[],
+  coachId: CoachId,
+  now: IsoInstant,
+): CoachWeekStats {
   const { startMs, endMs } = cairoWeekBounds(now);
-  const coachSlots = getSlots().filter((s) => s.coachId === coachId);
+  const coachSlots = slots.filter((s) => s.coachId === coachId);
   const week = coachSlots.filter(
     (s) => s.status === 'published' && ms(s.startsAt) >= startMs && ms(s.startsAt) < endMs,
   );
@@ -71,7 +77,7 @@ export function coachWeekStats(coachId: CoachId, now: IsoInstant): CoachWeekStat
   const coachSlotIds = new Set(coachSlots.map((s) => s.id));
   let attended = 0;
   let resolved = 0; // attended + no_show
-  for (const b of getBookings()) {
+  for (const b of bookings) {
     if (!coachSlotIds.has(b.slotId)) continue;
     if (b.status === 'attended') {
       attended += 1;
@@ -87,76 +93,68 @@ export function coachWeekStats(coachId: CoachId, now: IsoInstant): CoachWeekStat
 
 // --- CRUD seam ---
 
+/** name/bio/active only; the photo is a separate File argument (see below). */
 export interface CoachDraft {
   name: string;
   bio: string;
-  photoUrl: string | null;
   isActive: boolean;
 }
 
 export type SaveCoachResult =
   | { ok: true; coach: Coach }
-  | { ok: false; reason: 'name_required' | 'coach_missing' };
+  | { ok: false; reason: 'name_required' | 'coach_missing' | 'network' };
 
-/** Pause every ACTIVE template belonging to a coach — used when they go on leave. */
-function pauseTemplatesForCoach(coachId: CoachId): void {
-  for (const t of getTemplates()) {
-    if (t.coachId === coachId && t.isActive) commitTemplateSave({ ...t, isActive: false });
+/**
+ * Pause every ACTIVE template of a coach going on leave (so no new sessions
+ * generate for them; existing ones are untouched). Reads the cached templates —
+ * the same ones the calendar shows — and flips them one UPDATE at a time.
+ */
+async function pauseTemplatesForCoach(coachId: CoachId): Promise<void> {
+  const templates = queryClient.getQueryData<AvailabilityTemplate[]>(queryKeys.templates) ?? [];
+  for (const t of templates) {
+    if (t.coachId === coachId && t.isActive) await updateTemplate(t.id, { isActive: false });
   }
 }
 
-export function createCoach(draft: CoachDraft): SaveCoachResult {
-  const name = draft.name.trim();
-  if (name === '') return { ok: false, reason: 'name_required' };
-  const coach: Coach = {
-    id: newId(ID_PREFIXES.coach) as CoachId,
-    name,
-    bio: draft.bio.trim(),
-    photoUrl: draft.photoUrl,
-    isActive: draft.isActive,
-  };
-  commitCoachSave(coach);
-  return { ok: true, coach };
-}
-
-export function updateCoach(id: CoachId, draft: CoachDraft): SaveCoachResult {
-  const current = getCoaches().find((c) => c.id === id);
-  if (!current) return { ok: false, reason: 'coach_missing' };
-  const name = draft.name.trim();
-  if (name === '') return { ok: false, reason: 'name_required' };
-  // Going on leave pauses the coach's active templates so no new sessions generate
-  // for them; existing (possibly booked) sessions are left untouched. Coming back
-  // does NOT auto-resume — the owner re-activates rules deliberately.
-  if (current.isActive && !draft.isActive) pauseTemplatesForCoach(id);
-  const updated: Coach = { ...current, name, bio: draft.bio.trim(), photoUrl: draft.photoUrl, isActive: draft.isActive };
-  commitCoachSave(updated);
-  return { ok: true, coach: updated };
-}
-
-/** Toggle a coach's active/on-leave state directly (pauses templates on leave). */
-export function setCoachActive(id: CoachId, isActive: boolean): SaveCoachResult {
-  const current = getCoaches().find((c) => c.id === id);
-  if (!current) return { ok: false, reason: 'coach_missing' };
-  if (current.isActive && !isActive) pauseTemplatesForCoach(id);
-  const updated: Coach = { ...current, isActive };
-  commitCoachSave(updated);
-  return { ok: true, coach: updated };
-}
-
 /**
- * Turn a chosen image File into something the store can hold and Avatar can render.
- * With no storage backend yet, we read the bytes into a data: URL — honest (the
- * real image renders, not a placeholder URL) and self-contained (a plain string in
- * the in-memory store, with no object-URL lifetime to manage). S10 replaces the
- * body with a Supabase Storage upload that returns a public URL; the seam's shape —
- * File in, Promise<string> out — is identical, so the modal and Avatar don't change.
- * A coach with no photo stays a first-class state: Avatar falls back to initials.
+ * Create a coach, then (if a photo File was chosen) upload it and stamp the coach's
+ * photo_url — a new coach has no id until it's inserted, so the upload can only
+ * happen after. The modal shows a local preview meanwhile.
  */
-export function uploadCoachPhoto(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error ?? new Error('Could not read the image file.'));
-    reader.readAsDataURL(file);
-  });
+export async function createCoach(draft: CoachDraft, photo: File | null): Promise<SaveCoachResult> {
+  const name = draft.name.trim();
+  if (name === '') return { ok: false, reason: 'name_required' };
+  const res = await runWrite(
+    () => insertCoach({ name, bio: draft.bio.trim(), photoUrl: null, isActive: draft.isActive }),
+    TOUCHED.coaches,
+  );
+  if (!res.ok) return { ok: false, reason: 'network' };
+  if (!photo) return { ok: true, coach: res.value };
+  const withPhoto = await runWrite(async () => {
+    const url = await uploadPhotoApi(res.value.id, photo);
+    return updateCoachApi(res.value.id, { photoUrl: url });
+  }, TOUCHED.coaches);
+  return withPhoto.ok ? { ok: true, coach: withPhoto.value } : { ok: false, reason: 'network' };
+}
+
+/** Edit a coach. `photo` File replaces the headshot; null leaves it as-is. */
+export async function updateCoach(id: CoachId, draft: CoachDraft, photo: File | null): Promise<SaveCoachResult> {
+  const name = draft.name.trim();
+  if (name === '') return { ok: false, reason: 'name_required' };
+  const current = queryClient.getQueryData<Coach[]>(queryKeys.coaches)?.find((c) => c.id === id);
+  if (current?.isActive && !draft.isActive) await pauseTemplatesForCoach(id);
+  const photoUrl = photo ? await uploadPhotoApi(id, photo).catch(() => undefined) : undefined;
+  const res = await runWrite(
+    () => updateCoachApi(id, { name, bio: draft.bio.trim(), isActive: draft.isActive, ...(photoUrl !== undefined ? { photoUrl } : {}) }),
+    TOUCHED.coaches,
+  );
+  return res.ok ? { ok: true, coach: res.value } : { ok: false, reason: 'network' };
+}
+
+/** Toggle active/on-leave directly (pauses templates on leave). */
+export async function setCoachActive(id: CoachId, isActive: boolean): Promise<SaveCoachResult> {
+  const current = queryClient.getQueryData<Coach[]>(queryKeys.coaches)?.find((c) => c.id === id);
+  if (current?.isActive && !isActive) await pauseTemplatesForCoach(id);
+  const res = await runWrite(() => updateCoachApi(id, { isActive }), TOUCHED.coaches);
+  return res.ok ? { ok: true, coach: res.value } : { ok: false, reason: 'network' };
 }

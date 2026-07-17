@@ -1,11 +1,9 @@
 import { formatLocalTimeRange } from '@tpa/core';
-import type { AvailabilityTemplate } from '@tpa/types';
+import type { AvailabilityTemplate, Coach, SessionSlot } from '@tpa/types';
 import { CalendarPlus, Pencil, Plus, Repeat, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
-import { allCoaches, allSlots, allTemplates } from '../data/selectors';
 import { deleteTemplate, setTemplateActive } from '../data/templates';
-import { useAdminStore } from '../data/store';
 import { Avatar, Badge, Button, Card, EmptyState, Modal, TypePill, groupTags } from '../ui';
 import styles from './TemplatesPanel.module.css';
 
@@ -21,17 +19,20 @@ const byWeekdayThenStart = (a: AvailabilityTemplate, b: AvailabilityTemplate) =>
  * its already-generated sessions stay on the calendar, so we steer toward pausing.
  */
 export function TemplatesPanel({
+  coaches,
+  templates,
+  slots,
   onNew,
   onEdit,
   onGenerate,
 }: {
+  coaches: Coach[];
+  templates: AvailabilityTemplate[];
+  slots: SessionSlot[];
   onNew: () => void;
   onEdit: (template: AvailabilityTemplate) => void;
   onGenerate: () => void;
 }) {
-  useAdminStore(); // re-render after a create/edit/pause/delete
-  const coaches = allCoaches();
-  const templates = allTemplates();
   const [deleting, setDeleting] = useState<AvailabilityTemplate | null>(null);
 
   return (
@@ -129,7 +130,7 @@ export function TemplatesPanel({
       )}
 
       {deleting ? (
-        <DeleteTemplateConfirm template={deleting} onClose={() => setDeleting(null)} />
+        <DeleteTemplateConfirm template={deleting} slots={slots} onClose={() => setDeleting(null)} />
       ) : null}
     </div>
   );
@@ -142,13 +143,23 @@ export function TemplatesPanel({
  */
 function DeleteTemplateConfirm({
   template,
+  slots,
   onClose,
 }: {
   template: AvailabilityTemplate;
+  slots: SessionSlot[];
   onClose: () => void;
 }) {
-  const generated = allSlots().filter((s) => s.templateId === template.id);
+  const generated = slots.filter((s) => s.templateId === template.id);
   const booked = generated.filter((s) => s.bookedCount > 0).length;
+  const onPause = async () => {
+    await setTemplateActive(template.id, false);
+    onClose();
+  };
+  const onDelete = async () => {
+    await deleteTemplate(template.id);
+    onClose();
+  };
 
   return (
     <Modal
@@ -162,24 +173,11 @@ function DeleteTemplateConfirm({
             Cancel
           </Button>
           {template.isActive ? (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setTemplateActive(template.id, false);
-                onClose();
-              }}
-            >
+            <Button variant="secondary" onClick={() => void onPause()}>
               Pause instead
             </Button>
           ) : null}
-          <Button
-            variant="destructive"
-            icon={Trash2}
-            onClick={() => {
-              deleteTemplate(template.id);
-              onClose();
-            }}
-          >
+          <Button variant="destructive" icon={Trash2} onClick={() => void onDelete()}>
             Delete recurring session
           </Button>
         </>
