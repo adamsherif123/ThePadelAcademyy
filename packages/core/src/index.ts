@@ -77,7 +77,9 @@ export {
   isBatchUsable,
   isCancellableWithoutForfeit,
   isGroupSlot,
+  isSessionConfirmed,
   slotRemainingCapacity,
+  spotsUntilConfirmed,
   type BookBlockReason,
   type CanBookResult,
 } from './rules';

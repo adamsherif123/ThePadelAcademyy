@@ -37,6 +37,7 @@ const DEMO_SLOT: SessionSlot = {
   coachId: 'co_mariam' as CoachId, // → "Mariam"
   startsAt: '2026-07-19T15:00:00.000Z' as SessionSlot['startsAt'], // 6 PM Cairo
   endsAt: '2026-07-19T17:00:00.000Z' as SessionSlot['startsAt'], // 8 PM Cairo
+  confirmedAt: null,
   trainingType: 'group',
   capacity: 4,
   bookedCount: 0,

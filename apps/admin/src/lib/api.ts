@@ -141,6 +141,17 @@ export async function recordCashPurchaseRpc(playerId: PlayerId, packageId: Packa
     : { ok: false, reason: d.reason as CashReason };
 }
 
+export type ConfirmReason = 'not_admin' | 'slot_missing' | 'slot_cancelled' | 'slot_in_past';
+export type ConfirmResult =
+  | { ok: true; alreadyConfirmed: boolean }
+  | { ok: false; reason: ConfirmReason };
+export async function confirmSessionRpc(slotId: SlotId): Promise<ConfirmResult> {
+  const d = await callRpc('confirm_session', { p_slot_id: slotId });
+  return d.ok
+    ? { ok: true, alreadyConfirmed: Boolean(d.already_confirmed) }
+    : { ok: false, reason: d.reason as ConfirmReason };
+}
+
 export type AttendanceStatus = 'booked' | 'attended' | 'no_show';
 export type MarkAttendanceReason =
   | 'not_admin' | 'invalid_status' | 'booking_missing' | 'already_cancelled' | 'session_not_started';

@@ -5,6 +5,7 @@ import {
   formatInstantDate,
   formatInstantTime,
   formatPiastres,
+  isSessionConfirmed,
 } from '@tpa/core';
 import type {
   Coach,
@@ -73,7 +74,11 @@ function shortExpiry(expiresAt: IsoInstant, now: IsoInstant): string {
 }
 
 function SessionRow({ slot, coaches }: { slot: SessionSlot; coaches: Coach[] }) {
-  const full = slot.bookedCount >= slot.capacity;
+  // The dashboard is where this belongs: "Today's sessions" is Rania's at-a-glance
+  // ops list, and the one thing she acts on each evening is which sessions HAVEN'T
+  // filled yet (pending) versus which are locked in (confirmed) — so each row leads
+  // with that state rather than a bare seat count.
+  const confirmed = isSessionConfirmed(slot);
   return (
     <div className={styles.row}>
       <div className={styles.timeCol}>
@@ -86,9 +91,13 @@ function SessionRow({ slot, coaches }: { slot: SessionSlot; coaches: Coach[] }) 
         <TypePill type={slot.trainingType} />
         <span className={styles.sub}>{coachById(coaches, slot.coachId)?.name ?? 'Coach'}</span>
       </div>
-      <Badge tone={full ? 'danger' : 'neutral'}>
-        {slot.bookedCount}/{slot.capacity}
-      </Badge>
+      {confirmed ? (
+        <Badge tone="success">Confirmed</Badge>
+      ) : (
+        <Badge tone="warning">
+          Pending {slot.bookedCount}/{slot.capacity}
+        </Badge>
+      )}
     </div>
   );
 }

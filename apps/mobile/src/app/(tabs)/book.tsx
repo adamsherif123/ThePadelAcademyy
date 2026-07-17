@@ -45,6 +45,10 @@ const TYPE_ORDER: TrainingType[] = ['group', 'duo', 'individual', 'trial'];
 
 const DAYS = 14;
 
+// No pending/confirmed chip on the browse list: CapacityDots + "N/M booked"
+// already show how full each slot is, and the pending-vs-confirmed detail (with
+// honest copy) is surfaced at the decision point on confirm-booking. Keeping the
+// browse cards scannable, we don't duplicate it here.
 /** Map a core-derived availability verdict to SlotCard display props. */
 function slotDisplay(
   av: SlotAvailability,

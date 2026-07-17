@@ -58,6 +58,19 @@
   background: var(--color-status-danger);
   color: var(--color-text-inverse);
 }
+/* Pending (not yet confirmed): a small muted dot leads the count. Subtle by
+   design — a confirmed session simply shows the number, nothing extra. */
+.cap[data-pending]::before {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-inline-end: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.55;
+  vertical-align: middle;
+}
 
 .coach {
   color: var(--color-text-primary);

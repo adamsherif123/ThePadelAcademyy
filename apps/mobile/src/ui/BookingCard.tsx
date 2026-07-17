@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { formatInstantDate, formatInstantTime } from '@tpa/core';
+import { formatInstantDate, formatInstantTime, isSessionConfirmed, spotsUntilConfirmed } from '@tpa/core';
 import { color, radius, space } from '@tpa/theme';
 import type { BookingStatus, Coach, Gender, IsoInstant, Level, SessionSlot } from '@tpa/types';
 import { StyleSheet, View } from 'react-native';
@@ -86,6 +86,17 @@ export function BookingCard(props: BookingCardProps) {
 
       {props.variant === 'upcoming' ? (
         <>
+          {/* Is the SESSION on yet? Confirmed = sticky/on; pending = still filling.
+              Honest, no notification promise (the app can't send one). */}
+          {isSessionConfirmed(slot) ? (
+            <Badge label="Confirmed" tone="success" icon="checkmark-circle-outline" />
+          ) : (
+            <Badge
+              label={`Pending · ${spotsUntilConfirmed(slot)} to fill`}
+              tone="warning"
+              icon="people-outline"
+            />
+          )}
           {props.refundable ? (
             <InfoCard
               variant="success"

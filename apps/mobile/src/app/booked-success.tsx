@@ -1,4 +1,10 @@
-import { cancellationDeadline, formatInstantDate, formatInstantTime } from '@tpa/core';
+import {
+  cancellationDeadline,
+  formatInstantDate,
+  formatInstantTime,
+  isSessionConfirmed,
+  spotsUntilConfirmed,
+} from '@tpa/core';
 import { space } from '@tpa/theme';
 import type { BookingId } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -14,6 +20,7 @@ import {
   Badge,
   Card,
   IconRow,
+  InfoCard,
   LoadingView,
   Screen,
   SuccessView,
@@ -48,11 +55,18 @@ export default function BookedSuccessScreen() {
   const meta = TRAINING_META[slot.trainingType];
   const left = balanceByType(batchesQ.data ?? [], now)[slot.trainingType];
 
+  // The SEAT is always booked; what may still be pending is whether the SESSION
+  // runs. Confirmed → confident copy; pending → honest "runs once it fills" (no
+  // promise of any notification — the app can't send one). An individual
+  // auto-confirms on the first booking, so a 1-on-1 lands here as confirmed.
+  const confirmed = isSessionConfirmed(slot);
+  const toFill = spotsUntilConfirmed(slot);
+
   return (
     <Screen>
       <SuccessView
         tone="success"
-        eyebrow="See you on court"
+        eyebrow={confirmed ? 'See you on court' : 'Your spot is saved'}
         title="You're booked"
         primary={{ label: 'View my sessions', onPress: () => router.replace('/(tabs)/sessions') }}
         secondary={{ label: 'Done', onPress: () => router.replace('/(tabs)') }}
@@ -79,6 +93,17 @@ export default function BookedSuccessScreen() {
           </View>
         </Card>
 
+        {confirmed ? null : (
+          <InfoCard
+            variant="neutral"
+            icon="people-outline"
+            style={styles.pendingNote}
+            text={`Your spot and credit are saved. This session runs once ${toFill} more ${
+              toFill === 1 ? 'player joins' : 'players join'
+            }.`}
+          />
+        )}
+
         <Text variant="caption" tone="secondary" style={styles.usedLine}>
           {`1 ${meta.label} credit used · ${left} left`}
         </Text>
@@ -91,5 +116,6 @@ const styles = StyleSheet.create({
   top: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   info: { flex: 1, gap: 2 },
   rows: { gap: space.sm, marginTop: space.md },
+  pendingNote: { marginTop: space.md },
   usedLine: { textAlign: 'center', marginTop: space.md },
 });

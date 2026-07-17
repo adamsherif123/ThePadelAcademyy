@@ -42,6 +42,7 @@ const mkSlot = (over: Partial<SessionSlot> = {}): SessionSlot => ({
   level: 'beginner',
   status: 'published',
   templateId: null,
+  confirmedAt: null,
   ...over,
 });
 const mkPlayer = (over: Partial<Player> = {}): Player => ({

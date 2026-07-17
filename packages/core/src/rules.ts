@@ -33,6 +33,27 @@ export function slotRemainingCapacity(slot: SessionSlot): number {
 }
 
 /**
+ * Is the session confirmed (it's on)? The single rule both apps read. STICKY and
+ * RECORDED: it's `confirmedAt !== null`, NOT `booked_count >= capacity` — a session
+ * that filled then lost a player stays confirmed (see SessionSlot.confirmedAt). A
+ * session is confirmed when it fills (the booking that reaches capacity stamps it)
+ * or when the admin confirms it manually; until then it's pending.
+ */
+export function isSessionConfirmed(slot: SessionSlot): boolean {
+  return slot.confirmedAt !== null;
+}
+
+/**
+ * How many more bookings would fill a PENDING session (and so auto-confirm it).
+ * Zero once confirmed. Used for the honest "runs once N more players join" copy —
+ * a statement of what fills it, never a promise of notification.
+ */
+export function spotsUntilConfirmed(slot: SessionSlot): number {
+  if (isSessionConfirmed(slot)) return 0;
+  return Math.max(0, slot.capacity - slot.bookedCount);
+}
+
+/**
  * Can this credit batch pay for a slot of `trainingType` right now? Credits are
  * typed (a group credit can't book an individual slot), must have quantity left,
  * and must not have expired.

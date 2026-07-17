@@ -102,6 +102,7 @@ export function rowToSlot(r: Row): SessionSlot {
     level: (r.level as SessionSlot['level']) ?? null,
     status: str(r.status) as SessionSlot['status'],
     templateId: (nstr(r.template_id) as SessionSlot['templateId']) ?? null,
+    confirmedAt: nstr(r.confirmed_at) as IsoInstant | null,
   };
 }
 

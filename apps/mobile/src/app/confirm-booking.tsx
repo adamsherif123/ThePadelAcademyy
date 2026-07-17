@@ -1,4 +1,10 @@
-import { CANCELLATION_WINDOW_HOURS, formatInstantDate, formatInstantTime } from '@tpa/core';
+import {
+  CANCELLATION_WINDOW_HOURS,
+  formatInstantDate,
+  formatInstantTime,
+  isSessionConfirmed,
+  spotsUntilConfirmed,
+} from '@tpa/core';
 import { color, space } from '@tpa/theme';
 import type { Gender, Level, SlotId } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -89,6 +95,8 @@ export default function ConfirmBookingScreen() {
   const { slot, coach, verdict, batch, typeBalance, alreadyBooked } = preview;
   const meta = TRAINING_META[slot.trainingType];
   const isGroup = slot.gender !== null && slot.level !== null;
+  const confirmed = isSessionConfirmed(slot);
+  const toFill = spotsUntilConfirmed(slot);
   const submitting = bookMutation.isPending;
   const canConfirm = verdict.ok && batch !== undefined && !alreadyBooked && !submitting;
   const leftAfter = typeBalance - 1;
@@ -164,6 +172,30 @@ export default function ConfirmBookingScreen() {
           <Badge label={`${slot.bookedCount}/${slot.capacity} booked`} />
         </View>
       </Card>
+
+      {/* Confirmation state — what booking actually gets them. Honest: no promise
+          of a notification (the app can't send one). toFill === 1 means this
+          booking fills the last seat and confirms it on the spot (covers a 1-on-1,
+          which auto-confirms on the first booking). */}
+      {confirmed ? (
+        <InfoCard
+          variant="success"
+          icon="checkmark-circle-outline"
+          text="Confirmed — this session is on."
+        />
+      ) : toFill === 1 ? (
+        <InfoCard
+          variant="royal"
+          icon="people-outline"
+          text={`This session isn't confirmed yet — but booking it fills the last spot and locks it in. Your credit is spent when you book, and the ${CANCELLATION_WINDOW_HOURS}-hour cancellation rule still applies.`}
+        />
+      ) : (
+        <InfoCard
+          variant="amber"
+          icon="people-outline"
+          text={`This session isn't confirmed yet — it runs once it fills (${toFill} spots left, including yours). Your credit is spent when you book, and the ${CANCELLATION_WINDOW_HOURS}-hour cancellation rule still applies.`}
+        />
+      )}
 
       {/* Credit callout — or the unbookable guard */}
       {canConfirm && batch ? (

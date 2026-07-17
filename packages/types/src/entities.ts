@@ -158,6 +158,13 @@ export interface SessionSlot {
   status: SlotStatus;
   /** Set when generated from an AvailabilityTemplate; null for ad-hoc slots. */
   templateId: AvailabilityTemplateId | null;
+  /**
+   * When the session became confirmed (it's on) — set by the booking that fills it
+   * OR by the admin confirming manually; null while still pending. STICKY: once set
+   * it stays set until the session is cancelled, so an un-fill (4/4 → cancel → 3/4)
+   * never silently un-confirms. Recorded state, not derived from booked_count.
+   */
+  confirmedAt: IsoInstant | null;
 }
 
 /**

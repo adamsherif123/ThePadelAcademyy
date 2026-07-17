@@ -8,7 +8,9 @@ import {
   isBatchUsable,
   isCancellableWithoutForfeit,
   isGroupSlot,
+  isSessionConfirmed,
   slotRemainingCapacity,
+  spotsUntilConfirmed,
 } from './rules';
 
 const NOW = '2026-07-14T12:00:00.000Z' as IsoInstant;
@@ -35,6 +37,7 @@ function slot(over: Partial<SessionSlot> = {}): SessionSlot {
     level: 'beginner',
     status: 'published',
     templateId: null,
+    confirmedAt: null,
     ...over,
   };
 }
@@ -60,6 +63,27 @@ describe('slotRemainingCapacity', () => {
     expect(slotRemainingCapacity(slot({ capacity: 4, bookedCount: 4 }))).toBe(0);
     expect(slotRemainingCapacity(slot({ capacity: 4, bookedCount: 9 }))).toBe(0);
     expect(slotRemainingCapacity(slot({ status: 'cancelled', bookedCount: 0 }))).toBe(0);
+  });
+});
+
+describe('session confirmation (isSessionConfirmed / spotsUntilConfirmed)', () => {
+  it('reads confirmedAt, NOT booked_count — sticky, not derived', () => {
+    // pending: not yet stamped, even at 3/4
+    expect(isSessionConfirmed(slot({ capacity: 4, bookedCount: 3, confirmedAt: null }))).toBe(false);
+    // confirmed: stamped
+    expect(isSessionConfirmed(slot({ capacity: 4, bookedCount: 4, confirmedAt: NOW }))).toBe(true);
+    // THE sticky case: filled (4/4) then a cancel dropped it to 3/4, but confirmedAt
+    // survived → STILL confirmed. Pure derivation (booked_count>=capacity) would lie.
+    expect(isSessionConfirmed(slot({ capacity: 4, bookedCount: 3, confirmedAt: NOW }))).toBe(true);
+  });
+
+  it('spotsUntilConfirmed is seats-to-fill while pending, 0 once confirmed', () => {
+    expect(spotsUntilConfirmed(slot({ capacity: 4, bookedCount: 3, confirmedAt: null }))).toBe(1); // "1 more player"
+    expect(spotsUntilConfirmed(slot({ capacity: 2, bookedCount: 0, confirmedAt: null }))).toBe(2);
+    expect(spotsUntilConfirmed(slot({ capacity: 1, bookedCount: 0, confirmedAt: null }))).toBe(1); // individual: 1 booking confirms
+    expect(spotsUntilConfirmed(slot({ capacity: 4, bookedCount: 4, confirmedAt: NOW }))).toBe(0);
+    // sticky/un-fill: confirmed but 3/4 → still 0 (it's on; no more needed)
+    expect(spotsUntilConfirmed(slot({ capacity: 4, bookedCount: 3, confirmedAt: NOW }))).toBe(0);
   });
 });
 

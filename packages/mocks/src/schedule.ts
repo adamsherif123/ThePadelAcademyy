@@ -93,6 +93,9 @@ function generateSlots(): SessionSlot[] {
         level: template.level,
         status,
         templateId: template.id,
+        // A full slot reads as confirmed (the fill would have stamped it); anything
+        // not-yet-full is pending. Gives both apps confirmed + pending fixtures.
+        confirmedAt: bookedCount >= template.capacity ? startsAt : null,
       });
       idx += 1;
     }
@@ -153,6 +156,7 @@ const adHocSlots: SessionSlot[] = [
     level: null,
     status: 'published',
     templateId: null,
+    confirmedAt: hoursFromNow(2), // 1/1 individual → filled → confirmed
   },
   // A duo session ~5 days out, paid from a batch that has since expired. Cancelling
   // outside the window returns the credit to that batch — where it's already dead.
@@ -168,6 +172,7 @@ const adHocSlots: SessionSlot[] = [
     level: null,
     status: 'published',
     templateId: null,
+    confirmedAt: null, // 1/2 duo → still pending
   },
 ];
 

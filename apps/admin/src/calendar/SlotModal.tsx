@@ -1,4 +1,11 @@
-import { cairoCalendarDate, formatInstantDate, formatInstantTime, parseInstant } from '@tpa/core';
+import {
+  cairoCalendarDate,
+  formatInstantDate,
+  formatInstantTime,
+  isSessionConfirmed,
+  parseInstant,
+  spotsUntilConfirmed,
+} from '@tpa/core';
 import type {
   AvailabilityTemplate,
   Booking,
@@ -20,6 +27,7 @@ import {
   removeBooking,
 } from '../data/booking';
 import { cancelSession } from '../data/cancelSession';
+import { confirmSession } from '../data/confirm';
 import {
   cairoWallMinutes,
   closedWeekdays,
@@ -134,6 +142,7 @@ export function SlotModal({
   // The query cache re-renders us as the roster/seats change; re-derive the live slot.
   const slot = slotById(slots, initial.id) ?? initial;
   const [actionError, setActionError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   const startWall0 = cairoWallMinutes(slot.startsAt);
   const endWall0 = cairoWallMinutes(slot.endsAt);
@@ -160,6 +169,13 @@ export function SlotModal({
   // TASK 7: cancel-session is offered ONLY when the session is in the FUTURE.
   const isFuture = parseInstant(slot.startsAt).getTime() > parseInstant(now).getTime();
   const isPast = !isFuture;
+
+  // Confirmation state (the rule lives ONLY in these two @tpa/core predicates).
+  const confirmed = isSessionConfirmed(slot);
+  const toFill = spotsUntilConfirmed(slot);
+  // Confirm is offered only while the session is still PENDING, FUTURE, and
+  // published — a confirmed/cancelled/past session shows the chip, never the button.
+  const canConfirmSession = !confirmed && isFuture && slot.status === 'published';
   const rosterBookings = isPast
     ? bookingsForSlot(bookings, slot.id)
         .filter((b) => b.status !== 'cancelled')
@@ -435,12 +451,29 @@ export function SlotModal({
   }
 
   // ---- MAIN view ----
+  // Confirm a pending session manually (mirrors the other async handlers: awaits a
+  // never-throwing seam, surfaces a reason via actionError). The seam self-invalidates
+  // the cache, so on success the chip flips to Confirmed with no manual refetch.
+  const onConfirmSession = async () => {
+    setActionError(null);
+    setConfirming(true);
+    const res = await confirmSession(slot.id);
+    setConfirming(false);
+    if (!res.ok) setActionError(copyFor(res.reason));
+    // ok (incl. alreadyConfirmed): stay open; the re-derived slot now reads confirmed.
+  };
+
   // TASK 7: only offer Cancel session on a FUTURE session; a past one is for attendance.
   const footer = (
     <>
       {isFuture ? (
         <Button className={styles.cancelBtn} variant="destructive" icon={Ban} onClick={() => setView({ k: 'cancel' })}>
           Cancel session
+        </Button>
+      ) : null}
+      {canConfirmSession ? (
+        <Button variant="secondary" icon={Check} disabled={confirming} onClick={() => void onConfirmSession()}>
+          {confirming ? 'Confirming…' : 'Confirm session'}
         </Button>
       ) : null}
       <Button variant="secondary" onClick={onClose}>
@@ -469,12 +502,23 @@ export function SlotModal({
               {isPast ? 'Session ended' : TYPE_PLAYERS[slot.trainingType]} · coached by {originalCoach}
             </p>
           </div>
-          {isGroup ? (
-            <div className={styles.pills}>
-              <Badge tone="neutral">{GENDER_LABEL[slot.gender!]}</Badge>
-              <Badge tone="neutral">{LEVEL_LABEL[slot.level!]}</Badge>
-            </div>
-          ) : null}
+          <div className={styles.pills}>
+            {/* Confirmation state — the operational "is this session on?" chip. */}
+            {confirmed ? (
+              <Badge tone="success">Confirmed</Badge>
+            ) : (
+              <Badge tone="warning">
+                Pending — {slot.bookedCount}/{slot.capacity}
+                {toFill > 0 ? `, ${toFill} more to fill` : ''}
+              </Badge>
+            )}
+            {isGroup ? (
+              <>
+                <Badge tone="neutral">{GENDER_LABEL[slot.gender!]}</Badge>
+                <Badge tone="neutral">{LEVEL_LABEL[slot.level!]}</Badge>
+              </>
+            ) : null}
+          </div>
         </div>
 
         {/* Roster */}
