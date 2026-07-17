@@ -9,7 +9,7 @@ import { color, space } from '@tpa/theme';
 import type { Gender, Level, SlotId } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { bookingPreview } from '../data/booking';
 import { useBatches, useBookSlot, useBookings, useCoaches, useSlots, combine } from '../data/queries';
@@ -159,7 +159,10 @@ export default function ConfirmBookingScreen() {
             label="Time"
             value={`${formatInstantTime(slot.startsAt)} – ${formatInstantTime(slot.endsAt)}`}
           />
-          <IconRow chip icon="location-outline" label="Location" value={ACADEMY.locationLine} />
+          {/* Location taps through to Maps. */}
+          <Pressable onPress={() => Linking.openURL(ACADEMY.mapsUrl)}>
+            <IconRow chip icon="location-outline" label="Location" value={ACADEMY.locationLine} />
+          </Pressable>
         </View>
 
         <View style={styles.tags}>
@@ -175,9 +178,11 @@ export default function ConfirmBookingScreen() {
 
       {/* Confirmation state — what booking actually gets them. Honest: no promise
           of a notification (the app can't send one). toFill === 1 means this
-          booking fills the last seat and confirms it on the spot (covers a 1-on-1,
-          which auto-confirms on the first booking). */}
-      {confirmed ? (
+          booking fills the last seat and confirms it on the spot. A cap-1 session
+          (individual/trial) confirms on the first booking, so confirmation
+          messaging is noise there — suppress it (gate on capacity > 1). While
+          pending, toFill is always >= 1, so no branch can render "0 to fill". */}
+      {slot.capacity <= 1 ? null : confirmed ? (
         <InfoCard
           variant="success"
           icon="checkmark-circle-outline"

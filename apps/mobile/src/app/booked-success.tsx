@@ -8,7 +8,7 @@ import {
 import { space } from '@tpa/theme';
 import type { BookingId } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { coachById, slotById } from '../data/booking';
 import { useBatches, useBookings, useCoaches, useSlots, combine } from '../data/queries';
@@ -85,7 +85,10 @@ export default function BookedSuccessScreen() {
             <Badge label={meta.label} icon={meta.icon} />
           </View>
           <View style={styles.rows}>
-            <IconRow icon="location-outline" title={ACADEMY.locationLine} />
+            {/* Location taps through to Maps — the one thing a player needs at 6pm. */}
+            <Pressable onPress={() => Linking.openURL(ACADEMY.mapsUrl)}>
+              <IconRow icon="location-outline" title={ACADEMY.locationLine} subtitle="Tap for directions" />
+            </Pressable>
             <IconRow
               icon="time-outline"
               title={`Free cancellation until ${formatInstantTime(cancellationDeadline(slot))}`}
@@ -93,7 +96,11 @@ export default function BookedSuccessScreen() {
           </View>
         </Card>
 
-        {confirmed ? null : (
+        {/* Cap-1 sessions (individual/trial) confirm on the first booking, so a
+            "runs once N more join" note is nonsense there — gate on capacity > 1.
+            While pending, toFill is always >= 1 (a confirmed session returns 0),
+            so this can never render "0 to fill". */}
+        {confirmed || slot.capacity <= 1 ? null : (
           <InfoCard
             variant="neutral"
             icon="people-outline"

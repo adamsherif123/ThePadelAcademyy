@@ -159,12 +159,13 @@ export interface SessionSlot {
   /** Set when generated from an AvailabilityTemplate; null for ad-hoc slots. */
   templateId: AvailabilityTemplateId | null;
   /**
-   * When the session became confirmed (it's on) — set by the booking that fills it
-   * OR by the admin confirming manually; null while still pending. STICKY: once set
-   * it stays set until the session is cancelled, so an un-fill (4/4 → cancel → 3/4)
-   * never silently un-confirms. Recorded state, not derived from booked_count.
+   * When the ADMIN manually confirmed the session (S11.1) — null otherwise. This is
+   * ONLY the manual timestamp: a session confirmed by FILLING has this null and is
+   * confirmed by derivation (booked_count >= capacity). Manual confirmation is
+   * STICKY (survives an un-fill); fill-confirmation is derived. Read confirmed-ness
+   * via @tpa/core's isSessionConfirmed, never this field alone.
    */
-  confirmedAt: IsoInstant | null;
+  manuallyConfirmedAt: IsoInstant | null;
 }
 
 /**

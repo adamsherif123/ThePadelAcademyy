@@ -10,6 +10,8 @@ export const ACADEMY = {
   address: 'In front of Family Park, Rehab, Cairo',
   /** The canonical one-line location shown on session cards — the ONE source. */
   locationLine: 'Oro Plaza Hotel · Rehab, Cairo',
+  /** Deep link to Maps — the location line taps through here before a session. */
+  mapsUrl: 'https://maps.google.com/?q=Oro+Plaza+Hotel+Rehab+Cairo',
   hours: 'Sun – Wed · 5:00 PM – 11:00 PM',
   hoursNote: 'Group training mainly 5 – 9 PM',
 } as const;

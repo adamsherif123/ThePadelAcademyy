@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { formatInstantDate, formatInstantTime, isSessionConfirmed, spotsUntilConfirmed } from '@tpa/core';
+import { formatInstantDate, formatInstantTime, isSessionConfirmed } from '@tpa/core';
 import { color, radius, space } from '@tpa/theme';
 import type { BookingStatus, Coach, Gender, IsoInstant, Level, SessionSlot } from '@tpa/types';
-import { StyleSheet, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { ACADEMY } from './AcademyCard';
 import { Avatar } from './Avatar';
@@ -77,24 +77,35 @@ export function BookingCard(props: BookingCardProps) {
         )}
       </View>
 
-      <View style={styles.locationRow}>
+      <Pressable style={styles.locationRow} onPress={() => Linking.openURL(ACADEMY.mapsUrl)}>
         <Ionicons name="location-outline" size={15} color={color.text.muted} />
-        <Text variant="caption" tone="muted">
+        <Text variant="caption" tone="muted" style={styles.locationText}>
           {ACADEMY.locationLine}
         </Text>
-      </View>
+        <Ionicons name="chevron-forward" size={13} color={color.text.muted} />
+      </Pressable>
 
       {props.variant === 'upcoming' ? (
         <>
-          {/* Is the SESSION on yet? Confirmed = sticky/on; pending = still filling.
-              Honest, no notification promise (the app can't send one). */}
-          {isSessionConfirmed(slot) ? (
+          {/* One chip carries the fill count AND the state (S11.1). Cap-1 sessions
+              (individual/trial) confirm on the first booking — a chip there is
+              noise, so suppress it. Otherwise: pending shows why (${N}/${M} joined,
+              amber); confirmed-and-full is just "Confirmed"; confirmed-below-cap
+              (admin locked it early) keeps the count. Honest — no notification
+              promise (the app can't send one). */}
+          {slot.capacity <= 1 ? null : !isSessionConfirmed(slot) ? (
+            <Badge
+              label={`${slot.bookedCount}/${slot.capacity} joined`}
+              tone="warning"
+              icon="people-outline"
+            />
+          ) : slot.bookedCount >= slot.capacity ? (
             <Badge label="Confirmed" tone="success" icon="checkmark-circle-outline" />
           ) : (
             <Badge
-              label={`Pending · ${spotsUntilConfirmed(slot)} to fill`}
-              tone="warning"
-              icon="people-outline"
+              label={`Confirmed · ${slot.bookedCount}/${slot.capacity}`}
+              tone="success"
+              icon="checkmark-circle-outline"
             />
           )}
           {props.refundable ? (
@@ -138,5 +149,6 @@ const styles = StyleSheet.create({
   top: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   info: { flex: 1, gap: 2 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
+  locationText: { textDecorationLine: 'underline' },
   cancelRow: { flexDirection: 'row', justifyContent: 'flex-end' },
 });

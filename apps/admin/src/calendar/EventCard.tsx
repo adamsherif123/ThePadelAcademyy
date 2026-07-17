@@ -34,8 +34,9 @@ export function EventCard({
   const coach = coachById(coaches, slot.coachId);
   const full = slot.bookedCount >= slot.capacity;
   // Pending = not yet confirmed (hasn't filled and no manual confirm). A subtle dot
-  // on the capacity pill lets Rania scan which sessions still need players.
-  const pending = !isSessionConfirmed(slot);
+  // on the capacity pill lets Rania scan which sessions still need players. Cap-1
+  // sessions (individual/trial) confirm on the first booking, so they never show it.
+  const pending = slot.capacity > 1 && !isSessionConfirmed(slot);
   const tags = groupTags(slot.gender, slot.level) || TRAINING_LABEL[slot.trainingType];
 
   const density = Math.min(lanes, 3); // 1 = full, 2 = half, 3 = third (or narrower)
@@ -57,7 +58,7 @@ export function EventCard({
           className={styles.cap}
           data-full={full || undefined}
           data-pending={pending || undefined}
-          title={pending ? 'Pending — not yet filled' : 'Confirmed'}
+          title={slot.capacity > 1 ? (pending ? 'Pending — not yet filled' : 'Confirmed') : undefined}
         >
           {slot.bookedCount}/{slot.capacity}
         </span>

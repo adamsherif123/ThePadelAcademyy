@@ -79,6 +79,11 @@ function SessionRow({ slot, coaches }: { slot: SessionSlot; coaches: Coach[] }) 
   // filled yet (pending) versus which are locked in (confirmed) — so each row leads
   // with that state rather than a bare seat count.
   const confirmed = isSessionConfirmed(slot);
+  const full = slot.bookedCount >= slot.capacity;
+  // Cap-1 sessions (individual/trial) confirm on the first booking, so a confirmation
+  // tag is noise — they carry no state tag here. Cap>1 gets ONE chip that is both the
+  // count and the state.
+  const showConfirmState = slot.capacity > 1;
   return (
     <div className={styles.row}>
       <div className={styles.timeCol}>
@@ -91,13 +96,21 @@ function SessionRow({ slot, coaches }: { slot: SessionSlot; coaches: Coach[] }) 
         <TypePill type={slot.trainingType} />
         <span className={styles.sub}>{coachById(coaches, slot.coachId)?.name ?? 'Coach'}</span>
       </div>
-      {confirmed ? (
-        <Badge tone="success">Confirmed</Badge>
-      ) : (
-        <Badge tone="warning">
-          Pending {slot.bookedCount}/{slot.capacity}
-        </Badge>
-      )}
+      {showConfirmState ? (
+        confirmed ? (
+          full ? (
+            <Badge tone="success">Confirmed</Badge>
+          ) : (
+            <Badge tone="success">
+              Confirmed · {slot.bookedCount}/{slot.capacity}
+            </Badge>
+          )
+        ) : (
+          <Badge tone="warning">
+            Pending · {slot.bookedCount}/{slot.capacity}
+          </Badge>
+        )
+      ) : null}
     </div>
   );
 }

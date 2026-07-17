@@ -37,7 +37,7 @@ function slot(over: Partial<SessionSlot> = {}): SessionSlot {
     level: 'beginner',
     status: 'published',
     templateId: null,
-    confirmedAt: null,
+    manuallyConfirmedAt: null,
     ...over,
   };
 }
@@ -66,24 +66,30 @@ describe('slotRemainingCapacity', () => {
   });
 });
 
-describe('session confirmation (isSessionConfirmed / spotsUntilConfirmed)', () => {
-  it('reads confirmedAt, NOT booked_count — sticky, not derived', () => {
-    // pending: not yet stamped, even at 3/4
-    expect(isSessionConfirmed(slot({ capacity: 4, bookedCount: 3, confirmedAt: null }))).toBe(false);
-    // confirmed: stamped
-    expect(isSessionConfirmed(slot({ capacity: 4, bookedCount: 4, confirmedAt: NOW }))).toBe(true);
-    // THE sticky case: filled (4/4) then a cancel dropped it to 3/4, but confirmedAt
-    // survived → STILL confirmed. Pure derivation (booked_count>=capacity) would lie.
-    expect(isSessionConfirmed(slot({ capacity: 4, bookedCount: 3, confirmedAt: NOW }))).toBe(true);
+describe('session confirmation — DERIVED fill OR STICKY manual (S11.1)', () => {
+  it('DERIVED: full is confirmed, not-full is pending (a duo at 1/2 is NOT confirmed)', () => {
+    expect(isSessionConfirmed(slot({ capacity: 4, bookedCount: 4, manuallyConfirmedAt: null }))).toBe(true); // full
+    expect(isSessionConfirmed(slot({ capacity: 4, bookedCount: 3, manuallyConfirmedAt: null }))).toBe(false); // 3/4 pending
+    expect(isSessionConfirmed(slot({ capacity: 2, bookedCount: 1, manuallyConfirmedAt: null }))).toBe(false); // the S11 duo-1/2 lie, fixed
   });
 
-  it('spotsUntilConfirmed is seats-to-fill while pending, 0 once confirmed', () => {
-    expect(spotsUntilConfirmed(slot({ capacity: 4, bookedCount: 3, confirmedAt: null }))).toBe(1); // "1 more player"
-    expect(spotsUntilConfirmed(slot({ capacity: 2, bookedCount: 0, confirmedAt: null }))).toBe(2);
-    expect(spotsUntilConfirmed(slot({ capacity: 1, bookedCount: 0, confirmedAt: null }))).toBe(1); // individual: 1 booking confirms
-    expect(spotsUntilConfirmed(slot({ capacity: 4, bookedCount: 4, confirmedAt: NOW }))).toBe(0);
-    // sticky/un-fill: confirmed but 3/4 → still 0 (it's on; no more needed)
-    expect(spotsUntilConfirmed(slot({ capacity: 4, bookedCount: 3, confirmedAt: NOW }))).toBe(0);
+  it('DERIVED un-fills back to pending (fixes S11 sticky-fill); MANUAL survives an un-fill', () => {
+    // 4/4 → a cancel drops it to 3/4, NO manual confirm → pending again
+    expect(isSessionConfirmed(slot({ capacity: 4, bookedCount: 3, manuallyConfirmedAt: null }))).toBe(false);
+    // 4/4 → 3/4 but Rania confirmed it → STAYS confirmed (her recorded decision)
+    expect(isSessionConfirmed(slot({ capacity: 4, bookedCount: 3, manuallyConfirmedAt: NOW }))).toBe(true);
+  });
+
+  it('capacity-1 confirms on the first booking, always (fixes "PENDING · 0 TO FILL")', () => {
+    expect(isSessionConfirmed(slot({ capacity: 1, bookedCount: 1, manuallyConfirmedAt: null }))).toBe(true); // full-by-1
+    expect(isSessionConfirmed(slot({ capacity: 1, bookedCount: 0, manuallyConfirmedAt: null }))).toBe(false); // empty
+  });
+
+  it('spotsUntilConfirmed is seats-to-fill while pending, 0 once confirmed (fill OR manual)', () => {
+    expect(spotsUntilConfirmed(slot({ capacity: 4, bookedCount: 3, manuallyConfirmedAt: null }))).toBe(1);
+    expect(spotsUntilConfirmed(slot({ capacity: 2, bookedCount: 0, manuallyConfirmedAt: null }))).toBe(2);
+    expect(spotsUntilConfirmed(slot({ capacity: 4, bookedCount: 4, manuallyConfirmedAt: null }))).toBe(0); // full → 0
+    expect(spotsUntilConfirmed(slot({ capacity: 4, bookedCount: 3, manuallyConfirmedAt: NOW }))).toBe(0);   // manual → 0
   });
 });
 

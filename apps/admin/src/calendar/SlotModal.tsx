@@ -4,7 +4,6 @@ import {
   formatInstantTime,
   isSessionConfirmed,
   parseInstant,
-  spotsUntilConfirmed,
 } from '@tpa/core';
 import type {
   AvailabilityTemplate,
@@ -170,12 +169,17 @@ export function SlotModal({
   const isFuture = parseInstant(slot.startsAt).getTime() > parseInstant(now).getTime();
   const isPast = !isFuture;
 
-  // Confirmation state (the rule lives ONLY in these two @tpa/core predicates).
+  // Confirmation state (the rule lives ONLY in the @tpa/core predicate).
   const confirmed = isSessionConfirmed(slot);
-  const toFill = spotsUntilConfirmed(slot);
-  // Confirm is offered only while the session is still PENDING, FUTURE, and
-  // published — a confirmed/cancelled/past session shows the chip, never the button.
-  const canConfirmSession = !confirmed && isFuture && slot.status === 'published';
+  const full = slot.bookedCount >= slot.capacity;
+  // Capacity-1 sessions (individual/trial) confirm on the first booking, always — a
+  // permanent chip is noise and there's nothing to manually confirm, so the whole
+  // confirmation UI (chip + button) is suppressed for them.
+  const showConfirmState = slot.capacity > 1;
+  // Confirm is offered only while the session is still PENDING, FUTURE, published,
+  // and manually-confirmable (capacity > 1) — a confirmed/cancelled/past/cap-1
+  // session shows no button.
+  const canConfirmSession = showConfirmState && !confirmed && isFuture && slot.status === 'published';
   const rosterBookings = isPast
     ? bookingsForSlot(bookings, slot.id)
         .filter((b) => b.status !== 'cancelled')
@@ -503,15 +507,23 @@ export function SlotModal({
             </p>
           </div>
           <div className={styles.pills}>
-            {/* Confirmation state — the operational "is this session on?" chip. */}
-            {confirmed ? (
-              <Badge tone="success">Confirmed</Badge>
-            ) : (
-              <Badge tone="warning">
-                Pending — {slot.bookedCount}/{slot.capacity}
-                {toFill > 0 ? `, ${toFill} more to fill` : ''}
-              </Badge>
-            )}
+            {/* Confirmation state — ONE chip carrying both the count and the state.
+                Suppressed on cap-1 (always confirms on the first booking). */}
+            {showConfirmState ? (
+              confirmed ? (
+                full ? (
+                  <Badge tone="success">Confirmed</Badge>
+                ) : (
+                  <Badge tone="success">
+                    Confirmed · {slot.bookedCount}/{slot.capacity}
+                  </Badge>
+                )
+              ) : (
+                <Badge tone="warning">
+                  Pending · {slot.bookedCount}/{slot.capacity}
+                </Badge>
+              )
+            ) : null}
             {isGroup ? (
               <>
                 <Badge tone="neutral">{GENDER_LABEL[slot.gender!]}</Badge>

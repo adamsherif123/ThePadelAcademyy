@@ -33,20 +33,24 @@ export function slotRemainingCapacity(slot: SessionSlot): number {
 }
 
 /**
- * Is the session confirmed (it's on)? The single rule both apps read. STICKY and
- * RECORDED: it's `confirmedAt !== null`, NOT `booked_count >= capacity` — a session
- * that filled then lost a player stays confirmed (see SessionSlot.confirmedAt). A
- * session is confirmed when it fills (the booking that reaches capacity stamps it)
- * or when the admin confirms it manually; until then it's pending.
+ * Is the session confirmed (it's on)? The single rule both apps read (S11.1):
+ *
+ *   confirmed  ⇔  booked_count >= capacity  OR  manuallyConfirmedAt !== null
+ *
+ * Fill-confirmation is DERIVED — a duo at 1/2 is not confirmed, and a 4/4 that
+ * un-fills to 3/4 drops back to pending (it literally isn't full). Manual
+ * confirmation is STICKY — once the admin confirms, it stays confirmed through an
+ * un-fill, because that's her recorded decision, not something the count implies.
+ * (A capacity-1 session is confirmed on its first booking, always.)
  */
 export function isSessionConfirmed(slot: SessionSlot): boolean {
-  return slot.confirmedAt !== null;
+  return slot.bookedCount >= slot.capacity || slot.manuallyConfirmedAt !== null;
 }
 
 /**
- * How many more bookings would fill a PENDING session (and so auto-confirm it).
- * Zero once confirmed. Used for the honest "runs once N more players join" copy —
- * a statement of what fills it, never a promise of notification.
+ * How many more bookings would fill a PENDING session (and so confirm it). Zero once
+ * confirmed. Used for the honest "runs once N more players join" copy — a statement
+ * of what fills it, never a promise of notification.
  */
 export function spotsUntilConfirmed(slot: SessionSlot): number {
   if (isSessionConfirmed(slot)) return 0;

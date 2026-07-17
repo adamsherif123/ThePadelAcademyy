@@ -65,7 +65,7 @@ function slot(over: Partial<SessionSlot> & Pick<SessionSlot, 'id'>): SessionSlot
     level: 'beginner',
     status: 'published',
     templateId: null,
-    confirmedAt: null,
+    manuallyConfirmedAt: null,
     ...over,
   };
 }

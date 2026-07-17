@@ -194,7 +194,7 @@ export function generateSlots(
           level: template.level,
           status: 'published',
           templateId: template.id,
-          confirmedAt: null, // freshly generated → pending until it fills or is confirmed
+          manuallyConfirmedAt: null, // freshly generated → pending until it fills or is confirmed
         },
       });
     }
@@ -269,7 +269,7 @@ export async function createOneOffSlot(draft: OneOffDraft, now: IsoInstant): Pro
     level: needsGenderLevel ? draft.level : null,
     status: 'published',
     templateId: null,
-    confirmedAt: null,
+    manuallyConfirmedAt: null,
   };
   // The DB EXCLUDE constraint is the real coach-overlap guard (the modal only warns).
   const res = await runWrite(() => insertSlots([slot]), TOUCHED.slots);
