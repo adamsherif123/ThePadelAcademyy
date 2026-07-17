@@ -11,6 +11,7 @@ import {
   fetchPackages,
   fetchPurchases,
   fetchSlots,
+  fetchTemplates,
   type BookReason,
   type CancelReason,
 } from '../lib/api';
@@ -57,6 +58,9 @@ export const usePackages = () =>
 
 export const useSlots = () =>
   toResource(useQuery({ queryKey: queryKeys.slots, queryFn: fetchSlots }));
+
+export const useTemplates = () =>
+  toResource(useQuery({ queryKey: queryKeys.templates, queryFn: fetchTemplates }));
 
 export const useBookings = () =>
   toResource(useQuery({ queryKey: queryKeys.bookings, queryFn: fetchBookings }));

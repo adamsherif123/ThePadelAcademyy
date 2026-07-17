@@ -131,14 +131,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     async (draft: ProfileDraft) => {
       const res = await completeSignupRpc(draft);
       if (!res.ok) return { ok: false, error: res.reason };
+      const nowIso = toInstant(new Date());
       // Show the trial grant we know the server just minted (same @tpa/core rule).
-      setTrialGrant(buildSignupGrant(res.playerId as Player['id'], toInstant(new Date())));
-      // Refetch the player so status flips to `ready`; the wallet now has credits.
+      setTrialGrant(buildSignupGrant(res.playerId as Player['id'], nowIso));
+      // SEED the player into the cache SYNCHRONOUSLY. This is the fix for the signup
+      // bounce: `status` derives from this query, so writing it here flips status to
+      // `ready` before profile-setup navigates — the guard then sees a ready user on
+      // the trial-grant route (which it exempts) instead of a needs_profile user it
+      // would replace back. No refetch round-trip, so there is no window to lose the
+      // race in. (createdAt is a placeholder — unused in the UI — and the invalidate
+      // below reconciles the whole row to server truth a moment later.)
+      const e164 = phone ?? (session?.user.phone ? `+${session.user.phone}` : '');
+      queryClient.setQueryData<Player>(queryKeys.player, {
+        id: res.playerId as Player['id'],
+        phone: e164,
+        name: draft.name,
+        gender: draft.gender,
+        level: draft.level,
+        createdAt: nowIso,
+      });
+      // Reconcile the player to the server row + surface the freshly minted credits.
       await queryClient.invalidateQueries({ queryKey: queryKeys.player });
       await queryClient.invalidateQueries({ queryKey: queryKeys.creditBatches });
       return { ok: true };
     },
-    [],
+    [phone, session],
   );
 
   const signOut = useCallback(async () => {

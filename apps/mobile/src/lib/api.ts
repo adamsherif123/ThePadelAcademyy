@@ -7,6 +7,7 @@
 // value we can map to copy, and only transport failures throw.
 import type { BookBlockReason } from '@tpa/core';
 import type {
+  AvailabilityTemplate,
   Booking,
   BookingId,
   Coach,
@@ -22,6 +23,7 @@ import type {
 
 import { supabase } from './supabase';
 import {
+  rowToAvailabilityTemplate,
   rowToBooking,
   rowToCoach,
   rowToCreditBatch,
@@ -55,6 +57,11 @@ async function selectAll<T>(table: string, map: (r: Record<string, unknown>) => 
 }
 
 export const fetchCoaches = (): Promise<Coach[]> => selectAll('coaches', rowToCoach);
+// A signed-in (authenticated) player reads ACTIVE templates via RLS policy
+// `availability_templates_select_active` (S5.1) — this is how the client knows the
+// academy's operating weekdays. Anon cannot read them; these screens are behind auth.
+export const fetchTemplates = (): Promise<AvailabilityTemplate[]> =>
+  selectAll('availability_templates', rowToAvailabilityTemplate);
 export const fetchPackages = (): Promise<Package[]> => selectAll('packages', rowToPackage);
 export const fetchSlots = (): Promise<SessionSlot[]> => selectAll('session_slots', rowToSlot);
 export const fetchCreditBatches = (): Promise<CreditBatch[]> =>

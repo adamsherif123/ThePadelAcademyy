@@ -40,6 +40,7 @@ export const queryKeys = {
   player: ['player'] as const,
   coaches: ['coaches'] as const,
   packages: ['packages'] as const,
+  templates: ['templates'] as const,
   slots: ['slots'] as const,
   creditBatches: ['creditBatches'] as const,
   bookings: ['bookings'] as const,

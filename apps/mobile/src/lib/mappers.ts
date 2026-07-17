@@ -4,14 +4,17 @@
 // to re-apply the brands the DB columns can't carry — the shapes are checked by
 // the domain types the mappers return.
 import type {
+  AvailabilityTemplate,
   Booking,
   Coach,
   CreditBatch,
   IsoInstant,
+  LocalTime,
   Package,
   Player,
   Purchase,
   SessionSlot,
+  Weekday,
 } from '@tpa/types';
 
 /** A raw row from PostgREST: column name → value, with unknown value types. */
@@ -99,6 +102,23 @@ export function rowToSlot(r: Row): SessionSlot {
     level: (r.level as SessionSlot['level']) ?? null,
     status: str(r.status) as SessionSlot['status'],
     templateId: (nstr(r.template_id) as SessionSlot['templateId']) ?? null,
+  };
+}
+
+export function rowToAvailabilityTemplate(r: Row): AvailabilityTemplate {
+  // Postgres `time` comes back as "HH:mm:ss"; LocalTime is Cairo-local "HH:mm".
+  const hhmm = (v: unknown): LocalTime => str(v).slice(0, 5) as LocalTime;
+  return {
+    id: str(r.id) as AvailabilityTemplate['id'],
+    coachId: str(r.coach_id) as AvailabilityTemplate['coachId'],
+    weekday: num(r.weekday) as Weekday,
+    startTime: hhmm(r.start_time),
+    endTime: hhmm(r.end_time),
+    trainingType: str(r.training_type) as AvailabilityTemplate['trainingType'],
+    capacity: num(r.capacity),
+    gender: (r.gender as AvailabilityTemplate['gender']) ?? null,
+    level: (r.level as AvailabilityTemplate['level']) ?? null,
+    isActive: bool(r.is_active),
   };
 }
 

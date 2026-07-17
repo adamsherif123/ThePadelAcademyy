@@ -11,7 +11,7 @@ import {
   slotAvailability,
   slotsForType,
 } from '../../data/booking';
-import { useBatches, useBookings, useCoaches, useSlots, combine } from '../../data/queries';
+import { useBatches, useBookings, useCoaches, useSlots, useTemplates, combine } from '../../data/queries';
 import { balanceByType } from '../../data/wallet';
 import { useSession } from '../../session/SessionProvider';
 import {
@@ -79,7 +79,8 @@ export default function BookScreen() {
   const batchesQ = useBatches();
   const bookingsQ = useBookings();
   const coachesQ = useCoaches();
-  const gate = combine(slotsQ, batchesQ, bookingsQ, coachesQ);
+  const templatesQ = useTemplates();
+  const gate = combine(slotsQ, batchesQ, bookingsQ, coachesQ, templatesQ);
   const [type, setType] = useState<TrainingType>('group');
   const [dayKey, setDayKey] = useState<string | null>(null);
 
@@ -99,7 +100,7 @@ export default function BookScreen() {
   const bookings = bookingsQ.data ?? [];
   const coaches = coachesQ.data ?? [];
 
-  const days = dateStrip(allSlots, now, DAYS);
+  const days = dateStrip(templatesQ.data ?? [], now, DAYS);
   const firstOpen = days.find((d) => !d.closed) ?? days[0]!;
   const selectedDay = days.find((d) => d.key === dayKey) ?? firstOpen;
 

@@ -1,9 +1,20 @@
 import { cairoCalendarDate } from '@tpa/core';
-import type { Booking, Coach, CreditBatch, IsoInstant, Player, SessionSlot } from '@tpa/types';
+import type {
+  AvailabilityTemplate,
+  Booking,
+  Coach,
+  CreditBatch,
+  IsoInstant,
+  LocalTime,
+  Player,
+  SessionSlot,
+  Weekday,
+} from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
 import {
   bookedSlotIds,
+  dateStrip,
   operatingWeekdays,
   pastSessions,
   slotAvailability,
@@ -70,6 +81,21 @@ function batch(over: Partial<CreditBatch> & Pick<CreditBatch, 'id'>): CreditBatc
     createdAt: iso(-1),
     note: null,
     ...over,
+  };
+}
+
+function template(weekday: Weekday, isActive = true): AvailabilityTemplate {
+  return {
+    id: `at_${weekday}_${isActive ? 'a' : 'i'}` as AvailabilityTemplate['id'],
+    coachId: coach.id,
+    weekday,
+    startTime: '09:00' as LocalTime,
+    endTime: '10:00' as LocalTime,
+    trainingType: 'trial',
+    capacity: 1,
+    gender: null,
+    level: null,
+    isActive,
   };
 }
 
@@ -163,17 +189,31 @@ describe('upcoming / past split', () => {
   });
 });
 
-describe('operatingWeekdays', () => {
-  it('is derived from published slots only — a cancelled-only day is closed', () => {
-    const openDay = slot({ id: 'o' as SessionSlot['id'], startsAt: iso(2) });
-    const closedDay = slot({ id: 'c' as SessionSlot['id'], startsAt: iso(5), status: 'cancelled' });
-    const open = operatingWeekdays([openDay, closedDay]);
-    expect(open.has(cairoCalendarDate(iso(2)).weekday)).toBe(true);
-    const closedWeekday = cairoCalendarDate(iso(5)).weekday;
-    // Only closed if no published slot shares that weekday.
-    if (cairoCalendarDate(iso(2)).weekday !== closedWeekday) {
-      expect(open.has(closedWeekday)).toBe(false);
-    }
+describe('operatingWeekdays / dateStrip (from active templates)', () => {
+  it('open = weekdays with an active template; inactive or missing template = closed', () => {
+    const open = operatingWeekdays([template(1, true), template(3, false)]);
+    expect(open.has(1 as Weekday)).toBe(true); // Monday: active template
+    expect(open.has(3 as Weekday)).toBe(false); // Wednesday: template exists but INACTIVE
+    expect(open.has(2 as Weekday)).toBe(false); // Tuesday: no template at all
+  });
+
+  it('a weekday with an active template but ZERO slots is OPEN (nothing available), not CLOSED', () => {
+    // Only Monday(1) has an active template. Crucially we pass NO slots anywhere —
+    // the regression this guards is "no slots ⇒ every day closed".
+    const days = dateStrip([template(1, true)], NOW, 14);
+    const mondays = days.filter((d) => d.weekday === 1);
+    const tuesdays = days.filter((d) => d.weekday === 2);
+    expect(mondays.length).toBeGreaterThan(0);
+    expect(tuesdays.length).toBeGreaterThan(0);
+
+    // Monday is OPEN despite zero published slots — the operating day still shows.
+    for (const d of mondays) expect(d.closed).toBe(false);
+    // Tuesday has no template → genuinely CLOSED.
+    for (const d of tuesdays) expect(d.closed).toBe(true);
+
+    // On that open Monday the slot list is simply empty — "open, nothing available",
+    // which the Book screen renders as an empty state, NOT a closed day.
+    expect(slotsForType([], 'trial', player, mondays[0]!)).toEqual([]);
   });
 });
 
