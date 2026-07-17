@@ -1,7 +1,7 @@
-import type { IsoInstant, Piastres } from '@tpa/types';
+import type { IsoInstant, LocalTime, Piastres } from '@tpa/types';
 
 import { CAIRO_TZ, PIASTRES_PER_EGP } from './constants';
-import { cairoCalendarDate, parseInstant } from './time';
+import { cairoCalendarDate, parseInstant, parseLocalTime } from './time';
 
 /**
  * The ONE place in the codebase where money, dates, and times become display
@@ -75,6 +75,23 @@ const HOUR_FMT = new Intl.DateTimeFormat('en-US', {
  */
 export function formatHour(instant: IsoInstant): string {
   return HOUR_FMT.format(parseInstant(instant));
+}
+
+/**
+ * A LocalTime wall-clock ("18:00" / "18:30") → 12-hour display ("6 PM" / "6:30 PM").
+ * No timezone is involved — a template's start/end are wall times, not instants —
+ * so this is plain clock arithmetic, never Intl. On-the-hour times drop the minutes.
+ */
+export function formatLocalTime(time: LocalTime): string {
+  const { hour, minute } = parseLocalTime(time);
+  const period = hour < 12 ? 'AM' : 'PM';
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return minute === 0 ? `${hour12} ${period}` : `${hour12}:${String(minute).padStart(2, '0')} ${period}`;
+}
+
+/** A wall-clock range for a template row, e.g. "6 PM – 8 PM". */
+export function formatLocalTimeRange(start: LocalTime, end: LocalTime): string {
+  return `${formatLocalTime(start)} – ${formatLocalTime(end)}`;
 }
 
 /** e.g. "Tue, 14 Jul" in Cairo time. */

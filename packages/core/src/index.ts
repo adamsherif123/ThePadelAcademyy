@@ -50,10 +50,19 @@ export {
   formatHour,
   formatInstantDate,
   formatInstantTime,
+  formatLocalTime,
+  formatLocalTimeRange,
   formatMonthDay,
   formatPiastres,
   formatSessionTimeRange,
 } from './format';
+
+export {
+  buildAvailabilityTemplate,
+  templateRequiresGenderLevel,
+  type TemplateDraft,
+  type TemplateInvalidReason,
+} from './templates';
 
 export {
   canBookSlot,

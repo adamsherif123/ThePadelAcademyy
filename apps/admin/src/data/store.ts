@@ -101,6 +101,40 @@ export function commitSlotUpdate(updatedSlot: SessionSlot): void {
 }
 
 /**
+ * Append freshly-created slots — the bulk output of "generate slots", or a single
+ * one-off. Purely additive: it never rewrites an existing slot, which is what keeps
+ * generation from ever touching a session that's already on the calendar. S10
+ * replaces this with a bulk INSERT (a `generate_slots` RPC on the DB side).
+ */
+export function commitNewSlots(newSlots: SessionSlot[]): void {
+  if (newSlots.length === 0) return;
+  slots = [...slots, ...newSlots];
+  emit();
+}
+
+/**
+ * Insert-or-replace an availability template by id (create appends, edit replaces
+ * in place). Editing keeps the id, so slots already generated from the rule keep
+ * their templateId link. S10 → INSERT/UPDATE.
+ */
+export function commitTemplateSave(template: AvailabilityTemplate): void {
+  templates = templates.some((t) => t.id === template.id)
+    ? templates.map((t) => (t.id === template.id ? template : t))
+    : [...templates, template];
+  emit();
+}
+
+/**
+ * Delete an availability template. Deliberately does NOT touch the slots it
+ * generated — deleting a recurring rule stops FUTURE generation but leaves every
+ * already-scheduled (and possibly booked) session in place. S10 → DELETE.
+ */
+export function commitTemplateDelete(templateId: AvailabilityTemplate['id']): void {
+  templates = templates.filter((t) => t.id !== templateId);
+  emit();
+}
+
+/**
  * Commit an admin-initiated booking atomically: prepend the new booking, replace
  * the spent batch (decremented), and replace the slot (one more seat taken). The
  * seam computes the next-state; this is a dumb write. S10 replaces the seam body

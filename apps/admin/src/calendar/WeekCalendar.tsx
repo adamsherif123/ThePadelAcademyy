@@ -18,12 +18,14 @@ export function WeekCalendar({
   onPrevWeek,
   onNextWeek,
   onSlotClick,
+  onAddOneOff,
 }: {
   now: SessionSlot['startsAt'];
   weekOffset: number;
   onPrevWeek: () => void;
   onNextWeek: () => void;
   onSlotClick: (slot: SessionSlot) => void;
+  onAddOneOff: () => void;
 }) {
   const columns = weekColumns(now, weekOffset);
   const first = columns[0]!;
@@ -65,7 +67,7 @@ export function WeekCalendar({
               </li>
             ))}
           </ul>
-          <Button icon={Plus} disabled title="Add one-off slot (S4d)">
+          <Button icon={Plus} onClick={onAddOneOff}>
             Add one-off slot
           </Button>
         </div>

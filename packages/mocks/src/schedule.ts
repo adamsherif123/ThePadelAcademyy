@@ -32,6 +32,11 @@ export const mockTemplates: AvailabilityTemplate[] = [
   // spendable (trial credits with nowhere to go would be a dead fixture).
   { id: 'at_trial_sun' as AvailabilityTemplateId, coachId: 'co_hany' as CoachId, weekday: 0, startTime: '21:00' as LocalTime, endTime: '22:00' as LocalTime, trainingType: 'trial', capacity: 1, gender: null, level: null, isActive: true },
   { id: 'at_trial_wed' as AvailabilityTemplateId, coachId: 'co_mariam' as CoachId, weekday: 3, startTime: '20:00' as LocalTime, endTime: '21:00' as LocalTime, trainingType: 'trial', capacity: 1, gender: null, level: null, isActive: true },
+  // A PAUSED rule for the on-leave coach (co_laila): it generates nothing while
+  // paused, but the admin can resume it when she's back. Gives the templates tab a
+  // Paused badge + an on-leave coach card to render, and proves inactive templates
+  // are skipped by generation.
+  { id: 'at_grp_lad_beg_tue' as AvailabilityTemplateId, coachId: 'co_laila' as CoachId, weekday: 2, startTime: '18:30' as LocalTime, endTime: '20:00' as LocalTime, trainingType: 'group', capacity: 4, gender: 'ladies', level: 'beginner', isActive: false },
 ];
 
 // Start a few days before MOCK_NOW so there are past sessions for attended/
@@ -68,6 +73,7 @@ function generateSlots(): SessionSlot[] {
   let idx = 0;
 
   for (const template of mockTemplates) {
+    if (!template.isActive) continue; // a paused rule generates no slots
     for (const date of windowDates()) {
       if (date.weekday !== template.weekday) continue;
       const { startsAt, endsAt } = materializeTemplateSlot(template, date);

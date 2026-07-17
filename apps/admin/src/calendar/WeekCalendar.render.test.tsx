@@ -23,6 +23,7 @@ describe('WeekCalendar rendering', () => {
         onPrevWeek={() => {}}
         onNextWeek={() => {}}
         onSlotClick={() => {}}
+        onAddOneOff={() => {}}
       />,
     );
 
