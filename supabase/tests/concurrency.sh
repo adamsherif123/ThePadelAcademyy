@@ -18,7 +18,8 @@
 # ============================================================================
 set -uo pipefail
 
-CONTAINER="supabase_db_TPA-schema"
+# Derive $CONTAINER from config.toml + confirm the stack is up (clear error if not).
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 PSQL=(docker exec -i "$CONTAINER" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -tA)
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT

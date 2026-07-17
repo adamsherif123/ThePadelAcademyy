@@ -11,7 +11,11 @@
     "admin": "pnpm --filter admin dev",
     "typecheck": "pnpm -r --no-bail typecheck",
     "lint": "pnpm -r --no-bail lint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:db": "bash supabase/tests/pgtap.sh",
+    "test:concurrency": "bash supabase/tests/concurrency.sh",
+    "test:auth": "bash supabase/tests/auth_session.sh",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:db && pnpm test:concurrency && pnpm test:auth"
   },
   "devDependencies": {
     "tsx": "^4.23.1",

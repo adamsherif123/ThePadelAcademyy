@@ -12,9 +12,11 @@
 # ============================================================================
 set -uo pipefail
 
+# Derive $CONTAINER from config.toml + confirm the stack is up (clear error if not).
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 API="http://127.0.0.1:54321"
 ANON="$(supabase status -o env 2>/dev/null | grep -E '^ANON_KEY=' | cut -d= -f2 | tr -d '"')"
-DBX=(docker exec -i supabase_db_TPA-schema psql -U postgres -d postgres -tA)
+DBX=(docker exec -i "$CONTAINER" psql -U postgres -d postgres -tA)
 PA="+201555550001"; PB="+201555550002"; PC="+201555550003"
 
 FAILS=0
