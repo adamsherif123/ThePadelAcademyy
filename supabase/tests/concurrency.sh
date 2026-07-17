@@ -36,6 +36,16 @@ racer() { # $1=uuid $2=slot $3=target_iso $4=outfile
     > "$4" 2>&1 &
 }
 
+# A racer that CANCELS a session as the admin (for the book-vs-cancel race).
+racer_cancel() { # $1=admin_uuid $2=slot $3=target_iso $4=outfile
+  "${PSQL[@]}" \
+    -c "set role authenticated" \
+    -c "select set_config('request.jwt.claims', '{\"sub\":\"$1\",\"role\":\"authenticated\"}', false)" \
+    -c "select pg_sleep(greatest(0, extract(epoch from (timestamptz '$3' - clock_timestamp()))))" \
+    -c "select public.cancel_session('$2')->>'ok'" \
+    > "$4" 2>&1 &
+}
+
 uuid() { printf '00000000-0000-0000-0000-%012d' "$1"; }  # deterministic test uuids
 
 FAILS=0
@@ -105,6 +115,48 @@ WINS_C=$(grep -lFx WIN "$TMP"/c_*.txt 2>/dev/null | wc -l | tr -d ' ')
 check "exactly one of the two slots booked" "$WINS_C" "1"
 check "the single credit was spent once"    "$(sql "select quantity_total-quantity_remaining from public.credit_batches where id='cbr_c1'")" "1"
 check "exactly one booking for the player"  "$(sql "select count(*) from public.bookings where player_id='plr_c1' and status<>'cancelled'")" "1"
+
+# ── Scenario D: book_slot vs cancel_session on the SAME slot (S7b Task 0) ─────
+# The dangerous ordering: cancel_session commits first, refunds everyone it sees,
+# then the player's guarded increment must NOT slip a booking in after the refund
+# pass. The fix (status='published' in the guarded WHERE) makes that increment
+# match zero rows. We race K slots, each with a booking player AND the admin
+# cancelling at the same instant, and assert NO orphan survives in EITHER ordering:
+# no active booking on a cancelled slot, and no net credit spent (a booking that
+# landed was refunded by cancel_session).
+echo "Scenario D — book_slot vs cancel_session raced on the same slot (K=40):"
+D_N=40
+DSETUP="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id,is_admin) values ('plr_dadm','+201000900','Adm','men','beginner',now(),'$(uuid 999)',true);"
+for i in $(seq 1 $D_N); do
+  DSETUP+="insert into public.coaches (id,name,bio,is_active) values ('cor_d$i','C','b',true);"
+  DSETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status) values ('slr_d$i','cor_d$i',now()+interval '1 day',now()+interval '1 day 1 hour','trial',4,0,'published');"
+  DSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_d$i','+2010009${i}','D','men','beginner',now(),'$(uuid $((400+i)))');"
+  DSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_d$i','plr_d$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now());"
+done
+sql "$DSETUP" >/dev/null
+
+T=$(target 5)
+for i in $(seq 1 $D_N); do
+  racer        "$(uuid $((400+i)))" "slr_d$i" "$T" "$TMP/d_book_$i.txt"
+  racer_cancel "$(uuid 999)"        "slr_d$i" "$T" "$TMP/d_cxl_$i.txt"
+done
+wait
+# THE invariant, tolerant of the rare book/cancel deadlock (which aborts one side
+# cleanly, leaving the slot published and the booking legitimate — NOT an orphan):
+#  (1) no LIVE booking on a CANCELLED slot, and
+#  (2) no credit spent on a booking whose session ended cancelled (all refunded).
+# A booking on a still-published slot (a deadlocked cancel) is legitimate, so we
+# don't require every slot to end cancelled.
+D_ORPHAN=$(sql "select count(*) from public.bookings b join public.session_slots s on b.slot_id=s.id
+                where s.id like 'slr_d%' and b.status='booked' and s.status='cancelled'")
+D_LOST=$(sql "select count(*) from public.credit_batches cb
+              where cb.id like 'cbr_d%' and cb.quantity_remaining < 1
+                and (select status from public.session_slots where id='slr_d'||substr(cb.id,6))='cancelled'")
+D_CANCELLED=$(sql "select count(*) from public.session_slots where id like 'slr_d%' and status='cancelled'")
+D_REFUNDED=$(sql "select count(*) from public.bookings where slot_id like 'slr_d%' and status='cancelled'")
+check "no live booking on any cancelled slot (no orphan)"          "$D_ORPHAN" "0"
+check "no credit lost on a cancelled session (every one refunded)" "$D_LOST"   "0"
+echo "  info — $D_CANCELLED/$D_N slots cancelled; $D_REFUNDED booking(s) landed-then-refunded (proves both orderings raced)"
 
 # ── teardown ─────────────────────────────────────────────────────────────────
 cleanup_rows

@@ -34,3 +34,29 @@ describe('SQL ⇄ core constant parity (no silent drift)', () => {
     expect(tpaInterval('credit_expiry')).toBe(`${CREDIT_EXPIRY_DAYS} days`);
   });
 });
+
+/**
+ * The expiry-discipline guard (S7b Task 8). tpa.credit_expiry() / tpa.cancellation_window()
+ * exist so no RPC inlines `interval '30 days'` / `interval '3 hours'`. All three
+ * mint paths (settle_purchase, record_cash_purchase, grant_credits) must call
+ * tpa.credit_expiry() instead. This fails if either literal appears MORE THAN ONCE
+ * across the migrations — i.e. anywhere but its one defining function.
+ *
+ * Comments are stripped first (a comment may legitimately mention the literal, as
+ * the S7a migration's own "do not inline" note does). LIMITS: it matches the exact
+ * literal only — a paraphrase like `interval '30 day'` (singular), `interval '720
+ * hours'`, or `now() + 2592000 * interval '1 second'` would evade it. It catches
+ * the realistic copy-paste inlining, not a determined workaround.
+ */
+const strippedSql = allMigrationSql.replace(/--.*$/gm, '');
+const occurrences = (needle: string): number => strippedSql.split(needle).length - 1;
+
+describe('expiry/window literals live ONLY in their tpa.* function (no inlining)', () => {
+  it(`interval '${CREDIT_EXPIRY_DAYS} days' appears exactly once (tpa.credit_expiry)`, () => {
+    expect(occurrences(`interval '${CREDIT_EXPIRY_DAYS} days'`)).toBe(1);
+  });
+
+  it(`interval '${CANCELLATION_WINDOW_HOURS} hours' appears exactly once (tpa.cancellation_window)`, () => {
+    expect(occurrences(`interval '${CANCELLATION_WINDOW_HOURS} hours'`)).toBe(1);
+  });
+});
