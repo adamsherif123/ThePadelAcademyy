@@ -146,6 +146,7 @@ for (let dayOffset = WINDOW_DAYS; dayOffset >= 1; dayOffset -= 1) {
       status,
       amount: pkg.price,
       createdAt,
+      paymentMethod: 'paymob',
       gatewayOrderId: `pmob_g${pn}`,
       gatewayTransactionId: status === 'succeeded' ? `ptxn_g${pn}` : null,
     });

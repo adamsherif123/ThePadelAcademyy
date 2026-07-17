@@ -3,6 +3,7 @@ import type {
   CreditSource,
   Gender,
   Level,
+  PaymentMethod,
   PurchaseStatus,
   SlotStatus,
   TrainingType,
@@ -88,6 +89,8 @@ export const CREDIT_SOURCES = [
   'admin_grant',
 ] as const satisfies readonly CreditSource[];
 
+export const PAYMENT_METHODS = ['paymob', 'cash'] as const satisfies readonly PaymentMethod[];
+
 // --- Exhaustiveness guards: fail compilation if an array omits a union member ---
 type Covers<Arr extends readonly unknown[], U> = [Exclude<U, Arr[number]>] extends [never]
   ? true
@@ -118,3 +121,6 @@ export type _CoversWeekdays = Assert<Covers<typeof WEEKDAYS, Weekday>>;
 // Exported so `noUnusedLocals` in consuming apps doesn't flag them; intentionally
 // NOT re-exported from index.ts, so they stay out of @tpa/core's public API.
 export type _CoversCreditSources = Assert<Covers<typeof CREDIT_SOURCES, CreditSource>>;
+// Exported so `noUnusedLocals` in consuming apps doesn't flag them; intentionally
+// NOT re-exported from index.ts, so they stay out of @tpa/core's public API.
+export type _CoversPaymentMethods = Assert<Covers<typeof PAYMENT_METHODS, PaymentMethod>>;

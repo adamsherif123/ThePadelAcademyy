@@ -20,4 +20,12 @@ export { StatusChip } from './StatusChip';
 export { Table, type Column } from './Table';
 export { Toggle } from './Toggle';
 export { TypePill } from './TypePill';
-export { TRAINING_LABEL, GENDER_LABEL, LEVEL_LABEL, TYPE_PLAYERS, groupTags } from './trainingLabel';
+export {
+  TRAINING_LABEL,
+  GENDER_LABEL,
+  LEVEL_LABEL,
+  GENDER_OPTIONS,
+  LEVEL_OPTIONS,
+  TYPE_PLAYERS,
+  groupTags,
+} from './trainingLabel';

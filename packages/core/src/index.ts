@@ -14,6 +14,7 @@ export {
   EXPIRING_SOON_DAYS,
   GENDERS,
   LEVELS,
+  PAYMENT_METHODS,
   PIASTRES_PER_EGP,
   PURCHASE_STATUSES,
   SIGNUP_TRIAL_CREDITS,
@@ -33,14 +34,20 @@ export {
   type CreditExpiryState,
 } from './credits';
 
+export { buildCashPurchase, cashPurchaseHasNoGatewayRefs } from './purchases';
+
 export {
+  addCairoDays,
   cairoCalendarDate,
+  cairoMidnight,
   cairoOffsetMs,
   cairoWallTimeToInstant,
+  cairoWeekStart,
   materializeTemplateSlot,
   parseInstant,
   parseLocalTime,
   toInstant,
+  type CairoDate,
 } from './time';
 
 export {

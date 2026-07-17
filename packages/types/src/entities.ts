@@ -15,6 +15,7 @@ import type {
   CreditSource,
   Gender,
   Level,
+  PaymentMethod,
   PurchaseStatus,
   SlotStatus,
   TrainingType,
@@ -66,9 +67,11 @@ export interface Purchase {
   status: PurchaseStatus;
   amount: Piastres;
   createdAt: IsoInstant;
-  /** Gateway order handle; null until the gateway is engaged. */
+  /** How the money was taken: the Paymob card gateway, or cash at the desk. */
+  paymentMethod: PaymentMethod;
+  /** Gateway order handle; null until the gateway is engaged (always null for cash). */
   gatewayOrderId: string | null;
-  /** Gateway transaction handle; null until a transaction exists. */
+  /** Gateway transaction handle; null until a transaction exists (always null for cash). */
   gatewayTransactionId: string | null;
 }
 

@@ -170,6 +170,11 @@
   border-color: var(--color-accent-default);
 }
 
+.walletActions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
 .value {
   display: flex;
   align-items: center;
@@ -179,6 +184,11 @@
   background: var(--color-accent-soft);
   color: var(--color-text-primary);
   font-size: var(--font-size-body);
+}
+/* Money IN (cash received) reads as positive, distinct from a grant's neutral tint. */
+.valueIn {
+  background: var(--expiry-ok-bg);
+  color: var(--expiry-ok-fg);
 }
 .valueBig {
   font-weight: var(--font-weight-bold);

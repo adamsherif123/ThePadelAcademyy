@@ -33,7 +33,6 @@ import {
 
 // Coaches
 export const allCoaches = (): Coach[] => getCoaches();
-export const activeCoaches = (): Coach[] => getCoaches().filter((c) => c.isActive);
 export const coachById = (id: CoachId): Coach | undefined => getCoaches().find((c) => c.id === id);
 
 // Players
@@ -76,6 +75,5 @@ export const usableCreditFor = (
 
 // Packages
 export const allPackages = (): Package[] => getPackages();
-export const activePackages = (): Package[] => getPackages().filter((p) => p.isActive);
 export const packageById = (id: PackageId): Package | undefined =>
   getPackages().find((p) => p.id === id);

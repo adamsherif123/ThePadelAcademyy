@@ -18,6 +18,14 @@ export type Gender = 'men' | 'ladies';
 /** Client may only ever create `pending`; only a verified webhook advances it. */
 export type PurchaseStatus = 'pending' | 'succeeded' | 'failed';
 
+/**
+ * How the money reached the academy. `paymob` = the online card gateway (S7).
+ * `cash` = taken at the desk — Egypt runs on cash, and a cash sale is an ordinary
+ * purchase whose only difference from a card one is the channel. A cash purchase
+ * settles immediately (`succeeded`) and carries NO gateway references.
+ */
+export type PaymentMethod = 'paymob' | 'cash';
+
 export type BookingStatus = 'booked' | 'cancelled' | 'attended' | 'no_show';
 
 export type SlotStatus = 'published' | 'cancelled';

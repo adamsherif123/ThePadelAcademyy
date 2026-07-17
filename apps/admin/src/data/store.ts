@@ -188,6 +188,20 @@ export function commitCreditGrant(batch: CreditBatch): void {
   emit();
 }
 
+/**
+ * Record a settled CASH purchase and mint its credits in one atomic write: the
+ * succeeded purchase is prepended and its purchase-backed batch with it. Like the
+ * grant (and unlike coach/package config), this is money — the schema lets a client
+ * insert only PENDING purchases for itself, and credit_batches has no client write
+ * policy at all — so S10 replaces the seam with a SECURITY DEFINER RPC that does
+ * both inserts server-side, atomically. This commit is the mock stand-in.
+ */
+export function commitCashPurchase(purchase: Purchase, batch: CreditBatch): void {
+  purchases = [purchase, ...purchases];
+  batches = [batch, ...batches];
+  emit();
+}
+
 /** Insert-or-replace a player by id (edit replaces in place). S10 → is_admin UPDATE. */
 export function commitPlayerSave(player: Player): void {
   players = players.some((p) => p.id === player.id)

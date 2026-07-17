@@ -1,15 +1,26 @@
 import {
+  CREDIT_EXPIRY_DAYS,
   creditExpiryState,
   formatExpiry,
   formatInstantDate,
   formatPiastres,
-  GENDERS,
-  LEVELS,
 } from '@tpa/core';
-import type { CreditSource, Gender, IsoInstant, Level, Player, TrainingType } from '@tpa/types';
-import { AlertTriangle, ArrowLeft, Gift, Pencil } from 'lucide-react';
+import type {
+  CreditSource,
+  Gender,
+  IsoInstant,
+  Level,
+  Package,
+  PackageId,
+  PaymentMethod,
+  Piastres,
+  Player,
+  TrainingType,
+} from '@tpa/types';
+import { AlertTriangle, ArrowLeft, Banknote, Gift, Pencil } from 'lucide-react';
 import { useState } from 'react';
 
+import { recordCashPurchase } from '../data/cashPurchase';
 import { grantCredits } from '../data/grant';
 import { sessionRetailValue, SELLABLE_TYPES } from '../data/packages';
 import {
@@ -18,7 +29,7 @@ import {
   purchasesForPlayer,
   updatePlayerProfile,
 } from '../data/players';
-import { bookingsForPlayer, coachById, packageById, slotById } from '../data/selectors';
+import { allPackages, bookingsForPlayer, coachById, packageById, slotById } from '../data/selectors';
 import { useAdminStore } from '../data/store';
 import { useSession } from '../session/SessionProvider';
 import {
@@ -26,8 +37,10 @@ import {
   Badge,
   Button,
   GENDER_LABEL,
+  GENDER_OPTIONS,
   Input,
   LEVEL_LABEL,
+  LEVEL_OPTIONS,
   Modal,
   Select,
   StatusChip,
@@ -42,13 +55,16 @@ const SOURCE_LABEL: Record<CreditSource, string> = {
   signup_grant: 'Signup trial',
 };
 
-type View = 'main' | 'edit' | 'grant';
+const METHOD_LABEL: Record<PaymentMethod, string> = { paymob: 'Card', cash: 'Cash' };
+
+type View = 'main' | 'edit' | 'grant' | 'cash';
 
 /**
  * Player detail — what the owner opens when someone messages him. Profile, the full
  * wallet (every batch: type, remaining/total, source, expiry state), booking and
- * purchase history, plus the two writes that matter: edit the profile (gender/level
- * change which slots they see) and grant comp credits (admin_grant).
+ * purchase history, plus the three writes that matter: edit the profile (gender/
+ * level change which slots they see), record a cash payment (money IN — a real
+ * purchase), and grant comp credits (money OUT — an admin_grant).
  */
 export function PlayerDetailModal({ player, onClose }: { player: Player; onClose: () => void }) {
   const { now } = useSession();
@@ -57,6 +73,7 @@ export function PlayerDetailModal({ player, onClose }: { player: Player; onClose
 
   if (view === 'edit') return <EditView player={player} onBack={() => setView('main')} onClose={onClose} />;
   if (view === 'grant') return <GrantView player={player} now={now} onBack={() => setView('main')} onClose={onClose} />;
+  if (view === 'cash') return <CashView player={player} now={now} onBack={() => setView('main')} onClose={onClose} />;
 
   const batches = batchesForPlayerSorted(player.id);
   const bookings = bookingsForPlayer(player.id)
@@ -99,9 +116,14 @@ export function PlayerDetailModal({ player, onClose }: { player: Player; onClose
         <div className={styles.section}>
           <div className={styles.sectionHead}>
             <span className={styles.sectionTitle}>Wallet</span>
-            <Button size="sm" icon={Gift} onClick={() => setView('grant')}>
-              Grant credits
-            </Button>
+            <div className={styles.walletActions}>
+              <Button size="sm" variant="secondary" icon={Gift} onClick={() => setView('grant')}>
+                Grant
+              </Button>
+              <Button size="sm" icon={Banknote} onClick={() => setView('cash')}>
+                Record payment
+              </Button>
+            </div>
           </div>
           {batches.length === 0 ? (
             <p className={styles.empty}>No credits yet.</p>
@@ -173,7 +195,9 @@ export function PlayerDetailModal({ player, onClose }: { player: Player; onClose
                   <div key={p.id} className={styles.row}>
                     <div className={styles.rowMain}>
                       <span className={styles.rowTitle}>{pkg?.name ?? 'Package'}</span>
-                      <span className={styles.rowSub}>{formatInstantDate(p.createdAt)}</span>
+                      <span className={styles.rowSub}>
+                        {formatInstantDate(p.createdAt)} · {METHOD_LABEL[p.paymentMethod]}
+                      </span>
                     </div>
                     <div className={styles.rowEnd}>
                       <span className={styles.amount}>{formatPiastres(p.amount)}</span>
@@ -241,13 +265,13 @@ function EditView({ player, onBack, onClose }: { player: Player; onBack: () => v
             label="Gender"
             value={gender}
             onChange={(e) => setGender(e.target.value as Gender)}
-            options={GENDERS.map((g) => ({ value: g, label: GENDER_LABEL[g] }))}
+            options={GENDER_OPTIONS}
           />
           <Select
             label="Level"
             value={level}
             onChange={(e) => setLevel(e.target.value as Level)}
-            options={LEVELS.map((l) => ({ value: l, label: LEVEL_LABEL[l] }))}
+            options={LEVEL_OPTIONS}
           />
         </div>
 
@@ -352,6 +376,119 @@ function GrantView({ player, now, onBack, onClose }: { player: Player; now: IsoI
             </span>
           </p>
         ) : null}
+
+        {error ? (
+          <p className={styles.error}>
+            <AlertTriangle size={15} aria-hidden />
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </Modal>
+  );
+}
+
+// ---- CASH ----
+const sellablePackages = (): Package[] =>
+  allPackages()
+    .filter((p) => p.isActive && p.trainingType !== 'trial')
+    .sort((a, b) => a.trainingType.localeCompare(b.trainingType) || a.sessionCount - b.sessionCount);
+
+function CashView({ player, now, onBack, onClose }: { player: Player; now: IsoInstant; onBack: () => void; onClose: () => void }) {
+  const packages = sellablePackages();
+  const [packageId, setPackageId] = useState<PackageId | ''>(packages[0]?.id ?? '');
+  const selected = packages.find((p) => p.id === packageId) ?? null;
+  const [amountEgp, setAmountEgp] = useState<number>(selected ? selected.price / 100 : 0);
+  const [error, setError] = useState<string | null>(null);
+
+  const amount = Math.round(amountEgp * 100) as Piastres;
+  const list = selected?.price ?? (0 as Piastres);
+  const delta = amount - list;
+  const canSave = selected !== null && amount >= 1;
+  const expiryDate = formatInstantDate(
+    new Date(new Date(now).getTime() + CREDIT_EXPIRY_DAYS * 86_400_000).toISOString() as IsoInstant,
+  );
+
+  const pickPackage = (id: string) => {
+    setPackageId(id as PackageId);
+    const pkg = packages.find((p) => p.id === id);
+    if (pkg) setAmountEgp(pkg.price / 100); // amount follows the picked package's list price
+  };
+
+  const onSave = () => {
+    if (!selected) return;
+    const res = recordCashPurchase(player.id, selected.id, amount, now);
+    if (res.ok) onBack();
+    else
+      setError(
+        res.reason === 'amount_below_one'
+          ? 'The amount received must be above zero.'
+          : res.reason === 'package_missing'
+            ? 'Pick a package.'
+            : 'That player no longer exists.',
+      );
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      eyebrow={player.name}
+      title="Record cash payment"
+      footer={
+        <>
+          <Button variant="secondary" icon={ArrowLeft} onClick={onBack}>
+            Back
+          </Button>
+          <Button icon={Banknote} onClick={onSave} disabled={!canSave}>
+            Record payment
+          </Button>
+        </>
+      }
+    >
+      <div className={styles.form}>
+        <div className={styles.grid}>
+          <Select
+            label="Package"
+            value={packageId}
+            onChange={(e) => pickPackage(e.target.value)}
+            options={packages.map((p) => ({ value: p.id, label: p.name }))}
+          />
+          <Input
+            label="Amount received (EGP)"
+            type="number"
+            min={1}
+            value={amountEgp}
+            onChange={(e) => setAmountEgp(Number(e.target.value))}
+            hint={
+              selected
+                ? delta === 0
+                  ? 'List price'
+                  : `${formatPiastres(Math.abs(delta) as Piastres)} ${delta < 0 ? 'below' : 'above'} list`
+                : undefined
+            }
+          />
+        </div>
+
+        {delta > 0 ? (
+          <p className={styles.note}>
+            <AlertTriangle size={15} aria-hidden />
+            That’s above the {formatPiastres(list)} list price — allowed, but double-check it isn’t a typo.
+          </p>
+        ) : null}
+
+        {selected ? (
+          <p className={`${styles.value} ${styles.valueIn}`}>
+            <Banknote size={16} aria-hidden />
+            <span>
+              Records <span className={styles.valueBig}>{formatPiastres(amount)}</span> received and grants{' '}
+              {selected.sessionCount} {TRAINING_LABEL[selected.trainingType].toLowerCase()} credit
+              {selected.sessionCount === 1 ? '' : 's'}, expiring {expiryDate}.
+            </span>
+          </p>
+        ) : (
+          <p className={styles.empty}>No sellable packages to record against.</p>
+        )}
 
         {error ? (
           <p className={styles.error}>

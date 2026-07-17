@@ -41,6 +41,7 @@ import {
   Modal,
   PlayerSearch,
   Select,
+  StatusChip,
   TRAINING_LABEL,
   TYPE_PLAYERS,
   groupTags,
@@ -472,9 +473,7 @@ export function SlotModal({ slot: initial, onClose }: { slot: SessionSlot; onClo
                   return (
                     <div key={b.id} className={styles.historyRow}>
                       <span className={styles.historyName}>{player?.name ?? 'Player'}</span>
-                      <Badge tone={b.status === 'attended' ? 'success' : b.status === 'no_show' ? 'warning' : 'neutral'}>
-                        {b.status === 'no_show' ? 'No-show' : b.status.charAt(0).toUpperCase() + b.status.slice(1)}
-                      </Badge>
+                      <StatusChip status={b.status} />
                     </div>
                   );
                 })

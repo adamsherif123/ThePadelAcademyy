@@ -1,4 +1,12 @@
-import { cairoCalendarDate, cairoOffsetMs, cairoWallTimeToInstant, parseInstant } from '@tpa/core';
+import {
+  addCairoDays,
+  cairoCalendarDate,
+  cairoMidnight,
+  cairoOffsetMs,
+  cairoWallTimeToInstant,
+  parseInstant,
+  type CairoDate,
+} from '@tpa/core';
 import type { CoachId, IsoInstant, SessionSlot, SlotId, Weekday } from '@tpa/types';
 
 import { assignLanes } from './lanes';
@@ -6,25 +14,12 @@ import { getSlots, getTemplates } from './store';
 
 /**
  * Week-calendar selectors — pure, Cairo-correct (a UTC grid would shift every
- * event by the offset). S10 swaps the store internals underneath, unchanged.
+ * event by the offset). Cairo day/midnight arithmetic comes from @tpa/core (the
+ * canonical version). S10 swaps the store internals underneath, unchanged.
  */
 
 const DAY_MS = 86_400_000;
 const ms = (i: IsoInstant): number => parseInstant(i).getTime();
-
-interface CairoDate {
-  year: number;
-  month: number;
-  day: number;
-}
-
-const cairoMidnight = (d: CairoDate): IsoInstant => cairoWallTimeToInstant(d.year, d.month, d.day, 0, 0);
-
-/** Shift a Cairo calendar date by whole days (DST-safe: pure calendar arithmetic). */
-function addDays(d: CairoDate, delta: number): CairoDate {
-  const shifted = new Date(Date.UTC(d.year, d.month - 1, d.day) + delta * DAY_MS);
-  return { year: shifted.getUTCFullYear(), month: shifted.getUTCMonth() + 1, day: shifted.getUTCDate() };
-}
 
 /** Minutes since Cairo midnight for an instant — the vertical position in the grid. */
 export function cairoWallMinutes(instant: IsoInstant): number {
@@ -57,10 +52,10 @@ export interface DayColumn {
 /** The 7 Sun–Sat columns of the week `weekOffset` weeks from now's Cairo week. */
 export function weekColumns(now: IsoInstant, weekOffset: number): DayColumn[] {
   const c = cairoCalendarDate(now);
-  const sunday = addDays({ year: c.year, month: c.month, day: c.day }, -c.weekday + weekOffset * 7);
+  const sunday = addCairoDays({ year: c.year, month: c.month, day: c.day }, -c.weekday + weekOffset * 7);
   const closed = closedWeekdays();
   return Array.from({ length: 7 }, (_, i) => {
-    const date = addDays(sunday, i);
+    const date = addCairoDays(sunday, i);
     const isToday = date.year === c.year && date.month === c.month && date.day === c.day && weekOffset === 0;
     return {
       weekday: i as Weekday,
@@ -105,7 +100,7 @@ export function slotTimesFromWall(
   const endTotal = startMinutes + durationMinutes;
   const rollDays = Math.floor(endTotal / (24 * 60));
   const endMin = ((endTotal % (24 * 60)) + 24 * 60) % (24 * 60);
-  const end = addDays({ year, month, day }, rollDays);
+  const end = addCairoDays({ year, month, day }, rollDays);
   return {
     startsAt: cairoWallTimeToInstant(year, month, day, Math.floor(startMinutes / 60), startMinutes % 60),
     endsAt: cairoWallTimeToInstant(end.year, end.month, end.day, Math.floor(endMin / 60), endMin % 60),

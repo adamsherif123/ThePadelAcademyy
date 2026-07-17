@@ -17,16 +17,18 @@ import { MOCK_NOW, daysFromNow, egp } from './now';
  * UI states. `amount` mirrors the package price at purchase time.
  */
 const handPurchases: Purchase[] = [
-  { id: 'pu_omar_group8' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_group_8' as PackageId, status: 'succeeded', amount: egp(2800), createdAt: daysFromNow(-5), gatewayOrderId: 'pmob_ord_1001', gatewayTransactionId: 'pmob_txn_5001' },
-  { id: 'pu_omar_group4' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_group_4' as PackageId, status: 'succeeded', amount: egp(1600), createdAt: daysFromNow(-28), gatewayOrderId: 'pmob_ord_1002', gatewayTransactionId: 'pmob_txn_5002' },
-  { id: 'pu_omar_duo4' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_duo_4' as PackageId, status: 'succeeded', amount: egp(2200), createdAt: daysFromNow(-33), gatewayOrderId: 'pmob_ord_1003', gatewayTransactionId: 'pmob_txn_5003' },
-  { id: 'pu_omar_indiv4' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_indiv_4' as PackageId, status: 'succeeded', amount: egp(3200), createdAt: daysFromNow(-10), gatewayOrderId: 'pmob_ord_1004', gatewayTransactionId: 'pmob_txn_5004' },
+  { id: 'pu_omar_group8' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_group_8' as PackageId, status: 'succeeded', amount: egp(2800), createdAt: daysFromNow(-5), paymentMethod: 'paymob', gatewayOrderId: 'pmob_ord_1001', gatewayTransactionId: 'pmob_txn_5001' },
+  // A CASH sale taken at the desk: succeeded, no gateway refs — exercises the cash
+  // channel in purchase history and proves cash funds an ordinary purchased batch.
+  { id: 'pu_omar_group4' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_group_4' as PackageId, status: 'succeeded', amount: egp(1600), createdAt: daysFromNow(-28), paymentMethod: 'cash', gatewayOrderId: null, gatewayTransactionId: null },
+  { id: 'pu_omar_duo4' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_duo_4' as PackageId, status: 'succeeded', amount: egp(2200), createdAt: daysFromNow(-33), paymentMethod: 'paymob', gatewayOrderId: 'pmob_ord_1003', gatewayTransactionId: 'pmob_txn_5003' },
+  { id: 'pu_omar_indiv4' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_indiv_4' as PackageId, status: 'succeeded', amount: egp(3200), createdAt: daysFromNow(-10), paymentMethod: 'paymob', gatewayOrderId: 'pmob_ord_1004', gatewayTransactionId: 'pmob_txn_5004' },
 
   // pending: client created it, webhook hasn't confirmed — no transaction yet.
   // (Belongs to the current player so purchase history shows every status.)
-  { id: 'pu_omar_duo4_pending' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_duo_4' as PackageId, status: 'pending', amount: egp(2200), createdAt: daysFromNow(0), gatewayOrderId: 'pmob_ord_1005', gatewayTransactionId: null },
+  { id: 'pu_omar_duo4_pending' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_duo_4' as PackageId, status: 'pending', amount: egp(2200), createdAt: daysFromNow(0), paymentMethod: 'paymob', gatewayOrderId: 'pmob_ord_1005', gatewayTransactionId: null },
   // failed: gateway declined the transaction.
-  { id: 'pu_omar_indiv4_failed' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_indiv_4' as PackageId, status: 'failed', amount: egp(3200), createdAt: daysFromNow(-1), gatewayOrderId: 'pmob_ord_1006', gatewayTransactionId: 'pmob_txn_5006' },
+  { id: 'pu_omar_indiv4_failed' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_indiv_4' as PackageId, status: 'failed', amount: egp(3200), createdAt: daysFromNow(-1), paymentMethod: 'paymob', gatewayOrderId: 'pmob_ord_1006', gatewayTransactionId: 'pmob_txn_5006' },
 ];
 
 /** Hand-tuned core purchases + academy-scale generated history (dashboard revenue). */

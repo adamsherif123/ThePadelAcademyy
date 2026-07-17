@@ -1,8 +1,10 @@
 import {
   ID_PREFIXES,
   TRAINING_TYPES,
+  addCairoDays,
   cairoCalendarDate,
-  cairoWallTimeToInstant,
+  cairoMidnight,
+  cairoWeekStart,
   newId,
   parseInstant,
 } from '@tpa/core';
@@ -18,19 +20,13 @@ import { commitCoachSave, commitTemplateSave, getBookings, getCoaches, getSlots,
  * (isActive:false).
  */
 
-const DAY_MS = 86_400_000;
 const ms = (i: IsoInstant): number => parseInstant(i).getTime();
 
 /** [start, end) UTC ms of `now`'s Cairo week (Sunday 00:00 → next Sunday 00:00). */
 function cairoWeekBounds(now: IsoInstant): { startMs: number; endMs: number } {
-  const c = cairoCalendarDate(now);
-  const sundayUtc = Date.UTC(c.year, c.month - 1, c.day) - c.weekday * DAY_MS;
-  const s = new Date(sundayUtc);
-  const e = new Date(sundayUtc + 7 * DAY_MS);
-  return {
-    startMs: ms(cairoWallTimeToInstant(s.getUTCFullYear(), s.getUTCMonth() + 1, s.getUTCDate(), 0, 0)),
-    endMs: ms(cairoWallTimeToInstant(e.getUTCFullYear(), e.getUTCMonth() + 1, e.getUTCDate(), 0, 0)),
-  };
+  const start = cairoWeekStart(now);
+  const startDate = cairoCalendarDate(start);
+  return { startMs: ms(start), endMs: ms(cairoMidnight(addCairoDays(startDate, 7))) };
 }
 
 export interface CoachTypeCount {

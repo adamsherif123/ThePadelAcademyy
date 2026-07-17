@@ -1,9 +1,12 @@
 import {
   TRAINING_TYPES,
+  addCairoDays,
   cairoCalendarDate,
-  cairoWallTimeToInstant,
+  cairoMidnight,
+  cairoWeekStart,
   formatDayMonth,
   parseInstant,
+  type CairoDate,
 } from '@tpa/core';
 import type {
   CreditBatch,
@@ -27,26 +30,9 @@ import { getBatches, getBookings, getPackages, getPurchases, getSlots } from './
 const DAY_MS = 86_400_000;
 const ms = (i: IsoInstant): number => parseInstant(i).getTime();
 
-interface CairoDate {
-  year: number;
-  month: number;
-  day: number;
-}
-
-/** Cairo-local midnight (00:00) of a Cairo calendar date, as a UTC instant. */
-const cairoMidnight = (d: CairoDate): IsoInstant =>
-  cairoWallTimeToInstant(d.year, d.month, d.day, 0, 0);
-
-/** Shift a Cairo calendar date by whole days (DST-safe: pure calendar arithmetic). */
-function addDays(d: CairoDate, delta: number): CairoDate {
-  const shifted = new Date(Date.UTC(d.year, d.month - 1, d.day) + delta * DAY_MS);
-  return {
-    year: shifted.getUTCFullYear(),
-    month: shifted.getUTCMonth() + 1,
-    day: shifted.getUTCDate(),
-  };
-}
-
+// Cairo week/day/midnight arithmetic lives in @tpa/core (cairoMidnight,
+// addCairoDays, cairoWeekStart) — the single canonical version. Only the
+// dashboard-specific month arithmetic stays local.
 function addMonths(d: CairoDate, delta: number): CairoDate {
   const idx = (d.year * 12 + (d.month - 1)) + delta;
   return { year: Math.floor(idx / 12), month: (idx % 12) + 1, day: 1 };
@@ -57,12 +43,6 @@ const monthStart = (now: IsoInstant): IsoInstant => {
   const c = cairoCalendarDate(now);
   return cairoMidnight({ year: c.year, month: c.month, day: 1 });
 };
-
-/** Cairo-midnight of the SUNDAY that opens `now`'s Cairo week (weekday 0 = Sun). */
-function weekStartSunday(now: IsoInstant): IsoInstant {
-  const c = cairoCalendarDate(now);
-  return cairoMidnight(addDays({ year: c.year, month: c.month, day: c.day }, -c.weekday));
-}
 
 const succeeded = (): Purchase[] => getPurchases().filter((p) => p.status === 'succeeded');
 const sumAmount = (purchases: readonly Purchase[]): Piastres =>
@@ -105,7 +85,7 @@ export function activePlayerCount(now: IsoInstant): number {
 
 /** Published slots that start within `now`'s Cairo week (the academy runs Sun–Wed). */
 function slotsThisWeek(now: IsoInstant): SessionSlot[] {
-  const start = ms(weekStartSunday(now));
+  const start = ms(cairoWeekStart(now));
   const end = start + 7 * DAY_MS;
   return getSlots().filter((s) => s.status === 'published' && inRange(s.startsAt, start, end));
 }
@@ -188,13 +168,13 @@ export interface WeekBucket {
 }
 
 export function revenueOverTime(now: IsoInstant, weeks = 8): WeekBucket[] {
-  const sunday = cairoCalendarDate(weekStartSunday(now));
+  const sunday = cairoCalendarDate(cairoWeekStart(now));
   const base: CairoDate = { year: sunday.year, month: sunday.month, day: sunday.day };
   const paid = succeeded();
   const buckets: WeekBucket[] = [];
   for (let w = weeks - 1; w >= 0; w -= 1) {
-    const start = cairoMidnight(addDays(base, -w * 7));
-    const end = cairoMidnight(addDays(base, -w * 7 + 7));
+    const start = cairoMidnight(addCairoDays(base, -w * 7));
+    const end = cairoMidnight(addCairoDays(base, -w * 7 + 7));
     const revenue = sumAmount(paid.filter((p) => inRange(p.createdAt, ms(start), ms(end))));
     buckets.push({ label: formatDayMonth(start), weekStart: start, revenue });
   }

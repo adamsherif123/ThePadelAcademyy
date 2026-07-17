@@ -2,6 +2,10 @@ import { templateRequiresGenderLevel } from '@tpa/core';
 import type { CoachId, Gender, Level, TrainingType, Weekday } from '@tpa/types';
 import { useState } from 'react';
 
+// Gender/level dropdown options live once in ui/trainingLabel; re-exported here so
+// the recurring-session modals keep importing them from their shared form module.
+export { GENDER_OPTIONS, LEVEL_OPTIONS } from '../ui';
+
 /**
  * The field LOGIC shared by the template modal and the one-off modal: the option
  * lists, the per-type default capacity, and the group-gender/level rule. Both
@@ -17,17 +21,6 @@ export const SESSION_TYPE_OPTIONS: readonly { value: TrainingType; label: string
   { value: 'duo', label: 'Duo' },
   { value: 'individual', label: 'Individual' },
   { value: 'trial', label: 'Trial' },
-];
-
-export const GENDER_OPTIONS: readonly { value: Gender; label: string }[] = [
-  { value: 'men', label: "Men's" },
-  { value: 'ladies', label: "Ladies'" },
-];
-
-export const LEVEL_OPTIONS: readonly { value: Level; label: string }[] = [
-  { value: 'beginner', label: 'Beginner' },
-  { value: 'adv_beginner', label: 'Adv. Beginner' },
-  { value: 'intermediate', label: 'Intermediate' },
 ];
 
 export const WEEKDAY_OPTIONS: readonly { value: Weekday; label: string }[] = [

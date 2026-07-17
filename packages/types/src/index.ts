@@ -22,6 +22,7 @@ export type {
   CreditSource,
   Gender,
   Level,
+  PaymentMethod,
   PurchaseStatus,
   SlotStatus,
   TrainingType,

@@ -1,6 +1,6 @@
 import { formatInstantDate } from '@tpa/core';
 import { space } from '@tpa/theme';
-import type { Purchase, PurchaseStatus } from '@tpa/types';
+import type { PaymentMethod, Purchase, PurchaseStatus } from '@tpa/types';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
@@ -23,6 +23,9 @@ const STATUS_META: Record<PurchaseStatus, { label: string; tone: BadgeTone }> = 
   pending: { label: 'Pending', tone: 'warning' },
   failed: { label: 'Failed', tone: 'danger' },
 };
+
+/** How the player paid — cash sales are taken at the desk, cards through Paymob. */
+const METHOD_LABEL: Record<PaymentMethod, string> = { paymob: 'Card', cash: 'Cash' };
 
 /**
  * Purchase history (undesigned — built to the established pattern). Each purchase
@@ -67,7 +70,7 @@ function PurchaseRow({ purchase }: { purchase: Purchase }) {
       </View>
       <View style={styles.rowBottom}>
         <Text variant="caption" tone="secondary">
-          {formatInstantDate(purchase.createdAt)}
+          {formatInstantDate(purchase.createdAt)} · {METHOD_LABEL[purchase.paymentMethod]}
         </Text>
         <Money amount={purchase.amount} variant="body" weight="bold" />
       </View>

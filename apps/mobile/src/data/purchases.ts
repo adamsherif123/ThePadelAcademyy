@@ -45,6 +45,7 @@ export function payForPackage(
     status: 'succeeded',
     amount: pkg.price,
     createdAt: now,
+    paymentMethod: 'paymob', // the in-app flow is the card gateway (S6)
     gatewayOrderId: null,
     gatewayTransactionId: null,
   };
