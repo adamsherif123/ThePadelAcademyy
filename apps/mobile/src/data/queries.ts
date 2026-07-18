@@ -1,6 +1,5 @@
 import type { BookingId, SlotId } from '@tpa/types';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useMemo } from 'react';
 
 import {
   bookSlotRpc,
@@ -16,7 +15,6 @@ import {
   type CancelReason,
 } from '../lib/api';
 import { BOOKING_TOUCHED_KEYS, queryClient, queryKeys } from '../lib/queryClient';
-import { getMockOverlay } from './mockPayments';
 
 /**
  * The React Query layer: every screen's data is a hook here. Reads are cached and
@@ -65,37 +63,13 @@ export const useTemplates = () =>
 export const useBookings = () =>
   toResource(useQuery({ queryKey: queryKeys.bookings, queryFn: fetchBookings }));
 
-/** The mock-purchase overlay as a query, so a purchase re-renders wallet subscribers. */
-const useOverlay = () =>
-  useQuery({
-    queryKey: queryKeys.mockOverlay,
-    queryFn: () => getMockOverlay(),
-    staleTime: Infinity,
-    gcTime: Infinity,
-    initialData: () => getMockOverlay(),
-  });
+/** The player's credit batches — minted server-side by the Paymob webhook (S6). */
+export const useBatches = () =>
+  toResource(useQuery({ queryKey: queryKeys.creditBatches, queryFn: fetchCreditBatches }));
 
-/** The player's credit batches, with any mock-purchased (overlay) batches merged in. */
-export function useBatches(): Resource<import('@tpa/types').CreditBatch[]> {
-  const server = useQuery({ queryKey: queryKeys.creditBatches, queryFn: fetchCreditBatches });
-  const overlay = useOverlay();
-  const merged = useMemo(
-    () => (server.data ? [...(overlay.data?.batches ?? []), ...server.data] : undefined),
-    [server.data, overlay.data],
-  );
-  return toResource(server, merged);
-}
-
-/** The player's purchases, with any mock purchases merged in. */
-export function usePurchases(): Resource<import('@tpa/types').Purchase[]> {
-  const server = useQuery({ queryKey: queryKeys.purchases, queryFn: fetchPurchases });
-  const overlay = useOverlay();
-  const merged = useMemo(
-    () => (server.data ? [...(overlay.data?.purchases ?? []), ...server.data] : undefined),
-    [server.data, overlay.data],
-  );
-  return toResource(server, merged);
-}
+/** The player's purchases (pending until the webhook settles them). */
+export const usePurchases = () =>
+  toResource(useQuery({ queryKey: queryKeys.purchases, queryFn: fetchPurchases }));
 
 /** Collapse several resources into one loading / error / retry gate for a screen. */
 export function combine(...rs: Resource<unknown>[]): {

@@ -5,7 +5,7 @@
 // Mutations are the SECURITY DEFINER RPCs; each returns `{ ok, reason }` as DATA
 // (never an HTTP error), so a business rejection like `slot_full` arrives as a
 // value we can map to copy, and only transport failures throw.
-import type { BookBlockReason } from '@tpa/core';
+import { ID_PREFIXES, newId, type BookBlockReason } from '@tpa/core';
 import type {
   AvailabilityTemplate,
   Booking,
@@ -13,10 +13,15 @@ import type {
   Coach,
   CreditBatch,
   Gender,
+  IsoInstant,
   Level,
   Package,
+  PackageId,
+  Piastres,
   Player,
+  PlayerId,
   Purchase,
+  PurchaseId,
   SessionSlot,
   SlotId,
 } from '@tpa/types';
@@ -68,6 +73,62 @@ export const fetchCreditBatches = (): Promise<CreditBatch[]> =>
   selectAll('credit_batches', rowToCreditBatch);
 export const fetchBookings = (): Promise<Booking[]> => selectAll('bookings', rowToBooking);
 export const fetchPurchases = (): Promise<Purchase[]> => selectAll('purchases', rowToPurchase);
+
+/** One purchase by id (for the return-journey poll). RLS scopes it to the caller. */
+export async function fetchPurchaseById(id: string): Promise<Purchase | null> {
+  const { data, error } = await supabase.from('purchases').select('*').eq('id', id).maybeSingle();
+  if (error) throw new ApiError(`Failed to load purchase: ${error.message}`, error);
+  return data ? rowToPurchase(data) : null;
+}
+
+// ── payments (S6 / Paymob) ─────────────────────────────────────────────────────
+// The client inserts ONLY a PENDING purchase; RLS enforces player ownership AND
+// amount = the active package price (S5.1 test 23). The webhook (service_role, after
+// HMAC) is the only thing that ever settles it. We never self-confirm.
+export async function insertPendingPurchase(
+  playerId: PlayerId,
+  packageId: PackageId,
+  amount: Piastres,
+  now: IsoInstant,
+): Promise<PurchaseId> {
+  const id = newId(ID_PREFIXES.purchase) as PurchaseId;
+  const { error } = await supabase.from('purchases').insert({
+    id,
+    player_id: playerId,
+    package_id: packageId,
+    status: 'pending',
+    payment_method: 'paymob', // NOT NULL + RLS both require this; cash sales are admin-only (S5.2)
+    amount, // must equal the active package price or RLS rejects the insert
+    created_at: now,
+    gateway_order_id: null,
+    gateway_transaction_id: null,
+  });
+  if (error) throw new ApiError(`Could not start the purchase: ${error.message}`, error);
+  return id;
+}
+
+/**
+ * Ask the create-checkout Edge Function for a Paymob checkout URL. functions.invoke
+ * swallows the error BODY on a non-2xx (you get only "non-2xx status code"), so we
+ * read error.context (the Response) and surface the real reason — the briefing's
+ * 3-round lesson.
+ */
+export async function createCheckout(purchaseId: PurchaseId): Promise<string> {
+  const { data, error } = await supabase.functions.invoke('create-checkout', {
+    body: { purchaseId },
+  });
+  if (error) {
+    let detail = error.message;
+    const ctx = (error as { context?: Response }).context;
+    if (ctx && typeof ctx.text === 'function') {
+      detail = await ctx.text().catch(() => error.message);
+    }
+    throw new ApiError(`Checkout failed: ${detail}`, error);
+  }
+  const url = (data as { checkoutUrl?: string })?.checkoutUrl;
+  if (!url) throw new ApiError('Checkout failed: no URL returned.');
+  return url;
+}
 
 /** The signed-in player's own row (RLS returns exactly zero or one). null = no profile yet. */
 export async function fetchCurrentPlayer(): Promise<Player | null> {

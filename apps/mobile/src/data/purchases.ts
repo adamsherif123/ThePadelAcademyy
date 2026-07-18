@@ -4,8 +4,8 @@ import { packageById } from './catalog';
 
 /**
  * Purchase-history derivations — pure over the purchases list (the player's own,
- * scoped by RLS, merged with any mock-purchase overlay by the query layer). The
- * payment seam itself lives in ./mockPayments (payForPackage).
+ * scoped by RLS). The payment seam itself lives in ./payments (payForPackage),
+ * which starts a real Paymob checkout; the webhook settles each purchase.
  */
 
 /** The current player's purchases, newest first. */

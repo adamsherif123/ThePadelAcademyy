@@ -15,7 +15,6 @@ import {
 import { completeSignupRpc, fetchCurrentPlayer } from '../lib/api';
 import { queryClient, queryKeys } from '../lib/queryClient';
 import { supabase } from '../lib/supabase';
-import { resetMockOverlay } from '../data/mockPayments';
 import { deriveStatus, type SessionStatus } from './authMachine';
 
 export type { SessionStatus } from './authMachine';
@@ -191,8 +190,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setPhone(null);
     setTrialGrant(null);
-    // Drop every cached read + the mock-purchase overlay so the next player starts clean.
-    resetMockOverlay();
+    // Drop every cached read so the next player starts clean.
     queryClient.clear();
   }, []);
 

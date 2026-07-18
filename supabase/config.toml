@@ -400,6 +400,19 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# create-checkout: called by the signed-in player. JWT verification ON so the
+# function can read the caller's own purchase through RLS (it never trusts the
+# purchaseId argument — it re-reads the row under the caller's identity).
+[functions.create-checkout]
+verify_jwt = true
+
+# paymob-webhook: called by Paymob, which has no Supabase JWT. Auth is the HMAC
+# signature, verified INSIDE the function before any DB access — so JWT
+# verification is OFF (a rejected JWT would 401 the gateway before our HMAC check
+# ever runs). Deploy with `--no-verify-jwt` to match.
+[functions.paymob-webhook]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

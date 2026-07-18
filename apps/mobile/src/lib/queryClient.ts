@@ -45,7 +45,6 @@ export const queryKeys = {
   creditBatches: ['creditBatches'] as const,
   bookings: ['bookings'] as const,
   purchases: ['purchases'] as const,
-  mockOverlay: ['mockOverlay'] as const,
 };
 
 /** What a booking/cancellation changes: the wallet, the player's bookings, and seat counts. */

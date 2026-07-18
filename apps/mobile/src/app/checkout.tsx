@@ -7,8 +7,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { packageById, perSessionPiastres } from '../data/catalog';
 import { usePackages } from '../data/queries';
-import { payForPackage } from '../data/mockPayments';
-import { queryClient, queryKeys } from '../lib/queryClient';
+import { payForPackage } from '../data/payments';
 import { useSession } from '../session/SessionProvider';
 import {
   Badge,
@@ -25,15 +24,18 @@ import {
 } from '../ui';
 
 /**
- * Checkout (undesigned — built to the established pattern). Order summary + a
- * single pay CTA. Payment is entirely mocked behind the `payForPackage` seam,
- * which S6 replaces with the real Paymob flow — see ../data/mockPayments.
+ * Checkout. Order summary + a single pay CTA. `payForPackage` (S6) inserts a PENDING
+ * purchase, gets a Paymob checkout URL, and opens the browser; on return we route to
+ * purchase-success, which POLLS until the webhook settles it — credits are minted
+ * server-side, never here. The seam's promise (route to purchase-success regardless)
+ * is kept.
  */
 export default function CheckoutScreen() {
   const router = useRouter();
-  const { player, now } = useSession();
+  const { player } = useSession();
   const packagesQ = usePackages();
   const [paying, setPaying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { packageId } = useLocalSearchParams<{ packageId: string }>();
 
   if (packagesQ.isPending || packagesQ.isError) {
@@ -61,11 +63,16 @@ export default function CheckoutScreen() {
   const onPay = async () => {
     if (paying) return;
     setPaying(true);
-    const { batch } = await payForPackage(player.id, pkg, now);
-    // The overlay changed — re-read it so the wallet reflects the new credits with
-    // no manual refresh (S6: the gateway webhook mints them server-side instead).
-    await queryClient.invalidateQueries({ queryKey: queryKeys.mockOverlay });
-    router.replace({ pathname: '/purchase-success', params: { batchId: batch.id } });
+    setError(null);
+    const res = await payForPackage(player, pkg);
+    if (res.ok) {
+      // Route to purchase-success, which polls the purchase until the webhook settles
+      // it. We NEVER claim success here — the server confirms it.
+      router.replace({ pathname: '/purchase-success', params: { purchaseId: res.purchaseId } });
+    } else {
+      setPaying(false);
+      setError(res.error);
+    }
   };
 
   return (
@@ -81,6 +88,8 @@ export default function CheckoutScreen() {
       }
     >
       <ScreenHeader eyebrow="Checkout" title="Order Summary" onBack={() => router.back()} />
+
+      {error ? <InfoCard variant="amber" icon="alert-circle-outline" text={error} /> : null}
 
       <Card>
         <View style={styles.head}>
