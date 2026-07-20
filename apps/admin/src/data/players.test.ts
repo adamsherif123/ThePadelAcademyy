@@ -1,9 +1,11 @@
 import { isBatchUsable } from '@tpa/core';
 import { MOCK_NOW, mockBookings, mockCreditBatches, mockPlayers, mockPurchases, mockSlots } from '@tpa/mocks';
-import type { Gender } from '@tpa/types';
+import type { CreditBatch, Gender, IsoInstant, Player } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
 import {
+  activePlayers,
+  batchesForActivePlayers,
   batchesForPlayerSorted,
   creditBreakdown,
   mismatchedActiveBookings,
@@ -92,5 +94,28 @@ describe('updatePlayerProfile', () => {
     const res = updatePlayerProfile(p.id, { name: 'X', phone: '1', gender: 'men', level: 'beginner' });
     expect(res.ok).toBe(false);
     expect(res.ok ? null : res.reason).toBe('not_supported');
+  });
+});
+
+describe('activePlayers / batchesForActivePlayers (deleted accounts hidden from operational views)', () => {
+  const live = mockPlayers[0]!;
+  const gone: Player = { ...mockPlayers[1]!, name: 'Deleted player', deletedAt: MOCK_NOW as IsoInstant };
+  const roster: Player[] = [live, gone];
+
+  it('activePlayers drops rows with a deletedAt (keeps live ones)', () => {
+    const result = activePlayers(roster);
+    expect(result.map((p) => p.id)).toEqual([live.id]);
+    // a live player with no deletedAt field at all is kept (optional, absent = active)
+    expect(activePlayers([live])).toEqual([live]);
+  });
+
+  it('batchesForActivePlayers excludes a deleted player’s abandoned credits from the liability input', () => {
+    const batches: CreditBatch[] = [
+      { ...mockCreditBatches[0]!, playerId: live.id },
+      { ...mockCreditBatches[0]!, id: 'cb_gone' as CreditBatch['id'], playerId: gone.id },
+    ];
+    const kept = batchesForActivePlayers(batches, roster);
+    expect(kept.every((b) => b.playerId === live.id)).toBe(true);
+    expect(kept.some((b) => b.playerId === gone.id)).toBe(false);
   });
 });

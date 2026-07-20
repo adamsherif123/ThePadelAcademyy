@@ -23,6 +23,29 @@ import { usableCreditFor } from './selectors';
 
 const ms = (i: IsoInstant): number => new Date(i).getTime();
 
+/**
+ * The operational roster: live players only. A DELETED account is anonymised and
+ * RETAINED (its bookings/purchases/credits keep their FK — S6.x), but it must never
+ * appear where the admin lists players to SELECT or act on — the Players roster and the
+ * add-player search. Applied at these selection sites only; name-resolution
+ * (playerById, for a historical booking/purchase) keeps using the full list, so history
+ * still reads "Deleted player" rather than vanishing.
+ */
+export const activePlayers = (players: Player[]): Player[] => players.filter((p) => p.deletedAt == null);
+
+/**
+ * Credit batches held by LIVE players — the input to the credit-liability metric. A
+ * deleted account's purchased credits are EXCLUDED: deletion is a definitive forfeiture
+ * (the account can never return — re-signup mints a brand-new player with fresh credits),
+ * so those credits impose no future service obligation and are not a liability. Carrying
+ * them would overstate what the academy still owes. (Alternative: keep until expiry — but
+ * that treats a certain forfeiture as merely dormant, which it isn't.)
+ */
+export function batchesForActivePlayers(batches: CreditBatch[], players: Player[]): CreditBatch[] {
+  const live = new Set(activePlayers(players).map((p) => p.id));
+  return batches.filter((b) => live.has(b.playerId));
+}
+
 export interface CreditBreakdown {
   /** Usable G + D + I credits (the list row's headline; trial is not a bought type). */
   total: number;

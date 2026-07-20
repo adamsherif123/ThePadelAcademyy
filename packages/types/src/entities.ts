@@ -31,6 +31,12 @@ export interface Player {
   gender: Gender;
   level: Level;
   createdAt: IsoInstant;
+  /**
+   * Set when the account was deleted (anonymise-and-retain, S6.x): the row survives so
+   * bookings/purchases keep their FK, but the person is hidden from operational admin
+   * lists. Optional — most code paths don't care, and it's null/absent for a live player.
+   */
+  deletedAt?: IsoInstant | null;
 }
 
 export interface Coach {

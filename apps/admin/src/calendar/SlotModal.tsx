@@ -42,6 +42,7 @@ import {
   slotById,
   usableCreditFor,
 } from '../data/selectors';
+import { activePlayers } from '../data/players';
 import { updateSlotDetails } from '../data/slots';
 import { useSession } from '../session/SessionProvider';
 import {
@@ -293,7 +294,9 @@ export function SlotModal({
             {actionError}
           </p>
         ) : null}
-        <PlayerSearch players={players} renderTrailing={(p) => <AddTrailing player={p} />} />
+        {/* Deleted accounts are never bookable — exclude them from the add-player search
+            (the full `players` list is still used above for booked-name resolution). */}
+        <PlayerSearch players={activePlayers(players)} renderTrailing={(p) => <AddTrailing player={p} />} />
       </Modal>
     );
   }

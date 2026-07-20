@@ -3,7 +3,7 @@ import type { Level, Player } from '@tpa/types';
 import { ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { creditBreakdown } from '../data/players';
+import { activePlayers, creditBreakdown } from '../data/players';
 import { useAdminData } from '../data/queries';
 import { PlayerDetailModal } from '../players/PlayerDetailModal';
 import { useSession } from '../session/SessionProvider';
@@ -33,7 +33,9 @@ export function Players() {
   const [level, setLevel] = useState<Level | 'all'>('all');
   const [selected, setSelected] = useState<Player | null>(null);
 
-  const players = data.players;
+  // Roster + count exclude deleted accounts (anonymised-but-retained). History still
+  // resolves their names elsewhere via the full list; here we list only live players.
+  const players = activePlayers(data.players);
   const filtered = useMemo(
     () =>
       players.filter(

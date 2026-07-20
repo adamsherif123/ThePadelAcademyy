@@ -1,50 +1,43 @@
-// The expo-notifications integration — thin, and it NEVER throws: every function
-// returns a state so the app stays fully functional without push (permission denied,
-// a simulator with no token, or an unconfigured EAS project). Remote push requires an
-// EAS dev build; it does not work in Expo Go (SDK 53+). See NOTIFICATIONS_SETUP.md.
+// The expo-notifications integration. It NEVER throws and — critically — NEVER touches
+// expo-notifications at module-eval time.
+//
+// WHY NO STATIC IMPORT: importing expo-notifications runs its own module-scope
+// auto-registration side effect (DevicePushTokenAutoRegistration.fx → addPushTokenListener
+// → warnOfExpoGoPushUsage), which THROWS on Android in Expo Go (SDK 53+ removed remote
+// push there; iOS only warns). A static `import … from 'expo-notifications'` would throw
+// during THIS module's import — before any guard runs — taking down the whole route tree.
+// So expo-notifications is loaded lazily, ONLY when not in Expo Go, and every call is
+// try/caught. In Expo Go it is never imported, so the side effect never evaluates.
 import { color } from '@tpa/theme';
-import Constants, { AppOwnership } from 'expo-constants';
+import { isRunningInExpoGo } from 'expo';
+import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import type { Platform as PushPlatform } from '../lib/api';
 
 /**
- * True ONLY inside Expo Go, where SDK 53+ REMOVED remote-push support: the token and
- * listener APIs throw ("Android Push notifications … was removed from Expo Go"). We must
- * discriminate Expo Go from a real EAS DEV build — in SDK 56 the two are NOT separable by
- * `executionEnvironment` (both report `storeClient`), so that check would wrongly no-op a
- * dev build and kill the feature. `appOwnership` is `'expo'` ONLY in Expo Go (a dev or
- * production build reports `null`), so it is the reliable discriminator. In Expo Go the
- * whole remote subsystem is skipped — the in-app centre + Realtime keep working; only the
- * OS banner (which Expo Go can't deliver anyway) is absent.
+ * True ONLY inside Expo Go. Uses `isRunningInExpoGo()` — a native-module presence check
+ * (`requireNativeModule('ExpoGo') != null`), the SAME signal expo-notifications itself
+ * uses to decide whether to throw. So our guard is exactly aligned with the throw: true
+ * only where the library would throw, false in every dev/production build (which have no
+ * ExpoGo native module). `appOwnership`/`executionEnvironment` are NOT reliable here.
  */
 export function isExpoGo(): boolean {
-  return Constants.appOwnership === AppOwnership.Expo;
+  return isRunningInExpoGo();
 }
 
 /**
- * FOREGROUND BEHAVIOUR — show the banner (and list + no sound/badge) even when the
- * app is open. Justification: a "session confirmed" / "credits added" push is genuine,
- * timely news the player wants to see the moment it happens; the ambient banner is the
- * right signal, and the Realtime subscription simultaneously refreshes the in-app state
- * so the wallet/sessions already match by the time they look. Sound/badge are off to
- * keep an open-app interruption light. Module-level so it's installed once at import —
- * skipped in Expo Go and guarded so an import-time throw can never crash the app.
+ * Lazily load expo-notifications — and ONLY outside Expo Go, so its throwing module-scope
+ * side effect never evaluates there. Returns null when unavailable (Expo Go, or a load
+ * failure), so every caller degrades instead of throwing.
  */
-if (!isExpoGo()) {
+async function loadNotifications(): Promise<typeof import('expo-notifications') | null> {
+  if (isExpoGo()) return null;
   try {
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowBanner: true,
-        shouldShowList: true,
-        shouldPlaySound: false,
-        shouldSetBadge: false,
-      }),
-    });
+    return await import('expo-notifications');
   } catch {
-    // no-op: foreground presentation just falls back to the OS default.
+    return null;
   }
 }
 
@@ -55,21 +48,43 @@ export function pushPlatform(): PushPlatform | null {
   return null;
 }
 
-/** Android needs a channel for heads-up delivery. No-op on iOS/web. */
-export async function ensureAndroidChannel(): Promise<void> {
-  if (Platform.OS !== 'android') return;
-  await Notifications.setNotificationChannelAsync('default', {
-    name: 'Default',
-    importance: Notifications.AndroidImportance.DEFAULT,
-    lightColor: color.accent.default,
-  });
-}
-
 /** The EAS project id needed to mint an Expo push token. Empty until `eas init`. */
 function easProjectId(): string | null {
   const extra = Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined;
   const id = extra?.eas?.projectId ?? Constants.easConfig?.projectId;
   return typeof id === 'string' && id.length > 0 ? id : null;
+}
+
+/**
+ * FOREGROUND BEHAVIOUR — show the banner (+ list, no sound/badge) even when the app is
+ * open: a "session confirmed" / "credits added" push is timely news, and the Realtime
+ * subscription refreshes the in-app state alongside it. Called once from an effect (NOT
+ * at module scope), guarded and try/caught. No-op in Expo Go.
+ */
+export async function setupForegroundHandler(): Promise<void> {
+  const N = await loadNotifications();
+  if (!N) return;
+  try {
+    N.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      }),
+    });
+  } catch {
+    // no-op: foreground presentation falls back to the OS default.
+  }
+}
+
+async function ensureAndroidChannel(N: typeof import('expo-notifications')): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  await N.setNotificationChannelAsync('default', {
+    name: 'Default',
+    importance: N.AndroidImportance.DEFAULT,
+    lightColor: color.accent.default,
+  });
 }
 
 export type PushRegistration =
@@ -78,39 +93,79 @@ export type PushRegistration =
   | { status: 'unavailable'; reason: string };
 
 /**
- * Request permission (idempotent) and fetch this device's Expo push token. It NEVER
- * throws — every path returns a status the bridge already handles, so a registration
- * failure can never crash the app. First-class non-ok states: Expo Go (remote push is
- * absent — 'expo_go'), a simulator ('simulator'), permission denied ('denied'), no EAS
- * project id ('no_eas_project_id'), or any unexpected native throw ('registration_error').
+ * Request permission (idempotent) and fetch this device's Expo push token. NEVER throws —
+ * every path returns a status the bridge already handles. Non-ok states: Expo Go
+ * ('expo_go'), a simulator ('simulator'), permission denied ('denied'), no EAS project id
+ * ('no_eas_project_id'), or any native throw ('registration_error').
  */
 export async function registerForPush(): Promise<PushRegistration> {
-  // Skip the ENTIRE remote-push subsystem in Expo Go BEFORE calling any native API that
-  // would throw there.
   if (isExpoGo()) return { status: 'unavailable', reason: 'expo_go' };
-
   try {
     const platform = pushPlatform();
     if (!platform) return { status: 'unavailable', reason: 'unsupported_platform' };
     if (!Device.isDevice) return { status: 'unavailable', reason: 'simulator' };
 
-    await ensureAndroidChannel();
+    const N = await loadNotifications();
+    if (!N) return { status: 'unavailable', reason: 'module_unavailable' };
 
-    const existing = await Notifications.getPermissionsAsync();
+    await ensureAndroidChannel(N);
+
+    const existing = await N.getPermissionsAsync();
     let granted = existing.granted;
     if (!granted && existing.canAskAgain) {
-      granted = (await Notifications.requestPermissionsAsync()).granted;
+      granted = (await N.requestPermissionsAsync()).granted;
     }
     if (!granted) return { status: 'denied' };
 
     const projectId = easProjectId();
     if (!projectId) return { status: 'unavailable', reason: 'no_eas_project_id' };
 
-    const { data } = await Notifications.getExpoPushTokenAsync({ projectId });
+    const { data } = await N.getExpoPushTokenAsync({ projectId });
     return { status: 'ok', token: data, platform };
   } catch (e) {
-    // Belt-and-braces: any native throw (incl. a future SDK removing another API in
-    // Expo Go) becomes an unavailable status, never an uncaught crash.
     return { status: 'unavailable', reason: e instanceof Error ? e.message : 'registration_error' };
+  }
+}
+
+/** The deep-link payload send-push attaches to each notification. */
+export type PushTapData = { notificationId?: string; type?: string; slotId?: string | null };
+
+function tapDataFrom(response: import('expo-notifications').NotificationResponse): PushTapData {
+  const d = (response?.notification?.request?.content?.data ?? {}) as PushTapData;
+  return { notificationId: d.notificationId, type: d.type, slotId: d.slotId ?? null };
+}
+
+/**
+ * Subscribe to foreground receipt (onForeground) and a tap (onTap). Returns a cleanup.
+ * A no-op empty cleanup in Expo Go — keeps expo-notifications out of the bridge entirely,
+ * so the bridge never triggers the throwing import.
+ */
+export async function addPushListeners(handlers: {
+  onForeground: () => void;
+  onTap: (data: PushTapData) => void;
+}): Promise<() => void> {
+  const N = await loadNotifications();
+  if (!N) return () => {};
+  try {
+    const received = N.addNotificationReceivedListener(() => handlers.onForeground());
+    const responded = N.addNotificationResponseReceivedListener((r) => handlers.onTap(tapDataFrom(r)));
+    return () => {
+      received.remove();
+      responded.remove();
+    };
+  } catch {
+    return () => {};
+  }
+}
+
+/** The tap that cold-started the app from killed, or null (incl. Expo Go). Never throws. */
+export async function getInitialTap(): Promise<PushTapData | null> {
+  const N = await loadNotifications();
+  if (!N) return null;
+  try {
+    const response = await N.getLastNotificationResponseAsync();
+    return response ? tapDataFrom(response) : null;
+  } catch {
+    return null;
   }
 }

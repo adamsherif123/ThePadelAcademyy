@@ -32,6 +32,7 @@ export function rowToPlayer(r: Row): Player {
     gender: str(r.gender) as Player['gender'],
     level: str(r.level) as Player['level'],
     createdAt: iso(r.created_at),
+    deletedAt: nstr(r.deleted_at) as Player['deletedAt'],
   };
 }
 
