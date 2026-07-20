@@ -8,7 +8,7 @@
 -- Run with:  supabase test db
 -- ============================================================================
 begin;
-select plan(31);
+select plan(44);
 
 -- ── seed as postgres ─────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -131,6 +131,34 @@ select throws_ok($$ insert into public.notifications (id,player_id,type,title,bo
 -- device tokens: own-only.
 select lives_ok($$ insert into public.device_push_tokens (id,player_id,expo_push_token,platform,created_at,last_seen_at) values ('dpt_1','pl_1','ExponentPushToken[aaa]','android',now(),now()) $$, 'pl_1 registers their own token');
 select throws_ok($$ insert into public.device_push_tokens (id,player_id,expo_push_token,platform,created_at,last_seen_at) values ('dpt_2','pl_2','ExponentPushToken[bbb]','android',now(),now()) $$, '42501', null, 'pl_1 cannot register a token for pl_2');
+
+-- register_push_token (S12.1): resolves the caller server-side, reassigns-or-inserts.
+select is(public.register_push_token('ExponentPushToken[shared]','android')->>'ok', 'true', 'pl_1 registers a token via the RPC');
+select is(public.register_push_token('ExponentPushToken[shared]','android')->>'ok', 'true', 'idempotent re-register is ok');
+select is((select count(*)::int from public.device_push_tokens where expo_push_token='ExponentPushToken[shared]'), 1, 'one physical device → exactly one row');
+select is(public.register_push_token('ExponentPushToken[shared]','martian')->>'reason', 'invalid_platform', 'rejects an unknown platform');
+reset role;
+select is((select player_id from public.device_push_tokens where expo_push_token='ExponentPushToken[shared]'), 'pl_1', 'token owned by pl_1 before reassignment');
+
+-- pl_2 signs in on the SAME device → the RPC reassigns the token to pl_2. A direct client
+-- UPDATE could NOT do this (own-only SELECT hides pl_1's row) — the SECURITY DEFINER RPC is why.
+set local role authenticated;
+select set_config('request.jwt.claims','{"sub":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","role":"authenticated"}',true);  -- pl_2
+select is(public.register_push_token('ExponentPushToken[shared]','android')->>'ok', 'true', 'pl_2 re-registers the same token (reassignment)');
+select is((select count(*)::int from public.device_push_tokens), 1, 'pl_2 sees exactly the one reassigned token (own-only reads)');
+reset role;
+select is((select player_id from public.device_push_tokens where expo_push_token='ExponentPushToken[shared]'), 'pl_2', 'token reassigned to pl_2');
+select is((select count(*)::int from public.device_push_tokens where expo_push_token='ExponentPushToken[shared]'), 1, 'still exactly one row — no duplicate');
+
+-- pl_1 can no longer read the reassigned token; and can delete their OWN (sign-out cleanup).
+set local role authenticated;
+select set_config('request.jwt.claims','{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","role":"authenticated"}',true);  -- pl_1
+select is((select count(*)::int from public.device_push_tokens where expo_push_token='ExponentPushToken[shared]'), 0, 'pl_1 can no longer read the reassigned token (own-only)');
+select lives_ok($$ delete from public.device_push_tokens where id='dpt_1' $$, 'pl_1 deletes their OWN token');
+select is((select count(*)::int from public.device_push_tokens where id='dpt_1'), 0, 'own token deleted');
+-- not_authenticated: authenticated role with no player (no sub) → reason, no throw.
+select set_config('request.jwt.claims','{"role":"authenticated"}',true);
+select is(public.register_push_token('ExponentPushToken[nobody]','ios')->>'reason', 'not_authenticated', 'no current player → not_authenticated');
 
 reset role;
 

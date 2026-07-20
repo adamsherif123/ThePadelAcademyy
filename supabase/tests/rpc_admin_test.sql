@@ -9,7 +9,7 @@
 -- Run with:  supabase test db
 -- ============================================================================
 begin;
-select plan(70);
+select plan(71);
 
 -- ── seed as postgres ─────────────────────────────────────────────────────────
 -- S8: auth_user_id now FK-references auth.users — seed the linked auth rows first.
@@ -181,6 +181,23 @@ select set_config('request.jwt.claims', '{"role":"anon"}', true);
 select throws_ok($$ select public.settle_purchase('pu_s','x') $$, '42501', null, 'anon → settle_purchase DENIED at the privilege layer (42501)');
 select throws_ok($$ select public.fail_purchase('pu_f','x') $$, '42501', null, 'anon → fail_purchase DENIED at the privilege layer (42501)');
 reset role;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- S7b.1 INVARIANT GUARD — mechanical, so the ABBA deadlock can't silently return.
+-- cancel_session is the ONLY RPC that locks MULTIPLE credit_batches at once (it
+-- refunds every booking on a slot), which is why it MUST lock them in
+-- credit_batch_id order (20260720000007_s7b1). If a future RPC adds an explicit
+-- `from … credit_batches … for update` lock, this set_eq FAILS — forcing the author
+-- to confirm it uses the same ordered discipline (or it reopens the deadlock).
+-- (Single-row `update credit_batches` in book_slot etc. locks one row and is fine.)
+select set_eq(
+  $$ select p.proname
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public'
+        and p.prosrc ~* 'from\s+public\.credit_batches[^;]*for\s+update' $$,
+  $$ values ('cancel_session') $$,
+  'cancel_session is the ONLY function locking credit_batches FOR UPDATE (S7b.1 ordered-lock invariant)'
+);
 
 select * from finish();
 rollback;

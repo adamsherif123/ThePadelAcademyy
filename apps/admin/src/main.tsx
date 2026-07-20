@@ -4,6 +4,8 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 
 import { queryClient } from './lib/queryClient';
+import { initReporting } from './lib/reporting';
+import { RootErrorBoundary } from './ui/RootErrorBoundary';
 
 // Self-hosted Inter (no external request, no layout shift). Only the weights the
 // theme uses — regular…extrabold. 900/black was deleted in S3e.2; don't ship it.
@@ -23,14 +25,19 @@ if (!rootElement) {
   throw new Error('Root element #root not found');
 }
 
+// Start crash reporting once, before render. No-op without a DSN / in dev; never throws.
+initReporting();
+
 createRoot(rootElement).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <SessionProvider>
-          <App />
-        </SessionProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <RootErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <SessionProvider>
+            <App />
+          </SessionProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </RootErrorBoundary>
   </StrictMode>,
 );

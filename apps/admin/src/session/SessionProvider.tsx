@@ -49,7 +49,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+      setSession(next);
+      // A rejected token refresh (deleted/revoked admin auth user) surfaces as a null
+      // session here too — drop to signed_out cleanly and clear cached reads, so it
+      // self-heals to the login screen rather than trapping on an errored view.
+      if (!next) queryClient.clear();
+    });
     return () => sub.subscription.unsubscribe();
   }, []);
 

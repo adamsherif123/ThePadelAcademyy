@@ -3,6 +3,10 @@ packages:
   - 'packages/*'
 
 allowBuilds:
+  # @sentry/cli's binary is only needed to UPLOAD source maps at build time (a cutover
+  # step). We don't run it here, so its build script stays off — reporting itself works
+  # without it. Flip to true when wiring source-map upload with SENTRY_AUTH_TOKEN.
+  '@sentry/cli': false
   # esbuild native binary — used by vite, vitest, and tsx.
   esbuild: true
   # Native resolver used by eslint-plugin-import-x (via eslint-config-expo).

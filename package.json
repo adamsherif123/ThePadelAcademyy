@@ -15,7 +15,9 @@
     "test:db": "bash supabase/tests/pgtap.sh",
     "test:concurrency": "bash supabase/tests/concurrency.sh",
     "test:auth": "bash supabase/tests/auth_session.sh",
-    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:db && pnpm test:concurrency && pnpm test:auth"
+    "config:check": "node scripts/check-config.mjs",
+    "config:push": "node scripts/check-config.mjs --prod && supabase config push",
+    "verify": "node scripts/check-config.mjs && pnpm typecheck && pnpm lint && pnpm test && pnpm test:db && pnpm test:concurrency && pnpm test:auth"
   },
   "devDependencies": {
     "tsx": "^4.23.1",

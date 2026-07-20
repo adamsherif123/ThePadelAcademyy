@@ -86,6 +86,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     void supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next);
+      // A null session lands clean whatever the cause. supabase-js emits a signed-out
+      // state not only on our signOut() but when a background token refresh is REJECTED
+      // — a deleted/revoked auth user (the S9.2 class). deriveStatus then returns
+      // signed_out (the guard routes to sign-in); clearing the cache here means an
+      // auto-sign-out never leaves a previous player's reads behind for the next login.
+      if (!next) queryClient.clear();
     });
     return () => sub.subscription.unsubscribe();
   }, []);

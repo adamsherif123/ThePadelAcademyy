@@ -3,19 +3,46 @@
 // @tpa/core itself stays pure/runtime-agnostic.
 import 'react-native-get-random-values';
 
+import { space } from '@tpa/theme';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { StyleSheet, View } from 'react-native';
 
 import { queryClient } from '../lib/queryClient';
+import { captureException, initReporting } from '../lib/reporting';
 import { NotificationsBridge } from '../notifications/NotificationsBridge';
 import { nextRoute } from '../session/authMachine';
 import { SessionProvider, useSession } from '../session/SessionProvider';
 import { interFonts } from '../theme/fonts';
+import { Button, Screen, Text } from '../ui';
 
 SplashScreen.preventAutoHideAsync();
+
+/**
+ * Root render-error screen (Expo Router picks up this named export). A rendering error
+ * anywhere in the tree shows this recoverable screen instead of a dead white app, and
+ * reports to Sentry. (It cannot catch a module-eval throw — that class is fixed
+ * structurally — but it catches every render error below it.)
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  useEffect(() => {
+    captureException(error, { boundary: 'root' });
+  }, [error]);
+  return (
+    <Screen style={styles.errorScreen}>
+      <View style={styles.errorBody}>
+        <Text variant="h2">Something went wrong</Text>
+        <Text variant="body" tone="secondary">
+          The app hit an unexpected error. Please try again.
+        </Text>
+      </View>
+      <Button label="Try again" onPress={() => void retry()} />
+    </Screen>
+  );
+}
 
 /**
  * Route guard — a thin shell over the pure `nextRoute` state machine (unit-tested in
@@ -75,6 +102,11 @@ function RootNavigator() {
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts(interFonts);
 
+  // Start crash reporting once, early. No-op without a DSN / in dev; never throws.
+  useEffect(() => {
+    void initReporting();
+  }, []);
+
   if (!fontsLoaded && !fontError) {
     return null;
   }
@@ -87,3 +119,8 @@ export default function RootLayout() {
     </QueryClientProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  errorScreen: { flexGrow: 1, justifyContent: 'center', gap: space.xl, padding: space.xl },
+  errorBody: { gap: space.sm, alignItems: 'center' },
+});

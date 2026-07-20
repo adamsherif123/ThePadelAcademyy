@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
+    "@sentry/react": "^10.66.0",
     "@supabase/supabase-js": "^2.110.6",
     "@tanstack/react-query": "^5.101.2",
     "@tpa/core": "workspace:*",

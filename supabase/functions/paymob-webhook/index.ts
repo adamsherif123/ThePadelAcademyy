@@ -57,6 +57,14 @@ function env(name: string): string {
   return v;
 }
 
+// Structured, alertable error. One-line JSON with a stable marker so a Supabase
+// log-based alert (or a log drain → Sentry/Slack) can match `PAYMOB_WEBHOOK_ERROR` and
+// page someone — the webhook is the money path, so a silent failure here means money
+// taken and no credits.
+function logError(event: string, detail: Record<string, unknown>): void {
+  console.error(JSON.stringify({ marker: 'PAYMOB_WEBHOOK_ERROR', event, ...detail, at: new Date().toISOString() }));
+}
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('method_not_allowed', { status: 405 });
 
@@ -106,16 +114,30 @@ Deno.serve(async (req) => {
       // service_role client — SUPABASE_SERVICE_ROLE_KEY is auto-injected into Edge
       // Functions and never leaves this runtime (not in a commit, not in either app).
       const admin = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'));
-      const { error } = await admin.rpc(rpc, {
+      const { data, error } = await admin.rpc(rpc, {
         p_purchase_id: purchaseId,
         p_gateway_transaction_id: txnId,
       });
-      // Both RPCs are idempotent (already_settled / already_failed, no error). We
-      // still 200 on an RPC error so Paymob doesn't retry forever on a bad row; the
-      // detail is logged for reconciliation.
-      if (error) console.error(`${rpc} failed`, purchaseId, error.message);
+      // Both RPCs are idempotent (already_settled / already_failed, no error). We still
+      // 200 on any problem so Paymob stops re-delivering; the detail is logged so an
+      // alert can fire and the row be reconciled by hand.
+      if (error) {
+        logError('rpc_transport_error', { rpc, purchaseId, txnId, detail: error.message });
+      } else if (data && (data as { ok?: boolean }).ok === false) {
+        // The RPC ran but REFUSED (e.g. settle_purchase → not_pending): a payment
+        // Paymob reports as captured could not be settled because the purchase is no
+        // longer pending. On a success callback this is the money-taken-no-credits
+        // case — the single highest-value thing to alert on.
+        logError('rpc_refused', {
+          rpc,
+          purchaseId,
+          txnId,
+          reason: (data as { reason?: string }).reason ?? 'unknown',
+          gateway_success: obj.success === true,
+        });
+      }
     } else {
-      console.error('webhook: verified but missing merchant_order_id/id', JSON.stringify(order));
+      logError('missing_merchant_order_id', { order: JSON.stringify(order) });
     }
   }
 
