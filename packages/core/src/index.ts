@@ -31,6 +31,7 @@ export {
   buildSignupGrant,
   creditExpiryState,
   isPurchaseBacked,
+  unusedCreditValue,
   type CreditExpiryState,
 } from './credits';
 

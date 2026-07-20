@@ -1,4 +1,13 @@
-import type { CreditBatch, IsoInstant, Package, PackageId, PlayerId, PurchaseId } from '@tpa/types';
+import type {
+  CreditBatch,
+  IsoInstant,
+  Package,
+  PackageId,
+  Piastres,
+  PlayerId,
+  Purchase,
+  PurchaseId,
+} from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
 import { CREDIT_EXPIRY_DAYS, EXPIRING_SOON_DAYS, SIGNUP_TRIAL_CREDITS } from './constants';
@@ -8,6 +17,7 @@ import {
   buildSignupGrant,
   creditExpiryState,
   isPurchaseBacked,
+  unusedCreditValue,
 } from './credits';
 
 const NOW = '2026-07-15T09:00:00.000Z' as IsoInstant;
@@ -142,5 +152,53 @@ describe('isPurchaseBacked', () => {
     expect(isPurchaseBacked(purchased)).toBe(true);
     expect(isPurchaseBacked(buildSignupGrant(PLAYER, NOW))).toBe(false);
     expect(isPurchaseBacked(buildAdminGrant(PLAYER, 'group', 1, NOW))).toBe(false);
+  });
+});
+
+describe('unusedCreditValue', () => {
+  const batch = (over: Partial<CreditBatch> = {}): CreditBatch => ({
+    id: 'cb_x' as CreditBatch['id'],
+    playerId: PLAYER,
+    source: 'signup_grant',
+    purchaseId: null,
+    trainingType: 'individual',
+    quantityTotal: 4,
+    quantityRemaining: 2,
+    expiresAt: daysFrom(30),
+    createdAt: NOW,
+    note: null,
+    ...over,
+  });
+  const purchase = (over: Partial<Purchase> = {}): Purchase => ({
+    id: 'pu_x' as PurchaseId,
+    playerId: PLAYER,
+    packageId: 'pk_i4' as PackageId,
+    status: 'succeeded',
+    amount: 600000 as Piastres,
+    createdAt: NOW,
+    paymentMethod: 'paymob',
+    gatewayOrderId: null,
+    gatewayTransactionId: null,
+    ...over,
+  });
+  const iPkg = pkg({ id: 'pk_i4' as PackageId, trainingType: 'individual', sessionCount: 4, price: 600000 as Package['price'] });
+
+  it('counts usable credits (grants included) but values only purchase-backed ones', () => {
+    const purchased = batch({ id: 'cb_p' as CreditBatch['id'], source: 'purchase', purchaseId: 'pu_x' as PurchaseId, quantityRemaining: 2 });
+    const grant = batch({ id: 'cb_g' as CreditBatch['id'], source: 'signup_grant', purchaseId: null, trainingType: 'trial', quantityRemaining: 2 });
+    const res = unusedCreditValue([purchased, grant], [purchase()], [iPkg], NOW);
+    expect(res.count).toBe(4); // 2 purchased + 2 free grant
+    expect(res.valuePiastres).toBe(300000); // 2 × (600000 / 4), grant valued at 0
+  });
+
+  it('a half-used 6,000 EGP individual pack is worth 3,000 EGP (the confirm-screen number)', () => {
+    const half = batch({ source: 'purchase', purchaseId: 'pu_x' as PurchaseId, quantityRemaining: 2 });
+    expect(unusedCreditValue([half], [purchase()], [iPkg], NOW).valuePiastres).toBe(300000);
+  });
+
+  it('ignores expired and depleted batches', () => {
+    const expired = batch({ id: 'cb_e' as CreditBatch['id'], source: 'purchase', purchaseId: 'pu_x' as PurchaseId, quantityRemaining: 5, expiresAt: daysFrom(-1) });
+    const depleted = batch({ id: 'cb_d' as CreditBatch['id'], quantityRemaining: 0 });
+    expect(unusedCreditValue([expired, depleted], [purchase()], [iPkg], NOW)).toEqual({ count: 0, valuePiastres: 0 });
   });
 });

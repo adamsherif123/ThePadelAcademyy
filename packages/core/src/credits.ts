@@ -2,13 +2,16 @@ import type {
   CreditBatch,
   IsoInstant,
   Package,
+  Piastres,
   PlayerId,
+  Purchase,
   PurchaseId,
   TrainingType,
 } from '@tpa/types';
 
 import { CREDIT_EXPIRY_DAYS, EXPIRING_SOON_DAYS, SIGNUP_TRIAL_CREDITS } from './constants';
 import { ID_PREFIXES, newId } from './ids';
+import { isBatchUsable } from './rules';
 import { parseInstant, toInstant } from './time';
 
 /** CREDIT_EXPIRY_DAYS after `now`, as an instant. The one expiry rule for all credits. */
@@ -42,6 +45,39 @@ export function isPurchaseBacked(
  * `expiring_soon` covers the EXPIRING_SOON_DAYS window before that.
  */
 export type CreditExpiryState = 'ok' | 'expiring_soon' | 'expired';
+
+/**
+ * What a player walks away from when they delete their account: how many usable
+ * credits they hold, and roughly what those cost in EGP — so the confirm screen can
+ * show a real number before they confirm (Apple wants informed intent).
+ *
+ * COUNT is every usable (typed, in-quantity, unexpired) credit, grants included —
+ * they still book real sessions. VALUE is what those credits COST, so only
+ * purchase-backed batches contribute: a credit's price is the amount paid ÷ the
+ * package's session_count (immune to later repricing, since `amount` is captured on
+ * the purchase). Free grant credits are counted but valued at 0. Pure over the
+ * player's own batches/purchases/packages (RLS already scoped them) + `now`.
+ */
+export function unusedCreditValue(
+  batches: CreditBatch[],
+  purchases: Purchase[],
+  packages: Package[],
+  now: IsoInstant,
+): { count: number; valuePiastres: Piastres } {
+  let count = 0;
+  let value = 0;
+  for (const b of batches) {
+    if (!isBatchUsable(b, b.trainingType, now)) continue;
+    count += b.quantityRemaining;
+    if (!isPurchaseBacked(b)) continue;
+    const purchase = purchases.find((p) => p.id === b.purchaseId);
+    if (!purchase) continue;
+    const pkg = packages.find((p) => p.id === purchase.packageId);
+    if (!pkg || pkg.sessionCount <= 0) continue;
+    value += Math.round(purchase.amount / pkg.sessionCount) * b.quantityRemaining;
+  }
+  return { count, valuePiastres: value as Piastres };
+}
 
 export function creditExpiryState(expiresAt: IsoInstant, now: IsoInstant): CreditExpiryState {
   const expiresMs = parseInstant(expiresAt).getTime();

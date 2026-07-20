@@ -130,6 +130,24 @@ export async function createCheckout(purchaseId: PurchaseId): Promise<string> {
   return url;
 }
 
+/**
+ * Delete the signed-in player's account (Apple 5.1.1(v)). The Edge Function verifies
+ * the caller's JWT, runs the caller-scoped delete_account RPC (anonymise + detach),
+ * then deletes the auth identity via the Admin API. We read error.context for the
+ * real reason on a non-2xx, like createCheckout. Resolves on success; throws otherwise.
+ */
+export async function deleteAccount(): Promise<void> {
+  const { error } = await supabase.functions.invoke('delete-account', { body: {} });
+  if (error) {
+    let detail = error.message;
+    const ctx = (error as { context?: Response }).context;
+    if (ctx && typeof ctx.text === 'function') {
+      detail = await ctx.text().catch(() => error.message);
+    }
+    throw new ApiError(`Could not delete your account: ${detail}`, error);
+  }
+}
+
 /** The signed-in player's own row (RLS returns exactly zero or one). null = no profile yet. */
 export async function fetchCurrentPlayer(): Promise<Player | null> {
   const { data, error } = await supabase.from('players').select('*').maybeSingle();

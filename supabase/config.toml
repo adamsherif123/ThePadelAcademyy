@@ -413,6 +413,12 @@ verify_jwt = true
 [functions.paymob-webhook]
 verify_jwt = false
 
+# delete-account: called by the signed-in player. JWT verification ON — the function
+# resolves the caller from their token (getUser) and calls the caller-scoped
+# delete_account RPC (auth.uid()); it can only ever delete the token's owner.
+[functions.delete-account]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

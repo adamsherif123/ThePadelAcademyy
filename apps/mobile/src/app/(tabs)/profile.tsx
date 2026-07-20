@@ -90,6 +90,17 @@ export default function ProfileScreen() {
         icon="log-out-outline"
         onPress={() => void signOut()}
       />
+
+      {/* Heavier than sign-out and set apart: a ghost danger link to the gated
+          confirm screen (Apple 5.1.1(v) in-app deletion). */}
+      <Button
+        label="Delete account"
+        variant="ghost"
+        destructive
+        icon="trash-outline"
+        size="sm"
+        onPress={() => router.push('/delete-account')}
+      />
     </Screen>
   );
 }

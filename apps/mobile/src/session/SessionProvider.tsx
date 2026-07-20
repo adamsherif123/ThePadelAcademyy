@@ -12,7 +12,7 @@ import {
   type ReactNode,
 } from 'react';
 
-import { completeSignupRpc, fetchCurrentPlayer } from '../lib/api';
+import { completeSignupRpc, deleteAccount as deleteAccountApi, fetchCurrentPlayer } from '../lib/api';
 import { queryClient, queryKeys } from '../lib/queryClient';
 import { supabase } from '../lib/supabase';
 import { deriveStatus, type SessionStatus } from './authMachine';
@@ -53,6 +53,8 @@ interface SessionValue {
   verifyOtp: (code: string) => Promise<{ ok: boolean; error?: string }>;
   /** Create the player + trial grant via complete_signup. */
   completeProfile: (draft: ProfileDraft) => Promise<{ ok: boolean; error?: string }>;
+  /** Permanently delete the account (anonymise + drop the auth identity), then sign out. */
+  deleteAccount: () => Promise<{ ok: boolean; error?: string }>;
   signOut: () => Promise<void>;
 }
 
@@ -194,6 +196,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
   }, []);
 
+  const deleteAccount = useCallback(async () => {
+    try {
+      // DB anonymise-and-detach + auth-user delete, both server-side. Only on success
+      // do we tear down the local session — so a failure leaves the user signed in to
+      // retry, never stranded. The auth identity is gone now, but signOut uses
+      // scope:'local' (S9.2), so it never calls the server with the dead token.
+      await deleteAccountApi();
+      await signOut();
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: asMessage(e, 'We couldn’t delete your account. Please try again.') };
+    }
+  }, [signOut]);
+
   const value = useMemo<SessionValue>(
     () => ({
       status,
@@ -205,9 +221,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       sendOtp,
       verifyOtp,
       completeProfile,
+      deleteAccount,
       signOut,
     }),
-    [status, now, phone, player, trialGrant, sendOtp, verifyOtp, completeProfile, signOut],
+    [status, now, phone, player, trialGrant, sendOtp, verifyOtp, completeProfile, deleteAccount, signOut],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
