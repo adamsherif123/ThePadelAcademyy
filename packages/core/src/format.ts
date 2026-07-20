@@ -155,3 +155,23 @@ export function formatExpiry(expiresAt: IsoInstant, now: IsoInstant): string {
   if (days === 1) return 'expires tomorrow';
   return `expires in ${days} days`;
 }
+
+/**
+ * Relative "time ago" for the notification feed — short, and Cairo-anchored once it
+ * rolls to days. Pure: takes `now`, reads no clock.
+ *   < 1 min   -> "just now"        < 60 min -> "5m ago"        < 24 h -> "3h ago"
+ *   1 day     -> "yesterday"       2..6 days -> "3d ago"       older  -> "Tue, 14 Jul"
+ * A future instant (clock skew) reads "just now", never a negative age.
+ */
+export function formatRelativeTime(instant: IsoInstant, now: IsoInstant): string {
+  const deltaMs = parseInstant(now).getTime() - parseInstant(instant).getTime();
+  if (deltaMs < 60_000) return 'just now';
+  const mins = Math.floor(deltaMs / 60_000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = cairoDayDiff(instant, now);
+  if (days <= 1) return 'yesterday';
+  if (days < 7) return `${days}d ago`;
+  return formatInstantDate(instant);
+}

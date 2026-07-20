@@ -9,6 +9,7 @@ import { activePackages } from '../../data/catalog';
 import { useBatches, useBookings, useCoaches, usePackages, useSlots, combine } from '../../data/queries';
 import { nextSession } from '../../data/schedule';
 import { soonestExpiringBatch, totalReadyToBook } from '../../data/wallet';
+import { NotificationBell } from '../../notifications/NotificationBell';
 import { useSession } from '../../session/SessionProvider';
 import {
   ACADEMY,
@@ -46,7 +47,16 @@ export default function HomeScreen() {
 
   const firstName = player.name.split(' ')[0] ?? player.name;
   const header = (
-    <ScreenHeader eyebrow="The Padel Academy" title={`Hey, ${firstName}`} trailing={<Avatar name={player.name} />} />
+    <ScreenHeader
+      eyebrow="The Padel Academy"
+      title={`Hey, ${firstName}`}
+      trailing={
+        <View style={styles.headerTrailing}>
+          <NotificationBell />
+          <Avatar name={player.name} />
+        </View>
+      }
+    />
   );
   if (gate.isPending) {
     return (
@@ -149,6 +159,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  headerTrailing: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   content: { gap: space.lg },
   section: { gap: space.sm },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

@@ -12,7 +12,13 @@ import {
   type ReactNode,
 } from 'react';
 
-import { completeSignupRpc, deleteAccount as deleteAccountApi, fetchCurrentPlayer } from '../lib/api';
+import {
+  completeSignupRpc,
+  deleteAccount as deleteAccountApi,
+  deleteMyPushToken,
+  fetchCurrentPlayer,
+} from '../lib/api';
+import { getLastPushToken, setLastPushToken } from '../notifications/tokenStore';
 import { queryClient, queryKeys } from '../lib/queryClient';
 import { supabase } from '../lib/supabase';
 import { deriveStatus, type SessionStatus } from './authMachine';
@@ -180,7 +186,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [phone, session],
   );
 
+  // Drop THIS device's push token while the session is still valid (own-only RLS
+  // delete), so a signed-out phone stops getting this player's pushes and a deleted
+  // account stops getting any — without touching another device's token.
+  const dropThisDeviceToken = useCallback(async () => {
+    const token = getLastPushToken();
+    if (!token) return;
+    setLastPushToken(null);
+    await deleteMyPushToken(token).catch(() => undefined);
+  }, []);
+
   const signOut = useCallback(async () => {
+    // Before clearing the session (RLS still sees this player), unregister the token.
+    await dropThisDeviceToken();
     try {
       // `local` scope clears the stored session without a server round-trip, so a
       // user holding a JWT for a deleted auth user can still get out (a server-side
@@ -194,10 +212,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setTrialGrant(null);
     // Drop every cached read so the next player starts clean.
     queryClient.clear();
-  }, []);
+  }, [dropThisDeviceToken]);
 
   const deleteAccount = useCallback(async () => {
     try {
+      // Unregister this device's token FIRST, while the JWT is still valid — after the
+      // account is deleted the token delete (RLS) would have no session to authorise.
+      await dropThisDeviceToken();
       // DB anonymise-and-detach + auth-user delete, both server-side. Only on success
       // do we tear down the local session — so a failure leaves the user signed in to
       // retry, never stranded. The auth identity is gone now, but signOut uses
@@ -208,7 +229,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       return { ok: false, error: asMessage(e, 'We couldn’t delete your account. Please try again.') };
     }
-  }, [signOut]);
+  }, [signOut, dropThisDeviceToken]);
 
   const value = useMemo<SessionValue>(
     () => ({

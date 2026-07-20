@@ -8,9 +8,11 @@
     "scheme": "tpa",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.thepadelacademy.app"
     },
     "android": {
+      "package": "com.thepadelacademy.app",
       "adaptiveIcon": {
         "backgroundColor": "#06122f",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -33,8 +35,20 @@
           "imageWidth": 76
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#06122f"
+        }
+      ]
     ],
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

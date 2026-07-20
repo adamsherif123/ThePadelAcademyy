@@ -18,3 +18,5 @@ export type CreditBatchId = Brand<string, 'CreditBatchId'>; //      cb_
 export type SlotId = Brand<string, 'SlotId'>; //                    sl_
 export type BookingId = Brand<string, 'BookingId'>; //             bk_
 export type AvailabilityTemplateId = Brand<string, 'AvailabilityTemplateId'>; // at_
+export type NotificationId = Brand<string, 'NotificationId'>; //    nt_
+export type DeviceTokenId = Brand<string, 'DeviceTokenId'>; //      dpt_

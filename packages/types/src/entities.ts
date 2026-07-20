@@ -3,6 +3,7 @@ import type {
   BookingId,
   CoachId,
   CreditBatchId,
+  NotificationId,
   PackageId,
   PlayerId,
   PurchaseId,
@@ -15,6 +16,7 @@ import type {
   CreditSource,
   Gender,
   Level,
+  NotificationType,
   PaymentMethod,
   PurchaseStatus,
   SlotStatus,
@@ -182,4 +184,24 @@ export interface Booking {
   bookedAt: IsoInstant;
   /** Set when status becomes `cancelled`; null otherwise. */
   cancelledAt: IsoInstant | null;
+}
+
+/**
+ * An in-app notification, minted server-side by tpa.notify inside the event's RPC
+ * (S12). RLS lets the owning player read it and write only `read_at`. `slotId` /
+ * `bookingId` are the deep-link targets (a session_confirmed row → its session; a
+ * credits_granted row carries neither → the wallet). The gateway-internal `pushed_at`
+ * column is not surfaced here.
+ */
+export interface Notification {
+  id: NotificationId;
+  playerId: PlayerId;
+  type: NotificationType;
+  slotId: SlotId | null;
+  bookingId: BookingId | null;
+  title: string;
+  body: string;
+  createdAt: IsoInstant;
+  /** Null while unread; set (by the player) when opened. */
+  readAt: IsoInstant | null;
 }

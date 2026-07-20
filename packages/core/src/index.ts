@@ -57,6 +57,7 @@ export {
   formatExpiry,
   formatHour,
   formatInstantDate,
+  formatRelativeTime,
   formatInstantTime,
   formatLocalTime,
   formatLocalTimeRange,

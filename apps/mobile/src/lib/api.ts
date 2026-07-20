@@ -15,6 +15,8 @@ import type {
   Gender,
   IsoInstant,
   Level,
+  Notification,
+  NotificationId,
   Package,
   PackageId,
   Piastres,
@@ -32,11 +34,15 @@ import {
   rowToBooking,
   rowToCoach,
   rowToCreditBatch,
+  rowToNotification,
   rowToPackage,
   rowToPlayer,
   rowToPurchase,
   rowToSlot,
 } from './mappers';
+
+/** A device's OS, for the push token row. */
+export type Platform = 'ios' | 'android';
 
 /** A booking/cancel RPC that reaches the server can take this long before we give up. */
 export const RPC_TIMEOUT_MS = 12_000;
@@ -79,6 +85,66 @@ export async function fetchPurchaseById(id: string): Promise<Purchase | null> {
   const { data, error } = await supabase.from('purchases').select('*').eq('id', id).maybeSingle();
   if (error) throw new ApiError(`Failed to load purchase: ${error.message}`, error);
   return data ? rowToPurchase(data) : null;
+}
+
+// ── notifications (S12.x client) ───────────────────────────────────────────────
+// Reads are RLS-scoped to the caller; the only writable column is read_at. Rows are
+// never inserted from the client — the event RPCs mint them via tpa.notify.
+
+/** The player's notifications, newest first (RLS returns only their own). */
+export async function fetchNotifications(): Promise<Notification[]> {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw new ApiError(`Failed to load notifications: ${error.message}`, error);
+  return (data ?? []).map(rowToNotification);
+}
+
+/** Mark one notification read (the ONE column RLS lets the player write). Guarded so
+ *  a re-mark is a no-op. */
+export async function markNotificationRead(id: NotificationId, now: IsoInstant): Promise<void> {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read_at: now })
+    .eq('id', id)
+    .is('read_at', null);
+  if (error) throw new ApiError(`Failed to mark notification read: ${error.message}`, error);
+}
+
+/** Mark every unread notification read (the "mark all" the centre offers on open). */
+export async function markAllNotificationsRead(now: IsoInstant): Promise<void> {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read_at: now })
+    .is('read_at', null);
+  if (error) throw new ApiError(`Failed to mark notifications read: ${error.message}`, error);
+}
+
+// ── device push tokens (own-only RLS path — never service_role in the app) ──────
+
+/**
+ * Register/refresh THIS device's Expo token for the signed-in player via the
+ * register_push_token RPC (S12.1). The RPC resolves the caller server-side (never a
+ * player_id argument) and reassigns-or-inserts as definer — the only way to claim a
+ * token last registered to a DIFFERENT player on this shared device, since own-only
+ * reads hide that row from a direct client write. Not service_role: an ordinary RPC.
+ */
+export async function registerMyPushToken(token: string, platform: Platform): Promise<void> {
+  const { data, error } = await supabase.rpc('register_push_token', {
+    p_token: token,
+    p_platform: platform,
+  });
+  if (error) throw new ApiError(`Push token register failed: ${error.message}`, error);
+  const d = (data ?? {}) as { ok?: boolean; reason?: string };
+  if (!d.ok) throw new ApiError(`Push token register rejected: ${d.reason ?? 'unknown'}`);
+}
+
+/** Drop THIS device's token (sign-out / account deletion). Only removes the row if it
+ *  is the caller's (RLS delete-own), so signing out on phone A never mutes phone B. */
+export async function deleteMyPushToken(token: string): Promise<void> {
+  const { error } = await supabase.from('device_push_tokens').delete().eq('expo_push_token', token);
+  if (error) throw new ApiError(`Push token delete failed: ${error.message}`, error);
 }
 
 // ── payments (S6 / Paymob) ─────────────────────────────────────────────────────

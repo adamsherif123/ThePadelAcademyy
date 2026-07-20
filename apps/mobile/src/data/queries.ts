@@ -1,4 +1,4 @@
-import type { BookingId, SlotId } from '@tpa/types';
+import type { BookingId, IsoInstant, NotificationId, SlotId } from '@tpa/types';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import {
@@ -7,10 +7,13 @@ import {
   fetchBookings,
   fetchCoaches,
   fetchCreditBatches,
+  fetchNotifications,
   fetchPackages,
   fetchPurchases,
   fetchSlots,
   fetchTemplates,
+  markAllNotificationsRead,
+  markNotificationRead,
   type BookReason,
   type CancelReason,
 } from '../lib/api';
@@ -70,6 +73,26 @@ export const useBatches = () =>
 /** The player's purchases (pending until the webhook settles them). */
 export const usePurchases = () =>
   toResource(useQuery({ queryKey: queryKeys.purchases, queryFn: fetchPurchases }));
+
+/** The player's notifications, newest first — kept live by Realtime (NotificationsBridge). */
+export const useNotifications = () =>
+  toResource(useQuery({ queryKey: queryKeys.notifications, queryFn: fetchNotifications }));
+
+/** Mark one notification read (on tap / deep-link). read_at is the only writable column. */
+export function useMarkNotificationRead() {
+  return useMutation({
+    mutationFn: ({ id, now }: { id: NotificationId; now: IsoInstant }) => markNotificationRead(id, now),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.notifications }),
+  });
+}
+
+/** Mark every unread notification read (the centre's "mark all" on open). */
+export function useMarkAllNotificationsRead() {
+  return useMutation({
+    mutationFn: (now: IsoInstant) => markAllNotificationsRead(now),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.notifications }),
+  });
+}
 
 /** Collapse several resources into one loading / error / retry gate for a screen. */
 export function combine(...rs: Resource<unknown>[]): {

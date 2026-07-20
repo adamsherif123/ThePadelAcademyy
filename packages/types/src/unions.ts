@@ -41,6 +41,19 @@ export type SlotStatus = 'published' | 'cancelled';
 export type CreditSource = 'purchase' | 'signup_grant' | 'admin_grant';
 
 /**
+ * The server-side events that mint a notification (S12). Each is emitted inside the
+ * RPC that causes it; the client never invents these. `session_confirmed` fires when
+ * a session fills or the admin confirms it; the rest track cancels, removals,
+ * reschedules, and credit grants.
+ */
+export type NotificationType =
+  | 'session_confirmed'
+  | 'session_cancelled'
+  | 'removed_from_session'
+  | 'session_rescheduled'
+  | 'credits_granted';
+
+/**
  * 0 = Sunday ... 6 = Saturday — matches `Date.prototype.getUTCDay()`.
  * The academy's operating window is Sun–Wed (0–3).
  */

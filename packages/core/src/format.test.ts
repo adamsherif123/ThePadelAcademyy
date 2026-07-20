@@ -10,6 +10,7 @@ import {
   formatInstantTime,
   formatMonthDay,
   formatPiastres,
+  formatRelativeTime,
   formatSessionTimeRange,
 } from './format';
 
@@ -96,5 +97,21 @@ describe('formatExpiry', () => {
     expect(formatExpiry('2026-07-14T20:00:00.000Z' as IsoInstant, now)).toBe('expires today');
     expect(formatExpiry('2026-07-15T20:00:00.000Z' as IsoInstant, now)).toBe('expires tomorrow');
     expect(formatExpiry('2026-07-17T09:00:00.000Z' as IsoInstant, now)).toBe('expires in 3 days');
+  });
+});
+
+describe('formatRelativeTime', () => {
+  const now = '2026-07-14T12:00:00.000Z' as IsoInstant;
+  it('buckets recent times by minute/hour, then Cairo days, then falls back to a date', () => {
+    expect(formatRelativeTime('2026-07-14T11:59:30.000Z' as IsoInstant, now)).toBe('just now');
+    expect(formatRelativeTime('2026-07-14T11:55:00.000Z' as IsoInstant, now)).toBe('5m ago');
+    expect(formatRelativeTime('2026-07-14T09:00:00.000Z' as IsoInstant, now)).toBe('3h ago');
+    expect(formatRelativeTime('2026-07-13T10:00:00.000Z' as IsoInstant, now)).toBe('yesterday');
+    expect(formatRelativeTime('2026-07-11T12:00:00.000Z' as IsoInstant, now)).toBe('3d ago');
+    // older than a week → the Cairo date
+    expect(formatRelativeTime('2026-07-01T09:00:00.000Z' as IsoInstant, now)).toBe(formatInstantDate('2026-07-01T09:00:00.000Z' as IsoInstant));
+  });
+  it('a future instant (clock skew) reads "just now", never negative', () => {
+    expect(formatRelativeTime('2026-07-14T12:05:00.000Z' as IsoInstant, now)).toBe('just now');
   });
 });

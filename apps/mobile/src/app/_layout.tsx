@@ -10,6 +10,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
 import { queryClient } from '../lib/queryClient';
+import { NotificationsBridge } from '../notifications/NotificationsBridge';
 import { nextRoute } from '../session/authMachine';
 import { SessionProvider, useSession } from '../session/SessionProvider';
 import { interFonts } from '../theme/fonts';
@@ -46,21 +47,28 @@ function RootNavigator() {
   if (status === 'loading') return null;
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="wallet" />
-      <Stack.Screen name="buy-credits" />
-      <Stack.Screen name="package/[id]" />
-      <Stack.Screen name="checkout" />
-      <Stack.Screen name="purchase-success" />
-      <Stack.Screen name="confirm-booking" />
-      <Stack.Screen name="booked-success" />
-      <Stack.Screen name="cancel-booking" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="coaches" />
-      <Stack.Screen name="purchase-history" />
-      <Stack.Screen name="gallery" options={{ headerShown: true, title: 'Gallery (dev)', presentation: 'modal' }} />
-    </Stack>
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="wallet" />
+        <Stack.Screen name="buy-credits" />
+        <Stack.Screen name="package/[id]" />
+        <Stack.Screen name="checkout" />
+        <Stack.Screen name="purchase-success" />
+        <Stack.Screen name="confirm-booking" />
+        <Stack.Screen name="booked-success" />
+        <Stack.Screen name="cancel-booking" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="coaches" />
+        <Stack.Screen name="purchase-history" />
+        <Stack.Screen name="notifications" />
+        <Stack.Screen name="delete-account" />
+        <Stack.Screen name="gallery" options={{ headerShown: true, title: 'Gallery (dev)', presentation: 'modal' }} />
+      </Stack>
+      {/* Registers the push token, keeps the feed live, and routes tapped pushes
+          (incl. cold start). No-ops until a player is ready; renders nothing. */}
+      <NotificationsBridge />
+    </>
   );
 }
 

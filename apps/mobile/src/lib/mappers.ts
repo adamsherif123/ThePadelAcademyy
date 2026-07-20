@@ -10,6 +10,7 @@ import type {
   CreditBatch,
   IsoInstant,
   LocalTime,
+  Notification,
   Package,
   Player,
   Purchase,
@@ -132,5 +133,19 @@ export function rowToBooking(r: Row): Booking {
     status: str(r.status) as Booking['status'],
     bookedAt: iso(r.booked_at),
     cancelledAt: nstr(r.cancelled_at) as IsoInstant | null,
+  };
+}
+
+export function rowToNotification(r: Row): Notification {
+  return {
+    id: str(r.id) as Notification['id'],
+    playerId: str(r.player_id) as Notification['playerId'],
+    type: str(r.type) as Notification['type'],
+    slotId: nstr(r.slot_id) as Notification['slotId'],
+    bookingId: nstr(r.booking_id) as Notification['bookingId'],
+    title: str(r.title),
+    body: str(r.body),
+    createdAt: iso(r.created_at),
+    readAt: nstr(r.read_at) as IsoInstant | null,
   };
 }

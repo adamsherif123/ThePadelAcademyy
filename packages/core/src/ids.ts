@@ -11,6 +11,7 @@ export const ID_PREFIXES = {
   slot: 'sl_',
   booking: 'bk_',
   availabilityTemplate: 'at_',
+  deviceToken: 'dpt_',
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIXES)[keyof typeof ID_PREFIXES];
