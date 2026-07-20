@@ -231,6 +231,27 @@ export async function deleteTemplate(id: AvailabilityTemplate['id']): Promise<vo
   if (error) throw new ApiError(`Delete template failed: ${error.message}`, error.code, error);
 }
 
+export type RescheduleReason =
+  | 'not_admin' | 'slot_missing' | 'slot_cancelled'
+  | 'capacity_below_booked' | 'end_before_start' | 'in_past' | 'coach_conflict';
+export type RescheduleResult =
+  | { ok: true; moved: boolean }
+  | { ok: false; reason: RescheduleReason };
+/**
+ * Reschedule/edit a slot via the reschedule_session RPC (S12). It replaces the old
+ * direct column UPDATE so the row change and the "your session moved" notifications
+ * to booked players are one atomic, RPC-minted transaction. Returns {ok,reason} data.
+ */
+export async function rescheduleSessionRpc(
+  id: SlotId,
+  p: { coachId: CoachId; capacity: number; startsAt: string; endsAt: string },
+): Promise<RescheduleResult> {
+  const d = await callRpc('reschedule_session', {
+    p_slot_id: id, p_coach_id: p.coachId, p_capacity: p.capacity, p_starts_at: p.startsAt, p_ends_at: p.endsAt,
+  });
+  return d.ok ? { ok: true, moved: Boolean(d.moved) } : { ok: false, reason: d.reason as RescheduleReason };
+}
+
 /** Slot update — only the 5 grant-allowed columns; booked_count is never grantable. */
 export interface SlotPatch { coachId?: CoachId; capacity?: number; startsAt?: string; endsAt?: string; status?: SessionSlot['status'] }
 export function updateSlot(id: SlotId, p: SlotPatch): Promise<SessionSlot> {

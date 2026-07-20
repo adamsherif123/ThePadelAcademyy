@@ -419,6 +419,12 @@ verify_jwt = false
 [functions.delete-account]
 verify_jwt = true
 
+# send-push: called by the notifications-insert DB trigger (pg_net), which carries no
+# Supabase JWT. Auth is the shared x-trigger-secret checked inside the function, so
+# JWT verification is OFF. Deploy with `--no-verify-jwt`.
+[functions.send-push]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

@@ -1,18 +1,19 @@
 import { parseInstant } from '@tpa/core';
 import type { CoachId, IsoInstant, SessionSlot, SlotId } from '@tpa/types';
 
-import { updateSlot } from '../lib/api';
+import { rescheduleSessionRpc, type RescheduleReason } from '../lib/api';
 import { TOUCHED } from '../lib/queryClient';
-import { runWrite } from './queries';
+import { runRpc } from './queries';
 
 /**
- * Edit a slot — coach, capacity, start/end time — via the column-limited UPDATE
- * (coach_id, capacity, starts_at, ends_at, status only; booked_count is not
- * grantable, by design). Client re-validation stays (a seam never trusts its
- * caller): capacity can't drop below the seats already booked, end must follow
- * start, and a start can't be MOVED into the past. Coach overlap is NOT blocked here
- * (warn, don't block) — but the DB EXCLUDE constraint is the real guard, so a
- * reschedule that collides returns 'coach_conflict' (23P01) instead of a raw error.
+ * Edit a slot — coach, capacity, start/end time — via the reschedule_session RPC
+ * (S12). It replaced the old direct column UPDATE so the row change and the
+ * "your session moved" notifications to booked players are ONE atomic transaction,
+ * minted by an RPC (the notifications invariant). Client re-validation stays (a seam
+ * never trusts its caller): capacity can't drop below the seats already booked, end
+ * must follow start, a MOVED start can't be in the past — and the DB re-checks all of
+ * them. Coach overlap is warned-not-blocked here, but the DB EXCLUDE constraint is the
+ * real guard, surfaced by the RPC as 'coach_conflict'.
  */
 export interface SlotEdit {
   coachId: CoachId;
@@ -22,8 +23,8 @@ export interface SlotEdit {
 }
 
 export type UpdateSlotResult =
-  | { ok: true; slot: SessionSlot }
-  | { ok: false; reason: 'capacity_below_booked' | 'end_before_start' | 'in_past' | 'coach_conflict' | 'network' };
+  | { ok: true; moved: boolean }
+  | { ok: false; reason: RescheduleReason | 'network' };
 
 export async function updateSlotDetails(
   slot: SessionSlot,
@@ -38,11 +39,12 @@ export async function updateSlotDetails(
   if (startMoved && parseInstant(edit.startsAt).getTime() <= parseInstant(now).getTime()) {
     return { ok: false, reason: 'in_past' };
   }
-  const res = await runWrite(
-    () => updateSlot(slot.id, { coachId: edit.coachId, capacity: edit.capacity, startsAt: edit.startsAt, endsAt: edit.endsAt }),
+  return runRpc(
+    () => rescheduleSessionRpc(slot.id, {
+      coachId: edit.coachId, capacity: edit.capacity, startsAt: edit.startsAt, endsAt: edit.endsAt,
+    }),
     TOUCHED.slots,
   );
-  return res.ok ? { ok: true, slot: res.value } : { ok: false, reason: res.reason };
 }
 
 /** Re-export the slot id type callers used from here. */
