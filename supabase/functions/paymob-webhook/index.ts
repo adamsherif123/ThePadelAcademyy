@@ -84,25 +84,36 @@ Deno.serve(async (req) => {
     return new Response('invalid_hmac', { status: 401 }); // zero DB access happened
   }
 
-  // ── 2. Authenticated. Settle ONLY a successful transaction, idempotently. ──
-  // A failed/declined transaction is acknowledged (200, no retry) but not settled —
-  // the purchase stays pending and the client's return-journey poll times out.
-  if (obj.success === true) {
-    const order = (obj.order ?? {}) as Record<string, unknown>;
-    const purchaseId = order.merchant_order_id as string | undefined; // = our pu_ id
-    const txnId = obj.id != null ? String(obj.id) : null;
+  // ── 2. Authenticated. Record the TERMINAL outcome, idempotently. ──
+  // success=true              → settle_purchase (pending → succeeded, mints).
+  // success=false, pending=false → fail_purchase (pending → failed, mints NOTHING).
+  // success=false, pending=true  → a mid-flight state (e.g. "Pending 3DS
+  //   Authorization"); NOT terminal — do nothing, leave it pending, let the poll wait.
+  // Both RPCs are service_role-only, atomic, idempotent, and guarded on
+  // status='pending', so redelivery and out-of-order callbacks are safe.
+  const order = (obj.order ?? {}) as Record<string, unknown>;
+  const purchaseId = order.merchant_order_id as string | undefined; // = our pu_ id
+  const txnId = obj.id != null ? String(obj.id) : null;
+
+  const rpc = obj.success === true
+    ? 'settle_purchase'
+    : obj.success === false && obj.pending === false
+      ? 'fail_purchase'
+      : null;
+
+  if (rpc) {
     if (purchaseId && txnId) {
       // service_role client — SUPABASE_SERVICE_ROLE_KEY is auto-injected into Edge
       // Functions and never leaves this runtime (not in a commit, not in either app).
       const admin = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'));
-      const { error } = await admin.rpc('settle_purchase', {
+      const { error } = await admin.rpc(rpc, {
         p_purchase_id: purchaseId,
         p_gateway_transaction_id: txnId,
       });
-      // settle_purchase is idempotent (redelivery → already_settled, no error). We
+      // Both RPCs are idempotent (already_settled / already_failed, no error). We
       // still 200 on an RPC error so Paymob doesn't retry forever on a bad row; the
       // detail is logged for reconciliation.
-      if (error) console.error('settle_purchase failed', purchaseId, error.message);
+      if (error) console.error(`${rpc} failed`, purchaseId, error.message);
     } else {
       console.error('webhook: verified but missing merchant_order_id/id', JSON.stringify(order));
     }

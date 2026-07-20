@@ -27,18 +27,26 @@ const POLL_MS = 2000;
 const TIMEOUT_MS = 40_000;
 
 /**
- * The return journey (S6 Task 4). The user paid in a browser sheet and came back —
- * but the webhook (which mints the credits, server-side, after HMAC) may not have
- * fired yet. So we POLL the purchase status; we never claim success the server hasn't
- * confirmed, and never spin forever:
- *   pending  → "Confirming your payment…" (bounded poll)
- *   settled  → the credits, read from the batch the webhook actually minted
- *   timed out→ an honest "still confirming — no need to pay again" (no false success)
+ * The return journey (S6 Task 4, extended in S6.1). The user paid in a browser sheet
+ * and came back. Three terminal outcomes now, not two:
+ *   succeeded → the credits, read from the batch the webhook actually minted;
+ *   failed    → a decline screen (no credits, no charge) — we STOP, we don't poll;
+ *   pending   → "Confirming your payment…" (bounded poll), then an honest timeout.
+ *
+ * Two signals feed this, and we trust them differently:
+ *   - the redirect `outcome` param (client-controlled, instant) decides WHICH screen
+ *     to show first — a fast path that kills the infinite spinner on a decline;
+ *   - the webhook-written purchase.status (server-verified, durable) is the source of
+ *     truth. Credits come ONLY from the minted batch, NEVER from the redirect param.
+ * So `outcome=failure` shows the decline screen with no poll; `outcome=success` (or
+ * none) polls until the status resolves — and a polled `failed` still routes to the
+ * decline screen, so correctness never depends on the redirect arriving.
  */
 export default function PurchaseSuccessScreen() {
   const router = useRouter();
   const { player, now } = useSession();
-  const { purchaseId } = useLocalSearchParams<{ purchaseId: string }>();
+  const { purchaseId, outcome } = useLocalSearchParams<{ purchaseId: string; outcome?: string }>();
+  const knownDeclined = outcome === 'failure';
   const [deadline] = useState(() => Date.now() + TIMEOUT_MS);
   const [timedOut, setTimedOut] = useState(false);
   const batchesQ = useBatches();
@@ -46,10 +54,15 @@ export default function PurchaseSuccessScreen() {
   const purchaseQ = useQuery({
     queryKey: ['purchase', purchaseId],
     queryFn: () => fetchPurchaseById(purchaseId as string),
-    enabled: Boolean(purchaseId),
-    refetchInterval: (q) => (q.state.data?.status === 'succeeded' || timedOut ? false : POLL_MS),
+    // Don't poll a KNOWN decline — that was the bug this session fixes.
+    enabled: Boolean(purchaseId) && !knownDeclined,
+    refetchInterval: (q) => {
+      const s = q.state.data?.status;
+      return s === 'succeeded' || s === 'failed' || timedOut ? false : POLL_MS;
+    },
   });
   const settled = purchaseQ.data?.status === 'succeeded';
+  const declined = knownDeclined || purchaseQ.data?.status === 'failed';
 
   // The webhook settled → the batch exists. Refresh the wallet + purchase history.
   useEffect(() => {
@@ -59,14 +72,43 @@ export default function PurchaseSuccessScreen() {
     }
   }, [settled]);
 
+  // A declined purchase still belongs in purchase history — refresh it so the failed
+  // row shows there (it will never masquerade as pending).
+  useEffect(() => {
+    if (declined) void queryClient.invalidateQueries({ queryKey: queryKeys.purchases });
+  }, [declined]);
+
   // Stop polling at the deadline — a bounded wait, never an endless spinner.
   useEffect(() => {
-    if (settled || timedOut) return;
+    if (settled || declined || timedOut) return;
     const t = setInterval(() => {
       if (Date.now() >= deadline) setTimedOut(true);
     }, 1000);
     return () => clearInterval(t);
-  }, [settled, timedOut, deadline]);
+  }, [settled, declined, timedOut, deadline]);
+
+  // ── declined: honest, non-alarming — no credits, no charge (a decline never captures) ──
+  if (declined) {
+    return (
+      <Screen>
+        <SuccessView
+          tone="accent"
+          icon="close-circle-outline"
+          eyebrow="Payment declined"
+          title="Payment didn't go through"
+          primary={{ label: 'Try again', onPress: () => router.replace('/buy-credits') }}
+          secondary={{ label: 'Done', onPress: () => router.replace('/(tabs)') }}
+        >
+          <Card>
+            <Text variant="body" tone="secondary">
+              Your payment wasn&apos;t completed, so no credits were added — and you were not
+              charged. You can try again whenever you&apos;re ready.
+            </Text>
+          </Card>
+        </SuccessView>
+      </Screen>
+    );
+  }
 
   // ── settled: show the credits the webhook actually minted (batch.purchaseId === ours) ──
   const batch = settled ? (batchesQ.data ?? []).find((b) => b.purchaseId === purchaseId) : undefined;
@@ -102,7 +144,7 @@ export default function PurchaseSuccessScreen() {
     );
   }
 
-  // ── timed out (and not settled): honest, no false success ──
+  // ── timed out (and not settled/declined): honest, no false success ──
   if (timedOut && !settled) {
     return (
       <Screen style={styles.timeout}>

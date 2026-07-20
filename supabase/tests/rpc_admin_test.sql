@@ -9,7 +9,7 @@
 -- Run with:  supabase test db
 -- ============================================================================
 begin;
-select plan(60);
+select plan(70);
 
 -- ── seed as postgres ─────────────────────────────────────────────────────────
 -- S8: auth_user_id now FK-references auth.users — seed the linked auth rows first.
@@ -61,9 +61,10 @@ insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, bo
   ('bk_rb1', 'sl_rb', 'pl_a', 'cb_a2', 'booked', now()),
   ('bk_rb2', 'sl_rb', 'pl_b', 'cb_b2', 'booked', now());
 
--- Pending paymob purchase for settle_purchase.
+-- Pending paymob purchases: pu_s for settle_purchase, pu_f for fail_purchase (S6.1).
 insert into public.purchases (id, player_id, package_id, status, amount, created_at, payment_method, gateway_order_id) values
-  ('pu_s', 'pl_a', 'pk_d4', 'pending', 220000, now(), 'paymob', 'ord_s');
+  ('pu_s', 'pl_a', 'pk_d4', 'pending', 220000, now(), 'paymob', 'ord_s'),
+  ('pu_f', 'pl_a', 'pk_d4', 'pending', 220000, now(), 'paymob', 'ord_f');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- AS ADMIN
@@ -142,8 +143,9 @@ select is(public.grant_credits('pl_a','group',1,'x')->>'reason',   'not_admin', 
 select is(public.record_cash_purchase('pl_a','pk_g4',1)->>'reason','not_admin', 'player → record_cash_purchase denied (not_admin)');
 -- Task 0: booking a slot cancelled out from under you reports slot_cancelled.
 select is(public.book_slot('sl_cxl')->>'reason', 'slot_cancelled', 'book_slot on a cancelled slot → slot_cancelled (guarded WHERE + follow-up reason)');
--- A player may NOT execute settle_purchase at all (privilege layer).
+-- A player may NOT execute settle_purchase / fail_purchase at all (privilege layer).
 select throws_ok($$ select public.settle_purchase('pu_s','x') $$, '42501', null, 'player → settle_purchase DENIED at the privilege layer (42501)');
+select throws_ok($$ select public.fail_purchase('pu_f','x') $$, '42501', null, 'player → fail_purchase DENIED at the privilege layer (42501)');
 
 reset role;
 
@@ -154,16 +156,30 @@ set local role service_role;
 select is(public.settle_purchase('pu_s','txn_s')->>'already_settled', 'false', 'settle_purchase #1 → mints (already_settled=false)');
 select is(public.settle_purchase('pu_s','txn_s')->>'already_settled', 'true',  'settle_purchase #2 (redelivery) → already_settled, no second mint');
 select is(public.settle_purchase('pu_nope','x')->>'reason', 'purchase_missing', 'settle_purchase rejects an unknown purchase');
+
+-- ── fail_purchase (S6.1) — a declined callback records failed, mints nothing ──
+select is(public.fail_purchase('pu_f','txn_f')->>'already_failed', 'false', 'fail_purchase #1 → records failed (already_failed=false)');
+select is(public.fail_purchase('pu_f','txn_f2')->>'already_failed', 'true',  'fail_purchase #2 (redelivery) → already_failed, a no-op');
+select is(public.fail_purchase('pu_nope','x')->>'reason', 'purchase_missing', 'fail_purchase rejects an unknown purchase');
+-- TERMINAL-STATE RULE, both directions:
+select is(public.settle_purchase('pu_f','x')->>'reason', 'not_pending', 'a FAILED purchase can never be settled (not_pending, mints nothing)');
+select is(public.fail_purchase('pu_s','x')->>'reason', 'already_succeeded', 'a SUCCEEDED purchase can never be failed (already_succeeded)');
 reset role;
 
 select is((select count(*)::int from public.credit_batches where purchase_id='pu_s'), 1, 'double-delivery minted EXACTLY ONE batch');
 select is((select status from public.purchases where id='pu_s'), 'succeeded', 'settled purchase → succeeded');
 select is((select gateway_transaction_id from public.purchases where id='pu_s'), 'txn_s', 'settle recorded the gateway transaction id');
+-- fail_purchase outcomes: pu_f is terminally failed, minted nothing, and the
+-- redelivery (txn_f2) did NOT overwrite the recorded transaction id.
+select is((select status from public.purchases where id='pu_f'), 'failed', 'declined purchase → failed');
+select is((select gateway_transaction_id from public.purchases where id='pu_f'), 'txn_f', 'fail recorded the gateway txn id; redelivery did not overwrite it (guarded)');
+select is((select count(*)::int from public.credit_batches where purchase_id='pu_f'), 0, 'a declined purchase minted ZERO credit batches');
 
--- anon is denied settle_purchase too (privilege layer).
+-- anon is denied settle_purchase / fail_purchase too (privilege layer).
 set local role anon;
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
 select throws_ok($$ select public.settle_purchase('pu_s','x') $$, '42501', null, 'anon → settle_purchase DENIED at the privilege layer (42501)');
+select throws_ok($$ select public.fail_purchase('pu_f','x') $$, '42501', null, 'anon → fail_purchase DENIED at the privilege layer (42501)');
 reset role;
 
 select * from finish();

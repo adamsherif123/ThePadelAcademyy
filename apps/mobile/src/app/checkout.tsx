@@ -66,9 +66,13 @@ export default function CheckoutScreen() {
     setError(null);
     const res = await payForPackage(player, pkg);
     if (res.ok) {
-      // Route to purchase-success, which polls the purchase until the webhook settles
-      // it. We NEVER claim success here — the server confirms it.
-      router.replace({ pathname: '/purchase-success', params: { purchaseId: res.purchaseId } });
+      // Route to the return screen with the fast-path outcome hint. It confirms via
+      // the server (succeeded → credits, failed → decline) and never trusts this hint
+      // for anything but which screen to show first. We NEVER claim success here.
+      router.replace({
+        pathname: '/purchase-success',
+        params: { purchaseId: res.purchaseId, outcome: res.outcome },
+      });
     } else {
       setPaying(false);
       setError(res.error);
