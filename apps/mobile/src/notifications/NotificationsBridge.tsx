@@ -9,7 +9,7 @@ import { BOOKING_TOUCHED_KEYS, queryClient, queryKeys } from '../lib/queryClient
 import { supabase } from '../lib/supabase';
 import { useSession } from '../session/SessionProvider';
 import { notificationHref } from './deepLink';
-import { registerForPush } from './push';
+import { isExpoGo, registerForPush } from './push';
 import { setLastPushToken } from './tokenStore';
 
 /** A push/notification landing means server state changed — refresh the feed and the
@@ -24,8 +24,9 @@ function refreshFromNotification(): void {
  * the ready player, (b) keeps the in-app feed live via Realtime — so the badge updates
  * instantly even when push permission was denied, (c) refreshes on a foreground push,
  * and (d) routes a tapped push to the right screen, including the cold-start case where
- * a tap launched the app from killed. Renders nothing. Fully degrades: no token, denied
- * permission, or a simulator all leave the rest working.
+ * a tap launched the app from killed. Renders nothing. Fully degrades: Expo Go (no
+ * remote module), no token, denied permission, or a simulator all leave the in-app
+ * centre + Realtime working — only the OS banner is absent.
  */
 export function NotificationsBridge(): null {
   const { player, status } = useSession();
@@ -84,25 +85,36 @@ export function NotificationsBridge(): null {
     };
   }, [playerId]);
 
-  // (c) Foreground receipt → refresh; (d) tap → deep-link.
+  // (c) Foreground receipt → refresh; (d) tap → deep-link. These subscribe to the
+  //     remote-notification module, which throws in Expo Go (SDK 53+) — so skip them
+  //     there. No loss: Expo Go delivers no OS pushes, and the in-app feed is driven by
+  //     Realtime regardless. Wrapped so a native throw can't crash the mount.
   useEffect(() => {
-    const received = Notifications.addNotificationReceivedListener(() => refreshFromNotification());
-    const responded = Notifications.addNotificationResponseReceivedListener(openFromResponse);
-    return () => {
-      received.remove();
-      responded.remove();
-    };
+    if (isExpoGo()) return;
+    try {
+      const received = Notifications.addNotificationReceivedListener(() => refreshFromNotification());
+      const responded = Notifications.addNotificationResponseReceivedListener(openFromResponse);
+      return () => {
+        received.remove();
+        responded.remove();
+      };
+    } catch {
+      return undefined;
+    }
   }, [openFromResponse]);
 
   // Cold start: a tap that launched the app from killed. Handle once, only when a
-  // player is ready (so the auth guard doesn't bounce the deep-link to sign-in).
+  // player is ready (so the auth guard doesn't bounce the deep-link to sign-in). Skipped
+  // in Expo Go (the remote API throws there) and never allowed to reject uncaught.
   const coldStartDone = useRef(false);
   useEffect(() => {
-    if (coldStartDone.current || status !== 'ready' || !playerId) return;
+    if (coldStartDone.current || status !== 'ready' || !playerId || isExpoGo()) return;
     coldStartDone.current = true;
-    void Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response) openFromResponse(response);
-    });
+    Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        if (response) openFromResponse(response);
+      })
+      .catch(() => undefined);
   }, [status, playerId, openFromResponse]);
 
   return null;
