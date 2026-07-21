@@ -221,6 +221,18 @@ export async function fetchCurrentPlayer(): Promise<Player | null> {
   return data ? rowToPlayer(data) : null;
 }
 
+/**
+ * Is the signed-in auth user an ADMIN? (A1: admins are a separate identity with NO player
+ * row.) The consumer app uses this to REFUSE an admin credential — an admin who signs in
+ * here has no player and must never be sent to profile-setup (bug #2). is_admin() reads the
+ * admins table under the caller's JWT; false for every player.
+ */
+export async function fetchIsAdmin(): Promise<boolean> {
+  const { data, error } = await supabase.rpc('is_admin');
+  if (error) throw new ApiError(`is_admin failed: ${error.message}`, error);
+  return Boolean(data);
+}
+
 // ── RPC result contracts (mirror the jsonb the functions return) ──────────────
 
 export type BookReason =
@@ -245,7 +257,12 @@ export type CancelRpcResult =
   | { ok: true; refunded: boolean; creditBatchId: string | null }
   | { ok: false; reason: CancelReason };
 
-export type SignupReason = 'name_required' | 'invalid_gender' | 'invalid_level' | 'not_authenticated';
+export type SignupReason =
+  | 'name_required'
+  | 'invalid_gender'
+  | 'invalid_level'
+  | 'not_authenticated'
+  | 'is_admin'; // A1/A2: an admin identity can never become a player (defence in depth)
 
 export type SignupRpcResult =
   | { ok: true; alreadyCompleted: boolean; playerId: string }

@@ -254,26 +254,11 @@ otp_expiry = 3600
 # subject = "Your password has been changed"
 # content_path = "./templates/password_changed_notification.html"
 
-[auth.sms]
-# Phone OTP is the ONE auth method for this product — players AND the admin (S8
-# Task 4). No email/password, no second provider, no SMTP.
-enable_signup = true
-# The OTP verify step confirms the phone; no separate confirmation needed.
-enable_confirmations = false
-# Template for sending OTP to users
-template = "Your code is {{ `{{ .Code }}` }}"
-# Controls the minimum amount of time that must pass before sending another sms otp.
-max_frequency = "5s"
-
-# Test OTP: pre-defined phone→code map, so all of development (and this session's
-# real-session proof) works WITHOUT Twilio. Twilio is a launch blocker for real
-# players' phones, not for local dev. Keys are E.164 DIGITS ONLY — no leading '+'
-# (GoTrue normalises the incoming phone to digits before the lookup). Egyptian
-# mobiles are +20 1x xxxxxxxx.
-[auth.sms.test_otp]
-201555550001 = "123456"
-201555550002 = "123456"
-201555550003 = "123456"
+# Phone/SMS auth was removed in A2 — the consumer app and the admin app both use
+# email + password ([auth.email] above). No [auth.sms], no [auth.sms.test_otp] fixed-code
+# numbers, and no [auth.sms.twilio] provider: Twilio is gone entirely (it stays in git
+# history if a phone provider is ever wanted). The config-guard (scripts/check-config.mjs)
+# now passes trivially — there is no SMS landmine left to catch.
 
 # Configure logged in session timeouts.
 # [auth.sessions]
@@ -292,21 +277,7 @@ max_frequency = "5s"
 # enabled = true
 # uri = "pg-functions://<database>/<schema>/<hook_name>"
 
-# Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.
-#
-# GoTrue only treats phone auth as ENABLED when a provider is enabled, so Twilio is
-# switched on here with PLACEHOLDER credentials. The [auth.sms.test_otp] numbers
-# above skip SMS delivery entirely and never reach Twilio, so no real Twilio account
-# is needed for local dev or this session's real-session proof. Wiring real Twilio
-# creds (via env-var substitution) is a LAUNCH task for real players' phones — a
-# launch blocker, not a dev blocker. These placeholders are safe to commit.
-[auth.sms.twilio]
-enabled = true
-account_sid = "placeholder-not-used-locally"
-message_service_sid = "placeholder-not-used-locally"
-# DO NOT commit a REAL Twilio auth token. This placeholder is only ever consulted for
-# NON-test numbers, which local dev never sends. At launch, swap to env-var substitution.
-auth_token = "placeholder-not-used-locally"
+# (No SMS provider — phone auth removed in A2. See the note under [auth.email].)
 
 # Multi-factor-authentication is available to Supabase Pro plan.
 [auth.mfa]

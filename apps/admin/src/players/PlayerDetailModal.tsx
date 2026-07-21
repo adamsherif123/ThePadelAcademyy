@@ -146,7 +146,7 @@ export function PlayerDetailModal({
           <div className={styles.profileInfo}>
             <span className={styles.profileName}>{player.name}</span>
             <span className={styles.profileMeta}>
-              {player.phone} · Joined {formatInstantDate(player.createdAt)}
+              {player.phone ?? 'No phone'} · Joined {formatInstantDate(player.createdAt)}
             </span>
             <div className={styles.pills}>
               <Badge tone="neutral">{GENDER_LABEL[player.gender]}</Badge>
@@ -313,7 +313,7 @@ function EditView({
 
         <div className={styles.grid}>
           <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} disabled />
-          <Input label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} disabled />
+          <Input label="Phone" value={phone ?? ''} onChange={(e) => setPhone(e.target.value)} disabled />
           <Select
             label="Gender"
             value={gender}

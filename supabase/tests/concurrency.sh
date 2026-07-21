@@ -57,7 +57,8 @@ check() { # $1=label $2=got $3=want
 cleanup_rows() {
   # book_slot mints bookings with 'bk_<uuid>' ids, so delete bookings by their
   # slot/player, not by an id prefix (FK-safe order: bookings → batches → slots → players → coaches).
-  sql "delete from public.bookings       where slot_id like 'slr_%' or player_id like 'plr_%';
+  sql "delete from public.notifications  where slot_id like 'slr_%' or player_id like 'plr_%';
+       delete from public.bookings       where slot_id like 'slr_%' or player_id like 'plr_%';
        delete from public.credit_batches where id like 'cbr_%' or player_id like 'plr_%';
        delete from public.session_slots  where id like 'slr_%';
        delete from public.players        where id like 'plr_%';

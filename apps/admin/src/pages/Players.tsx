@@ -97,7 +97,7 @@ export function Players() {
                 <Avatar name={p.name} size={40} />
                 <div className={styles.info}>
                   <span className={styles.name}>{p.name}</span>
-                  <span className={styles.phone}>{p.phone}</span>
+                  <span className={styles.phone}>{p.phone ?? 'No phone'}</span>
                 </div>
                 <div className={styles.pills}>
                   <Badge tone="neutral">{GENDER_LABEL[p.gender]}</Badge>

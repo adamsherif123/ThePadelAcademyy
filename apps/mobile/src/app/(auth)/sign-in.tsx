@@ -1,92 +1,84 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color, radius, space } from '@tpa/theme';
+import { color, space } from '@tpa/theme';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { useSession } from '../../session/SessionProvider';
 import { ACADEMY, BrandMark, Button, Input, NavyScreen, PillOnNavy, Text } from '../../ui';
 
-/** 01 — Sign in with phone. Sends a real OTP, then the OTP screen verifies it. */
+/** Loose email shape check — the server is the real authority; this just catches typos. */
+const looksLikeEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
+/**
+ * 01 — Sign in with email (A2). Enter an email → Next → the password screen, which signs
+ * a returning player in or offers "create account" for a new one. We do NOT probe whether
+ * the email exists here: there's no way to do that without either a password (not yet
+ * collected) or an enumeration endpoint (which would leak which emails are registered to
+ * anyone holding the public anon key). So the new-vs-returning split happens on the next
+ * screen, off the password attempt — never off an email-existence check.
+ */
 export default function SignInScreen() {
   const router = useRouter();
-  const { sendOtp } = useSession();
-  const [value, setValue] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const onContinue = async () => {
-    if (submitting) return;
-    // Empty input falls back to a configured test number so dev sign-in is one tap.
-    const input = value.trim() || '155 555 0001';
-    setSubmitting(true);
+  const onContinue = () => {
+    const value = email.trim();
+    if (!looksLikeEmail(value)) {
+      setError('Enter a valid email address.');
+      return;
+    }
     setError(null);
-    const res = await sendOtp(input);
-    setSubmitting(false);
-    if (res.ok) router.push('/(auth)/otp');
-    else setError(res.error ?? 'Could not send the code. Please try again.');
+    router.push({ pathname: '/(auth)/password', params: { email: value } });
   };
 
   return (
     <NavyScreen scroll contentContainerStyle={styles.content}>
       <BrandMark size={72} />
 
-        <View style={styles.hero}>
-          <Text variant="label">The Padel Academy · Cairo</Text>
-          <Text variant="display" tone="inverse">
-            {'Train hard.\nPlay padel.\nLevel up.'}
-          </Text>
-        </View>
+      <View style={styles.hero}>
+        <Text variant="label">The Padel Academy · Cairo</Text>
+        <Text variant="display" tone="inverse">
+          {'Train hard.\nPlay padel.\nLevel up.'}
+        </Text>
+      </View>
 
-        <View style={styles.pills}>
-          <PillOnNavy label="Group" />
-          <PillOnNavy label="Duo" />
-          <PillOnNavy label="Individual" />
-        </View>
+      <View style={styles.pills}>
+        <PillOnNavy label="Group" />
+        <PillOnNavy label="Duo" />
+        <PillOnNavy label="Individual" />
+      </View>
 
-        <View style={styles.locationRow}>
-          <Ionicons name="location-outline" size={16} color={color.text.muted} />
-          <Text variant="caption" tone="muted">
-            {ACADEMY.locationLine}
-          </Text>
-        </View>
+      <View style={styles.locationRow}>
+        <Ionicons name="location-outline" size={16} color={color.text.muted} />
+        <Text variant="caption" tone="muted">
+          {ACADEMY.locationLine}
+        </Text>
+      </View>
 
-        <View style={styles.spacer} />
+      <View style={styles.spacer} />
 
-        <View style={styles.form}>
-          <Text variant="label">Sign in with your phone</Text>
-          <View style={styles.phoneRow}>
-            <View style={styles.countryChip}>
-              <Text variant="body" tone="inverse">
-                🇪🇬 +20
-              </Text>
-            </View>
-            <View style={styles.phoneInput}>
-              <Input
-                tone="navy"
-                placeholder="1XX XXX XXXX"
-                keyboardType="phone-pad"
-                value={value}
-                onChangeText={setValue}
-                returnKeyType="done"
-                onSubmitEditing={onContinue}
-              />
-            </View>
-          </View>
-          <Button
-            label={submitting ? 'Sending code…' : 'Continue'}
-            onPress={onContinue}
-            disabled={submitting}
-          />
-          {error ? (
-            <Text variant="caption" tone="accent" style={styles.helper}>
-              {error}
-            </Text>
-          ) : null}
-          <Text variant="caption" tone="muted" style={styles.helper}>
-            We&apos;ll text you a verification code. New players get 2 free trial sessions.
-          </Text>
-        </View>
+      <View style={styles.form}>
+        <Text variant="label">Sign in with your email</Text>
+        <Input
+          tone="navy"
+          placeholder="you@example.com"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          autoComplete="email"
+          textContentType="emailAddress"
+          value={email}
+          onChangeText={setEmail}
+          returnKeyType="next"
+          onSubmitEditing={onContinue}
+          error={error ?? undefined}
+        />
+        <Button label="Continue" onPress={onContinue} />
+        <Text variant="caption" tone="muted" style={styles.helper}>
+          New players get 2 free trial sessions. You&apos;ll set a password next.
+        </Text>
+      </View>
     </NavyScreen>
   );
 }
@@ -98,15 +90,5 @@ const styles = StyleSheet.create({
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   spacer: { flex: 1, minHeight: space.xl },
   form: { gap: space.md },
-  phoneRow: { flexDirection: 'row', gap: space.sm, alignItems: 'stretch' },
-  countryChip: {
-    justifyContent: 'center',
-    paddingHorizontal: space.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: color.border.onInverse,
-    backgroundColor: color.pillOnInverse.bg,
-  },
-  phoneInput: { flex: 1 },
   helper: { textAlign: 'center', marginTop: space.xs },
 });

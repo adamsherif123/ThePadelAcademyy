@@ -9,41 +9,30 @@ and "live for real players."
 
 ---
 
-## 1. Auth config — the landmine (guarded)
+## 1. Auth config — email/password (A2)
 
-`supabase/config.toml` ships, **for local dev only**:
-- `[auth.sms.test_otp]` — three fixed-code numbers (`+20155555000{1,2,3}` → `123456`).
-- `[auth.sms.twilio]` — `enabled = true` with **placeholder** credentials.
+Auth is **email + password** for both apps (A2 removed phone OTP and Twilio entirely —
+no `[auth.sms]`, no `[auth.sms.test_otp]` backdoor numbers, no `[auth.sms.twilio]`). The
+old SMS landmine is gone, so `scripts/check-config.mjs` now passes trivially; it stays
+wired into `pnpm verify` / `pnpm config:push` as a regression guard (it will fail if an
+SMS provider or test-OTP block ever reappears). Config reaches the hosted project via
+**`supabase config push`** (the auth block — not `supabase db push`, which is migrations
+only).
 
-If pushed to production these become **fixed-code login backdoors** and a live-but-fake
-SMS provider. Config reaches the hosted project via **`supabase config push`** (it pushes
-the auth block — not `supabase db push`, which is migrations only). So the danger is a
-`supabase config push` while linked to the production project.
+Email confirmation is currently **OFF** (`[auth.email].enable_confirmations = false`) —
+Adam's decision so a new signup can use the account immediately with no SMTP.
 
-**Guard:** `node scripts/check-config.mjs --prod` fails if any test-OTP number or
-placeholder provider is present. It is wired into **`pnpm config:push`** — the sanctioned
-way to push config to production. `pnpm verify` also runs a dev-safe variant that fails if
-a *real* Twilio secret ever gets committed to `config.toml`.
-
-**Cutover steps (production):**
-1. **Delete** the entire `[auth.sms.test_otp]` section from `config.toml` (or maintain a
-   production config without it).
-2. Set the **real SMS/WhatsApp provider**. For WhatsApp OTP, Egypt typically uses Twilio's
-   WhatsApp channel or `twilio_verify`. Put real credentials behind **env() substitution**,
-   never inline:
-   ```toml
-   [auth.sms.twilio]
-   enabled = true
-   account_sid = "env(TWILIO_ACCOUNT_SID)"
-   message_service_sid = "env(TWILIO_MESSAGE_SERVICE_SID)"
-   auth_token = "env(TWILIO_AUTH_TOKEN)"
-   ```
-   Export those vars in the deploy shell (from your secrets manager) before pushing.
-3. Push with the guard: `pnpm config:push` (refuses if the landmine is still present).
-4. Verify a real phone receives an OTP on the production project.
-
-> Do NOT do this in dev: removing the test numbers breaks local sign-in and this repo's
-> auth proofs, which rely on the fixed codes.
+**Cutover decision (production):**
+1. Decide whether to require **email confirmation**. If yes, set
+   `[auth.email].enable_confirmations = true` AND configure a real SMTP server under
+   `[auth.email.smtp]` (host/port/user/pass via `env()` substitution — never inline), or
+   confirmation emails won't send. The mobile flow currently assumes an immediate session
+   after signUp; enabling confirmations means adding a "check your email" step.
+2. Set `[auth]` `site_url` / `additional_redirect_urls` to the production URLs (used for
+   any confirmation / password-reset email links).
+3. Password reset: there is no in-app reset flow (it needs SMTP). Until SMTP is wired,
+   resets are done from the Supabase dashboard. Revisit once (1) is decided.
+4. Push config with the guard: `pnpm config:push`.
 
 ---
 
@@ -75,8 +64,8 @@ Set the admin's email+password with the supported script (see `apps/admin/ADMIN_
 ## 4. Store / project cutover (needs your accounts — not in scope here)
 
 - **Production Supabase project**: create it, `supabase link` to it, run `supabase db push`
-  (migrations) and `supabase config push` **via `pnpm config:push`** (the guard blocks the
-  test-OTP landmine). Set all Edge Function secrets (`supabase secrets set …`: Paymob, HMAC,
+  (migrations) and `supabase config push` **via `pnpm config:push`** (the guard runs, though
+  the SMS landmine is gone since A2). Set all Edge Function secrets (`supabase secrets set …`: Paymob, HMAC,
   `PUSH_TRIGGER_SECRET`, and — if used — `SENTRY_DSN`). Re-schedule the stale-purchase cron
   (`create extension pg_cron; select cron.schedule('fail-stale-purchases','17 * * * *', $$ select public.fail_stale_purchases(); $$);`) and re-point the Paymob callbacks at the prod webhook.
 - **Payments**: switch Paymob from the test integration to the live account (real creds via

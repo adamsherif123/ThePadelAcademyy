@@ -26,7 +26,12 @@ import type {
 
 export interface Player {
   id: PlayerId;
-  phone: string;
+  /**
+   * Nullable since A2: consumer auth moved from phone-OTP to email/password, so a player
+   * signs up with an email (held on the auth user, not here) and has NO phone. Legacy
+   * players keep theirs; the deletion tombstone still writes a 'deleted:'||id sentinel.
+   */
+  phone: string | null;
   name: string;
   gender: Gender;
   level: Level;

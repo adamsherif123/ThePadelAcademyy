@@ -65,11 +65,19 @@ describe('purchasesForPlayer', () => {
 describe('matchesPlayerQuery (the single shared predicate)', () => {
   it('matches on name substring and on phone with or without spaces', () => {
     const p = mockPlayers[0]!;
+    const phone = p.phone ?? ''; // phone is nullable since A2; the mocks still carry one
     expect(matchesPlayerQuery(p, p.name.slice(0, 3).toLowerCase())).toBe(true);
-    expect(matchesPlayerQuery(p, p.phone)).toBe(true);
-    expect(matchesPlayerQuery(p, p.phone.replace(/\s+/g, ''))).toBe(true);
+    expect(matchesPlayerQuery(p, phone)).toBe(true);
+    expect(matchesPlayerQuery(p, phone.replace(/\s+/g, ''))).toBe(true);
     expect(matchesPlayerQuery(p, 'zzzzzz-nomatch')).toBe(false);
     expect(matchesPlayerQuery(p, '')).toBe(true); // empty matches everything
+  });
+
+  it('handles a phone-less player (A2 email signups) without throwing', () => {
+    const emailPlayer = { ...mockPlayers[0]!, phone: null };
+    expect(matchesPlayerQuery(emailPlayer, emailPlayer.name.slice(0, 3).toLowerCase())).toBe(true);
+    expect(matchesPlayerQuery(emailPlayer, '0100')).toBe(false); // no phone → no phone match
+    expect(matchesPlayerQuery(emailPlayer, '')).toBe(true);
   });
 });
 

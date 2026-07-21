@@ -9,6 +9,7 @@ import type { Player } from '@tpa/types';
 export function matchesPlayerQuery(player: Player, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (q === '') return true;
-  const phone = player.phone.replace(/\s+/g, '');
+  // phone is nullable since A2 (email players have none) — treat absent as no match.
+  const phone = (player.phone ?? '').replace(/\s+/g, '');
   return player.name.toLowerCase().includes(q) || phone.includes(q.replace(/\s+/g, ''));
 }

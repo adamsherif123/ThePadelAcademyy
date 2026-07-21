@@ -1,7 +1,7 @@
 import { GENDERS, LEVELS } from '@tpa/core';
 import { color, radius, space } from '@tpa/theme';
 import type { Gender, Level } from '@tpa/types';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -17,32 +17,62 @@ const LEVEL_COPY: Record<Level, { title: string; description: string }> = {
   intermediate: { title: 'Intermediate', description: 'Match-ready — tactics, walls and net play' },
 };
 
+const MIN_PASSWORD = 8;
+
 /**
- * 03 — Profile setup (light). Gender + level filter which group slots show (S3b).
+ * 03 — Profile setup (A2). Two ways in:
+ *   • NEW player — arrives from the password screen with an `email` param and NO session:
+ *     collects name/gender/level PLUS password + confirm, and on submit does
+ *     signUp({email,password}) → complete_signup (create the player + 2 trial credits).
+ *   • ORPHAN — the guard forces a signed-in user with no player row here (a signup that
+ *     died after the auth user was created): the password already exists, so it only
+ *     collects the profile and runs complete_signup.
  *
- * The guard forces every new player here (session exists, no player yet), so it must
- * not be a dead end: it carries a sign-out escape. If complete_signup can't succeed
- * for this session — e.g. an orphaned session whose auth user was removed — the user
- * can sign out and start over with a different number instead of being bricked.
+ * Either way it must not be a dead end: it carries a sign-out escape. An admin never
+ * reaches this screen — the guard routes an admin credential to the refusal screen (bug #2).
  */
 export default function ProfileSetupScreen() {
   const router = useRouter();
-  const { completeProfile, signOut, phone } = useSession();
+  const { email: emailParam } = useLocalSearchParams<{ email?: string }>();
+  const { completeProfile, signUpWithEmail, signOut, email: sessionEmail } = useSession();
+  // An email param means the new-signup path (no session yet). Otherwise it's an orphan
+  // session that already has a password — collect the profile only.
+  const isNewFlow = Boolean(emailParam);
+  const shownEmail = emailParam ?? sessionEmail ?? '';
+
   const [name, setName] = useState('');
   const [gender, setGender] = useState<Gender | null>(null);
   const [level, setLevel] = useState<Level | null>(null);
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const complete = name.trim().length > 0 && gender !== null && level !== null;
+  const passwordTooShort = isNewFlow && password.length > 0 && password.length < MIN_PASSWORD;
+  const confirmMismatch = isNewFlow && confirm.length > 0 && confirm !== password;
+  const passwordOk = !isNewFlow || (password.length >= MIN_PASSWORD && confirm === password);
+  const complete = name.trim().length > 0 && gender !== null && level !== null && passwordOk;
   const busy = submitting || leaving;
 
   const onCreate = async () => {
-    if (!complete || busy) return;
+    if (!complete || busy || gender === null || level === null) return;
     setSubmitting(true);
     setError(null);
     try {
+      // New player: create the GoTrue auth user first (it owns the password), then the
+      // profile. If the email is already taken, send them to sign in instead of stranding.
+      if (isNewFlow) {
+        const signUpRes = await signUpWithEmail(emailParam ?? '', password);
+        if (!signUpRes.ok) {
+          if (signUpRes.taken) {
+            setError('That email already has an account. Go back and sign in with your password.');
+          } else {
+            setError(signUpRes.error ?? 'We couldn’t create your account. Please try again.');
+          }
+          return;
+        }
+      }
       // complete_signup creates the player and grants the 2 trial credits atomically.
       // completeProfile never throws — it returns {ok:false,error} on any failure.
       const res = await completeProfile({ name: name.trim(), gender, level });
@@ -51,7 +81,7 @@ export default function ProfileSetupScreen() {
         router.push('/(auth)/trial-grant');
         return;
       }
-      setError('We couldn’t create your profile. If this keeps happening, sign out below and try a different number.');
+      setError('We couldn’t create your profile. If this keeps happening, sign out below and try again.');
     } finally {
       // A stuck spinner is a bug even when the error is handled: reset on EVERY path
       // (on success this screen is unmounting anyway, so it's harmless there).
@@ -68,98 +98,126 @@ export default function ProfileSetupScreen() {
   return (
     <Screen scroll contentContainerStyle={styles.content}>
       <ScreenHeader eyebrow="Almost there" title="Set up your Profile" />
-        <Text variant="bodySecondary">
-          This takes 30 seconds and decides which group sessions you&apos;ll see.
+      <Text variant="bodySecondary">
+        This takes 30 seconds and decides which group sessions you&apos;ll see.
+      </Text>
+      {shownEmail ? (
+        <Text variant="caption" tone="muted">
+          {`Signing up as ${shownEmail}`}
         </Text>
-        {phone ? (
-          <Text variant="caption" tone="muted">
-            {`Signing up as ${phone}`}
-          </Text>
-        ) : null}
+      ) : null}
 
-        <View style={styles.field}>
-          <Text variant="label">Your name</Text>
-          <Input placeholder="e.g. Ahmed Samir" value={name} onChangeText={setName} />
-        </View>
+      <View style={styles.field}>
+        <Text variant="label">Your name</Text>
+        <Input placeholder="e.g. Ahmed Samir" value={name} onChangeText={setName} />
+      </View>
 
-        <View style={styles.field}>
-          <Text variant="label">Group category</Text>
-          <View style={styles.genderRow}>
-            {GENDERS.map((g) => {
-              const selected = gender === g;
-              return (
-                <Pressable
-                  key={g}
-                  onPress={() => setGender(g)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  style={[styles.genderCard, selected && styles.selectedCard]}
-                >
-                  <Text variant="h2" tone={selected ? 'accent' : 'primary'}>
-                    {GENDER_LABEL[g]}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={styles.field}>
-          <Text variant="label">Your level</Text>
-          {LEVELS.map((l) => {
-            const selected = level === l;
+      <View style={styles.field}>
+        <Text variant="label">Group category</Text>
+        <View style={styles.genderRow}>
+          {GENDERS.map((g) => {
+            const selected = gender === g;
             return (
               <Pressable
-                key={l}
-                onPress={() => setLevel(l)}
+                key={g}
+                onPress={() => setGender(g)}
                 accessibilityRole="radio"
                 accessibilityState={{ selected }}
-                style={[styles.levelCard, selected && styles.selectedCard]}
+                style={[styles.genderCard, selected && styles.selectedCard]}
               >
-                <View style={styles.levelText}>
-                  <Text variant="body" weight="bold">
-                    {LEVEL_COPY[l].title}
-                  </Text>
-                  <Text variant="caption" tone="secondary">
-                    {LEVEL_COPY[l].description}
-                  </Text>
-                </View>
-                <View style={[styles.radio, selected && styles.radioSelected]}>
-                  {selected ? <View style={styles.radioDot} /> : null}
-                </View>
+                <Text variant="h2" tone={selected ? 'accent' : 'primary'}>
+                  {GENDER_LABEL[g]}
+                </Text>
               </Pressable>
             );
           })}
         </View>
+      </View>
 
-        <InfoCard
-          variant="neutral"
-          text="Men's and ladies' groups train separately, and players are placed by level. You'll only see group slots that match your category and level."
-        />
+      <View style={styles.field}>
+        <Text variant="label">Your level</Text>
+        {LEVELS.map((l) => {
+          const selected = level === l;
+          return (
+            <Pressable
+              key={l}
+              onPress={() => setLevel(l)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              style={[styles.levelCard, selected && styles.selectedCard]}
+            >
+              <View style={styles.levelText}>
+                <Text variant="body" weight="bold">
+                  {LEVEL_COPY[l].title}
+                </Text>
+                <Text variant="caption" tone="secondary">
+                  {LEVEL_COPY[l].description}
+                </Text>
+              </View>
+              <View style={[styles.radio, selected && styles.radioSelected]}>
+                {selected ? <View style={styles.radioDot} /> : null}
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
 
-        <Button
-          label={submitting ? 'Creating…' : 'Create my Profile'}
-          onPress={onCreate}
-          disabled={!complete || busy}
-        />
-        {error ? (
-          <Text variant="caption" tone="accent" style={styles.helper}>
-            {error}
-          </Text>
-        ) : !complete ? (
-          <Text variant="caption" tone="muted" style={styles.helper}>
-            Fill in all three fields to continue
-          </Text>
-        ) : null}
+      {isNewFlow ? (
+        <View style={styles.field}>
+          <Text variant="label">Choose a password</Text>
+          <Input
+            placeholder={`At least ${MIN_PASSWORD} characters`}
+            secureTextEntry
+            autoCapitalize="none"
+            autoComplete="new-password"
+            textContentType="newPassword"
+            value={password}
+            onChangeText={setPassword}
+            error={passwordTooShort ? `At least ${MIN_PASSWORD} characters` : undefined}
+          />
+          <Input
+            placeholder="Confirm password"
+            secureTextEntry
+            autoCapitalize="none"
+            autoComplete="new-password"
+            textContentType="newPassword"
+            value={confirm}
+            onChangeText={setConfirm}
+            error={confirmMismatch ? 'Passwords don’t match' : undefined}
+          />
+        </View>
+      ) : null}
 
-        {/* The escape hatch: this screen is forced by the guard, so it must never be
-            a dead end. Sign out returns to sign-in to start over with another number. */}
-        <Button
-          label={leaving ? 'Signing out…' : 'Sign out / use a different number'}
-          variant="ghost"
-          onPress={onSignOut}
-          disabled={busy}
-        />
+      <InfoCard
+        variant="neutral"
+        text="Men's and ladies' groups train separately, and players are placed by level. You'll only see group slots that match your category and level."
+      />
+
+      <Button
+        label={submitting ? 'Creating…' : 'Create my Profile'}
+        onPress={onCreate}
+        disabled={!complete || busy}
+      />
+      {error ? (
+        <Text variant="caption" tone="accent" style={styles.helper}>
+          {error}
+        </Text>
+      ) : !complete ? (
+        <Text variant="caption" tone="muted" style={styles.helper}>
+          {isNewFlow
+            ? 'Fill in all fields and choose a password to continue'
+            : 'Fill in all three fields to continue'}
+        </Text>
+      ) : null}
+
+      {/* The escape hatch: this screen can be forced by the guard, so it must never be
+          a dead end. Sign out returns to sign-in to start over with another email. */}
+      <Button
+        label={leaving ? 'Signing out…' : 'Sign out / use a different email'}
+        variant="ghost"
+        onPress={onSignOut}
+        disabled={busy}
+      />
     </Screen>
   );
 }

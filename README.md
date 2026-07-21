@@ -15,7 +15,7 @@ domain core and a Supabase (Postgres) backend.
 - `packages/theme` — shared design tokens (`@tpa/theme`): colour, scale, and domain tints.
 - `supabase/` — the backend. `migrations/` is the schema: tables with CHECK / exclusion
   constraints, Row-Level Security, and `SECURITY DEFINER` RPCs for every money mutation
-  (book / cancel, admin actions, cash + gateway settlement) plus phone-OTP signup.
+  (book / cancel, admin actions, cash + gateway settlement) plus email/password signup.
   `tests/` holds the proofs (see [Tests](#tests)).
 
 Shared packages are **source-only** TypeScript (no build step); each app's bundler
@@ -57,8 +57,9 @@ supabase stop        # tear the stack down
 ```
 
 The database is fully reproducible from `supabase/migrations` — there is no seed data.
-Phone auth uses `[auth.sms.test_otp]` numbers in `supabase/config.toml` (code `123456`),
-so local dev needs no Twilio.
+Auth is email + password (A2 — phone OTP and Twilio removed); email confirmation is off
+for dev (`[auth.email].enable_confirmations = false`), so a fresh signup can use the
+account immediately with no SMTP.
 
 ## Tests
 
@@ -69,7 +70,7 @@ a clear message if the stack isn't up.
 pnpm test             # vitest: @tpa/core logic, the zero-JS-emit guard, SQL⇄TS constant parity
 pnpm test:db          # pgTAP: RLS isolation, every constraint, every RPC (179 assertions)
 pnpm test:concurrency # real N-connection races against the RPCs
-pnpm test:auth        # a real phone-OTP session, end to end
+pnpm test:auth        # a real email/password session, end to end (incl. the admin refusal)
 pnpm verify           # everything above (typecheck + lint + all four suites)
 ```
 
@@ -81,9 +82,10 @@ What each backend suite proves:
 - **`test:concurrency`** — a capacity-N court never oversells and a one-credit player
   never books twice under real parallel connections; a booking racing a session
   cancellation is never orphaned; concurrent cancellations never deadlock.
-- **`test:auth`** — signing up through the real auth API grants the two trial credits,
-  `book_slot` works, wallet reads are isolated per player, a double signup is idempotent,
-  and an authenticated user without a completed profile is denied everywhere.
+- **`test:auth`** — signing up through the real email/password API grants the two trial
+  credits, `book_slot` works, wallet reads are isolated per player, a double signup is
+  idempotent, an authenticated user without a completed profile is denied everywhere, and
+  an admin credential is refused in the consumer flow (is_admin, no player — bug #2).
 
 ## Other checks
 

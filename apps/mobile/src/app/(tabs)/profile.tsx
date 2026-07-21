@@ -26,7 +26,7 @@ import {
 /** 15 — Profile. Identity card, links, academy, sign out. */
 export default function ProfileScreen() {
   const router = useRouter();
-  const { player, now, signOut } = useSession();
+  const { player, email, now, signOut } = useSession();
   const batches = useBatches();
   const purchases = usePurchases();
   const coaches = useCoaches();
@@ -56,7 +56,7 @@ export default function ProfileScreen() {
           <View style={styles.identityText}>
             <Text variant="h2">{player.name}</Text>
             <Text variant="caption" tone="secondary">
-              {player.phone}
+              {email ?? player.phone ?? ''}
             </Text>
           </View>
           <CircleIconButton icon="pencil" accessibilityLabel="Edit profile" onPress={() => {}} />

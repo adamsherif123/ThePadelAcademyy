@@ -36,7 +36,7 @@ export function PlayerSearch({
               <Avatar name={p.name} size={36} />
               <div className={styles.info}>
                 <span className={styles.name}>{p.name}</span>
-                <span className={styles.phone}>{p.phone}</span>
+                <span className={styles.phone}>{p.phone ?? 'No phone'}</span>
               </div>
               {renderTrailing ? <div className={styles.trailing}>{renderTrailing(p)}</div> : null}
             </li>

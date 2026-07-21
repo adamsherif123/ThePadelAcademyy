@@ -17,6 +17,7 @@ import {
   deleteAccount as deleteAccountApi,
   deleteMyPushToken,
   fetchCurrentPlayer,
+  fetchIsAdmin,
 } from '../lib/api';
 import { getLastPushToken, setLastPushToken } from '../notifications/tokenStore';
 import { queryClient, queryKeys } from '../lib/queryClient';
@@ -26,19 +27,20 @@ import { deriveStatus, type SessionStatus } from './authMachine';
 export type { SessionStatus } from './authMachine';
 
 /**
- * Real Supabase auth (S9). The mock context is gone: `session` comes from the
- * auth client (persisted in AsyncStorage, auto-refreshed), and `player` is the
- * signed-in player's row read through RLS. The three meaningful states are made
- * explicit as `status`, because "verified but no profile yet" is a real place a
- * user can be — a route, not an error:
+ * Real Supabase auth (S9 → A2). Consumer auth is EMAIL + PASSWORD now (phone OTP and
+ * Twilio are gone): `session` comes from `signInWithPassword` / `signUp` (persisted in
+ * AsyncStorage, auto-refreshed), and `player` is the signed-in player's row read through
+ * RLS. The states are made explicit as `status`, because "verified but no profile yet" and
+ * "verified but an ADMIN" are real places a user can land — routes, not errors:
  *
  *   signed_out    — no session          → (auth)/sign-in
+ *   not_a_player  — an ADMIN credential  → (auth)/not-a-player (refused — bug #2)
  *   needs_profile — session, no player   → (auth)/profile-setup, run complete_signup
  *   ready         — session + player     → (tabs)
  *
- * The non-auth screens still read only `player` / `now` / `signOut`, so swapping
- * the internals here left them untouched. `now` is the real clock, refreshed on an
- * interval so expiry countdowns and the 3-hour cancel window stay honest.
+ * `is_admin()` is queried alongside the player so an admin who signs into the players'
+ * app is refused instead of bounced to profile-setup (the bug the A1 separation made
+ * detectable). The non-auth screens still read only `player` / `now` / `signOut`.
  */
 interface ProfileDraft {
   name: string;
@@ -50,13 +52,17 @@ interface SessionValue {
   status: SessionStatus;
   isAuthed: boolean;
   now: IsoInstant;
-  phone: string | null;
+  /** The signed-in email (for the profile screen + the refusal message). null if none. */
+  email: string | null;
   player: Player | null;
   trialGrant: CreditBatch | null;
-  /** Send an OTP to `phone`. Returns an error message on transport failure. */
-  sendOtp: (phone: string) => Promise<{ ok: boolean; error?: string }>;
-  /** Verify the SMS code, establishing a session. */
-  verifyOtp: (code: string) => Promise<{ ok: boolean; error?: string }>;
+  /** Sign in a RETURNING user. Returns {ok:false,error} on bad credentials — never throws. */
+  signInWithEmail: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  /** Create the auth user (GoTrue owns the password). `taken` when the email already exists. */
+  signUpWithEmail: (
+    email: string,
+    password: string,
+  ) => Promise<{ ok: boolean; error?: string; taken?: boolean }>;
   /** Create the player + trial grant via complete_signup. */
   completeProfile: (draft: ProfileDraft) => Promise<{ ok: boolean; error?: string }>;
   /** Permanently delete the account (anonymise + drop the auth identity), then sign out. */
@@ -66,22 +72,14 @@ interface SessionValue {
 
 const SessionContext = createContext<SessionValue | null>(null);
 
-/** Digits only, always +20 E.164 — matches how the DB stores phone + the test_otp keys. */
-function normalizePhone(raw: string): string {
-  const digits = raw.replace(/[^0-9]/g, '').replace(/^0+/, '');
-  const local = digits.startsWith('20') ? digits : `20${digits}`;
-  return `+${local}`;
-}
-
 export function SessionProvider({ children }: { children: ReactNode }) {
   // `undefined` = still restoring from storage; `null` = restored, signed out.
   const [session, setSession] = useState<Session | null | undefined>(undefined);
-  const [phone, setPhone] = useState<string | null>(null);
   const [trialGrant, setTrialGrant] = useState<CreditBatch | null>(null);
   const [now, setNow] = useState<IsoInstant>(() => toInstant(new Date()));
 
-  // Restore the persisted session, then track every auth change (verify, refresh,
-  // sign-out) for the life of the app.
+  // Restore the persisted session, then track every auth change (sign-in, sign-up,
+  // refresh, sign-out) for the life of the app.
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
@@ -102,20 +100,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(id);
   }, []);
 
-  // The player row (RLS returns exactly the caller's own, or none). Only queried
-  // once a session exists; on sign-out React Query drops it.
+  // The player row (RLS returns exactly the caller's own, or none) AND whether this auth
+  // user is an admin. Both are gated on a session; on sign-out React Query drops them.
   const hasSession = Boolean(session);
   const playerQuery = useQuery({
     queryKey: queryKeys.player,
     queryFn: fetchCurrentPlayer,
     enabled: hasSession,
   });
+  const adminQuery = useQuery({ queryKey: ['isAdmin'], queryFn: fetchIsAdmin, enabled: hasSession });
   const player = hasSession ? (playerQuery.data ?? null) : null;
+  const isAdmin = hasSession ? Boolean(adminQuery.data) : false;
 
   const status: SessionStatus = deriveStatus({
     sessionRestored: session !== undefined,
     hasSession,
-    playerLoading: playerQuery.isLoading,
+    gateLoading: playerQuery.isLoading || adminQuery.isLoading,
+    isAdmin,
     player,
   });
 
@@ -127,33 +128,34 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const asMessage = (e: unknown, fallback: string): string =>
     e instanceof Error && e.message ? e.message : fallback;
 
-  const sendOtp = useCallback(async (input: string) => {
-    const e164 = normalizePhone(input);
-    setPhone(e164);
+  const signInWithEmail = useCallback(async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithOtp({ phone: e164 });
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (error) return { ok: false, error: error.message };
+      // onAuthStateChange flips `session`; the player + is_admin queries then decide
+      // ready vs not_a_player. No navigation here — the guard routes on the status flip.
       return { ok: true };
     } catch (e) {
-      return { ok: false, error: asMessage(e, 'Could not send the code. Please try again.') };
+      return { ok: false, error: asMessage(e, 'Could not sign in. Please try again.') };
     }
   }, []);
 
-  const verifyOtp = useCallback(
-    async (code: string) => {
-      if (!phone) return { ok: false, error: 'No phone number to verify.' };
-      try {
-        const { error } = await supabase.auth.verifyOtp({ phone, token: code, type: 'sms' });
-        if (error) return { ok: false, error: error.message };
-        // onAuthStateChange will flip `session`; the player query then decides
-        // needs_profile vs ready.
-        return { ok: true };
-      } catch (e) {
-        return { ok: false, error: asMessage(e, 'Could not verify the code. Please try again.') };
+  const signUpWithEmail = useCallback(async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
+      if (error) return { ok: false, error: error.message };
+      // With email confirmation OFF, signing up an EXISTING email returns an obfuscated
+      // user with an empty identities array (GoTrue's anti-enumeration shape) and no
+      // error. Treat that as "already registered" so the screen can send them to sign in.
+      if (data.user && (data.user.identities?.length ?? 0) === 0) {
+        return { ok: false, taken: true, error: 'That email already has an account.' };
       }
-    },
-    [phone],
-  );
+      // A session now exists (no confirmation step); the caller runs complete_signup next.
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: asMessage(e, 'Could not create your account. Please try again.') };
+    }
+  }, []);
 
   const completeProfile = useCallback(
     async (draft: ProfileDraft) => {
@@ -169,11 +171,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // the trial-grant route (which it exempts) instead of a needs_profile user it
         // would replace back. No refetch round-trip, so there is no window to lose the
         // race in. (createdAt is a placeholder — unused in the UI — and the invalidate
-        // below reconciles the whole row to server truth a moment later.)
-        const e164 = phone ?? (session?.user.phone ? `+${session.user.phone}` : '');
+        // below reconciles the whole row to server truth a moment later. phone is null:
+        // email players have none.)
         queryClient.setQueryData<Player>(queryKeys.player, {
           id: res.playerId as Player['id'],
-          phone: e164,
+          phone: null,
           name: draft.name,
           gender: draft.gender,
           level: draft.level,
@@ -189,7 +191,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return { ok: false, error: asMessage(e, 'We couldn’t create your profile. Please try again.') };
       }
     },
-    [phone, session],
+    [],
   );
 
   // Drop THIS device's push token while the session is still valid (own-only RLS
@@ -214,7 +216,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // Ignore — we force the local signed-out state below regardless.
     }
     setSession(null);
-    setPhone(null);
     setTrialGrant(null);
     // Drop every cached read so the next player starts clean.
     queryClient.clear();
@@ -242,16 +243,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       status,
       isAuthed: status === 'ready',
       now,
-      phone,
+      email: session?.user.email ?? null,
       player,
       trialGrant,
-      sendOtp,
-      verifyOtp,
+      signInWithEmail,
+      signUpWithEmail,
       completeProfile,
       deleteAccount,
       signOut,
     }),
-    [status, now, phone, player, trialGrant, sendOtp, verifyOtp, completeProfile, deleteAccount, signOut],
+    [status, now, session, player, trialGrant, signInWithEmail, signUpWithEmail, completeProfile, deleteAccount, signOut],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

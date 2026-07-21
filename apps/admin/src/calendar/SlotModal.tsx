@@ -335,7 +335,7 @@ export function SlotModal({
           <Avatar name={player?.name ?? 'Player'} size={44} />
           <div>
             <p className={styles.removeName}>{player?.name ?? 'Player'}</p>
-            <p className={styles.removeSub}>{player?.phone}</p>
+            <p className={styles.removeSub}>{player?.phone ?? 'No phone'}</p>
           </div>
         </div>
         <p className={styles.removeQ}>What happens to their 1 {TRAINING_LABEL[slot.trainingType]} credit?</p>
@@ -552,7 +552,7 @@ export function SlotModal({
                 <div className={styles.rosterInfo}>
                   <span className={styles.rosterName}>{player?.name ?? 'Player'}</span>
                   <span className={styles.rosterSub}>
-                    {player?.phone}
+                    {player?.phone ?? 'No phone'}
                     {tags ? ` · ${tags}` : ''}
                   </span>
                 </div>

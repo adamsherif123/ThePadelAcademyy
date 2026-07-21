@@ -30,7 +30,7 @@ const nstr = (v: unknown): string | null => (v == null ? null : (v as string));
 export function rowToPlayer(r: Row): Player {
   return {
     id: str(r.id) as Player['id'],
-    phone: str(r.phone),
+    phone: nstr(r.phone),
     name: str(r.name),
     gender: str(r.gender) as Player['gender'],
     level: str(r.level) as Player['level'],

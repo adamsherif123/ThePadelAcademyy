@@ -102,7 +102,7 @@ export function Gallery() {
     { key: 'type', header: 'Session', render: () => <TypePill type="group" /> },
     { key: 'status', header: 'Status', align: 'end', render: () => <StatusChip status="booked" /> },
   ];
-  const rows: PlayerRow[] = players.map((p) => ({ id: p.id, name: p.name, phone: p.phone }));
+  const rows: PlayerRow[] = players.map((p) => ({ id: p.id, name: p.name, phone: p.phone ?? '—' }));
 
   return (
     <div>
