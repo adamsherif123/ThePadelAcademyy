@@ -20,10 +20,13 @@ insert into auth.users (id) values
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
   ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
 
-insert into public.players (id, phone, name, gender, level, created_at, auth_user_id, is_admin) values
-  ('pl_adm', '+201000000000', 'Adm', 'men', 'beginner', now(), 'ffffffff-ffff-ffff-ffff-ffffffffffff', true),
-  ('pl_a',   '+201000000001', 'Ali', 'men', 'beginner', now(), 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', false),
-  ('pl_b',   '+201000000002', 'Bea', 'men', 'beginner', now(), 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', false);
+insert into public.players (id, phone, name, gender, level, created_at, auth_user_id) values
+  ('pl_a',   '+201000000001', 'Ali', 'men', 'beginner', now(), 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
+  ('pl_b',   '+201000000002', 'Bea', 'men', 'beginner', now(), 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+
+-- A1: the admin is NOT a player — an auth user linked to an admins row, no player row.
+insert into public.admins (id, auth_user_id, display_name, created_at) values
+  ('adm_test', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'Adm', now());
 
 insert into public.coaches (id, name, bio, is_active) values ('co1', 'Coach', 'b', true);
 

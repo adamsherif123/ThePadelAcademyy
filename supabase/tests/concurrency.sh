@@ -132,7 +132,8 @@ check "exactly one booking for the player"  "$(sql "select count(*) from public.
 echo "Scenario D — book_slot vs cancel_session raced on the same slot (K=40):"
 D_N=40
 DSETUP="insert into auth.users (id) values ('$(uuid 999)');"
-DSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id,is_admin) values ('plr_dadm','+201000900','Adm','men','beginner',now(),'$(uuid 999)',true);"
+# A1: the cancelling admin is an admins row, NOT a player — is_admin() reads admins.
+DSETUP+="insert into public.admins (id,auth_user_id,display_name,created_at) values ('adm_dadm','$(uuid 999)','Adm',now());"
 for i in $(seq 1 $D_N); do
   DSETUP+="insert into public.coaches (id,name,bio,is_active) values ('cor_d$i','C','b',true);"
   DSETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status) values ('slr_d$i','cor_d$i',now()+interval '1 day',now()+interval '1 day 1 hour','trial',4,0,'published');"

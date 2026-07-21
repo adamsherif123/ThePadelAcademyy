@@ -8,7 +8,7 @@
 -- Run with:  supabase test db
 -- ============================================================================
 begin;
-select plan(44);
+select plan(48);
 
 -- ── seed as postgres ─────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -17,11 +17,14 @@ insert into auth.users (id) values
   ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),   -- pl_2
   ('cccccccc-cccc-cccc-cccc-cccccccccccc');   -- pl_3
 
-insert into public.players (id, phone, name, gender, level, created_at, auth_user_id, is_admin) values
-  ('pl_adm','+201000000090','Adm','men','beginner',now(),'ffffffff-ffff-ffff-ffff-ffffffffffff', true),
-  ('pl_1',  '+201000000091','P1', 'men','beginner',now(),'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', false),
-  ('pl_2',  '+201000000092','P2', 'men','beginner',now(),'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', false),
-  ('pl_3',  '+201000000093','P3', 'men','beginner',now(),'cccccccc-cccc-cccc-cccc-cccccccccccc', false);
+insert into public.players (id, phone, name, gender, level, created_at, auth_user_id) values
+  ('pl_1',  '+201000000091','P1', 'men','beginner',now(),'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
+  ('pl_2',  '+201000000092','P2', 'men','beginner',now(),'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
+  ('pl_3',  '+201000000093','P3', 'men','beginner',now(),'cccccccc-cccc-cccc-cccc-cccccccccccc');
+
+-- A1: the admin is NOT a player — an auth user linked to an admins row, no player row.
+insert into public.admins (id, auth_user_id, display_name, created_at) values
+  ('adm_test', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'Adm', now());
 
 insert into public.coaches (id,name,bio,is_active) values ('co_n','C','b',true);
 
@@ -73,7 +76,13 @@ select is((select count(*)::int from public.notifications where slot_id='sl_ind'
 -- ════════════════════════════════════════════════════════════════════════════
 -- AS ADMIN — cancel / remove / grant / reschedule / confirm
 -- ════════════════════════════════════════════════════════════════════════════
-set local role authenticated;
+-- Stay as postgres (RLS bypassed) and only set the admin's JWT claims: these RPCs
+-- authorise via is_admin() in their SECURITY DEFINER body (which reads auth.uid() from
+-- the claim, not the session role), and the emitted notifications belong to the *players*
+-- — so, exactly like scenario A verifies book_slot's emissions after `reset role`, the
+-- read-backs here must run as postgres. (An admin has no player identity, so under the
+-- notifications RLS — player_id = current_player_id() — an admin session reads none of
+-- them; this is unchanged by A1.)
 select set_config('request.jwt.claims','{"sub":"ffffffff-ffff-ffff-ffff-ffffffffffff","role":"authenticated"}',true);
 
 -- C) cancel_session → session_cancelled to EVERY booked player.

@@ -19,11 +19,15 @@ insert into auth.users (id) values
   ('cccccccc-cccc-cccc-cccc-cccccccccccc'),
   ('ffffffff-ffff-ffff-ffff-ffffffffffff');
 
-insert into public.players (id, phone, name, gender, level, created_at, auth_user_id, is_admin) values
-  ('pl_adm', '+201000000000', 'Adm', 'men', 'beginner', now(), 'ffffffff-ffff-ffff-ffff-ffffffffffff', true),
-  ('pl_a',   '+201000000001', 'Ali', 'men', 'beginner', now(), 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', false),
-  ('pl_b',   '+201000000002', 'Bea', 'men', 'beginner', now(), 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', false),
-  ('pl_c',   '+201000000003', 'Cy',  'men', 'beginner', now(), 'cccccccc-cccc-cccc-cccc-cccccccccccc', false);
+insert into public.players (id, phone, name, gender, level, created_at, auth_user_id) values
+  ('pl_a',   '+201000000001', 'Ali', 'men', 'beginner', now(), 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
+  ('pl_b',   '+201000000002', 'Bea', 'men', 'beginner', now(), 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
+  ('pl_c',   '+201000000003', 'Cy',  'men', 'beginner', now(), 'cccccccc-cccc-cccc-cccc-cccccccccccc');
+
+-- A1: the admin is NOT a player — an auth user linked to an admins row, no player row.
+-- The tests set claims to this uid to act as admin; is_admin() reads admins.
+insert into public.admins (id, auth_user_id, display_name, created_at) values
+  ('adm_test', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'Adm', now());
 
 insert into public.coaches (id, name, bio, is_active) values
   ('co_cs','C','b',true),('co_rb','C','b',true),('co_gl','C','b',true),('co_gi','C','b',true),

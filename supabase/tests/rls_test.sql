@@ -17,10 +17,13 @@ insert into auth.users (id) values
   ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'),
   ('ffffffff-ffff-ffff-ffff-ffffffffffff');
 
-insert into public.players (id, phone, name, gender, level, created_at, auth_user_id, is_admin) values
-  ('pl_A',     '+201000000001', 'Ali', 'men',    'beginner',     now(), 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', false),
-  ('pl_B',     '+201000000002', 'Bea', 'ladies', 'intermediate', now(), 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', false),
-  ('pl_admin', '+201000000003', 'Adm', 'men',    'beginner',     now(), 'ffffffff-ffff-ffff-ffff-ffffffffffff', true);
+insert into public.players (id, phone, name, gender, level, created_at, auth_user_id) values
+  ('pl_A',     '+201000000001', 'Ali', 'men',    'beginner',     now(), 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
+  ('pl_B',     '+201000000002', 'Bea', 'ladies', 'intermediate', now(), 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+
+-- A1: the admin is NOT a player — an auth user linked to an admins row, no player row.
+insert into public.admins (id, auth_user_id, display_name, created_at) values
+  ('adm_test', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'Adm', now());
 
 insert into public.coaches (id, name, bio, photo_url, is_active) values
   ('co_active',   'Coach Active',   'bio', null, true),
@@ -92,10 +95,14 @@ select throws_ok(
   $$ update public.credit_batches set quantity_remaining = 999 where id = 'cb_A' $$,
   '42501', null, 'A cannot update any credit_batches row, including their own');
 
--- players: cannot self-promote; can edit own profile; cannot touch others.
+-- players: cannot become admin; can edit own profile; cannot touch others.
+-- A1 separation: a player has NO write path to admin-ness. `admins` grants authenticated
+-- only SELECT of their own row (no INSERT/UPDATE/DELETE, no write policy), so a player
+-- cannot mint themselves an admin identity — admin creation is out-of-band only.
 select throws_ok(
-  $$ update public.players set is_admin = true where auth_user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid $$,
-  '42501', null, 'A cannot set is_admin on themselves (column GRANT)');
+  $$ insert into public.admins (id, auth_user_id, display_name, created_at)
+       values ('adm_hack', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid, 'Hacker', now()) $$,
+  '42501', null, 'A cannot insert themselves into admins (no INSERT grant — out-of-band only)');
 select lives_ok(
   $$ update public.players set name = 'Ali Renamed' where auth_user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::uuid $$,
   'A can update their own name (positive control)');
@@ -158,7 +165,7 @@ set local role authenticated;
 set local request.jwt.claims to '{"sub":"ffffffff-ffff-ffff-ffff-ffffffffffff","role":"authenticated"}';
 
 -- Broad reads.
-select is((select count(*)::int from public.players),        3, 'admin can read all players');
+select is((select count(*)::int from public.players),        2, 'admin can read all players (A1: the admin is not a player, so only pl_A + pl_B)');
 select is((select count(*)::int from public.credit_batches), 2, 'admin can read all credit batches');
 select is((select count(*)::int from public.purchases),      3, 'admin can read all purchases (pu_A, pu_B + the pending A inserted)');
 select is((select count(*)::int from public.session_slots),  2, 'admin can read cancelled slots too');
