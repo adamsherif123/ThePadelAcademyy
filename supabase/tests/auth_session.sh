@@ -42,8 +42,10 @@ teardown() {
   db "delete from public.bookings; delete from public.credit_batches; delete from public.players;
       delete from public.admins where auth_user_id in (select id from auth.users where email='$EADM');
       delete from public.session_slots where id='sl_auth'; delete from public.coaches where id='co_auth';
-      delete from auth.users where email in ('$EA','$EB','$EC','$EADM');" >/dev/null
+      delete from auth.users where email in ('$EA','$EB','$EC','$EADM','phone1@players.eg','phone2@players.eg');" >/dev/null
 }
+# email_has_account, called UNAUTHENTICATED with only the anon key (the sign-in screen).
+anon_has() { curl -s -X POST "$API/rest/v1/rpc/email_has_account" -H "apikey: $ANON" -H "Content-Type: application/json" -d "{\"p_email\":\"$1\"}"; }
 
 # ── setup ────────────────────────────────────────────────────────────────────
 teardown
@@ -63,6 +65,11 @@ check "complete_signup(A) → not already_completed" "$(echo "$R" | jqf "d['alre
 PLID_A="$(echo "$R" | jqf "d['player_id']")"
 
 check "player.phone is null (email signup — no phone)" "$(db "select coalesce(phone,'<null>') from public.players where id='$PLID_A'")" "<null>"
+check "player.email is stored from the auth user (A2.1)" "$(db "select email from public.players where id='$PLID_A'")" "$EA"
+
+# A2.1 routing check, over the real anon-key path (not just a forged claim).
+check "email_has_account(A) → true, called unauthenticated with the anon key" "$(anon_has "$EA")" "true"
+check "email_has_account(unknown) → false"                                     "$(anon_has "nobody@nowhere.eg")" "false"
 check "current_player_id() resolves via real auth.uid()" "$(db "select id from public.players where auth_user_id='$UID_A'")" "$PLID_A"
 
 # The 2 trial credits exist, read through RLS with A's own JWT.
@@ -107,6 +114,16 @@ check "C reads zero credit batches (no player → RLS denies)" "$(rest_get "$TOK
 check "C reads zero players (RLS denies)"        "$(rest_get "$TOK_C" "players?select=id" | jqf "len(d)")" "0"
 check "C's book_slot → not_authenticated (current_player_id NULL)" "$(rpc "$TOK_C" book_slot '{"p_slot_id":"sl_auth"}' | jqf "d['reason']")" "not_authenticated"
 
+echo "── optional phone at signup: normalised to +20 E.164, and UNIQUE ──"
+read -r TOK_P UID_P <<<"$(signup "phone1@players.eg" "$PW")"
+RP="$(rpc "$TOK_P" complete_signup '{"p_name":"Phoney","p_gender":"men","p_level":"beginner","p_phone":"0100 111 2222"}')"
+check "signup WITH an optional phone → ok"        "$(echo "$RP" | jqf "d['ok']")" "True"
+check "the phone is normalised to +20 E.164"      "$(db "select phone from public.players where auth_user_id='$UID_P'")" "+201001112222"
+read -r TOK_Q UID_Q <<<"$(signup "phone2@players.eg" "$PW")"
+check "a 2nd player claiming the same number → phone_taken (clean reason)" \
+  "$(rpc "$TOK_Q" complete_signup '{"p_name":"Dupe","p_gender":"men","p_level":"beginner","p_phone":"+20 100 111 2222"}' | jqf "d['reason']")" "phone_taken"
+check "the phone_taken signup made no player"     "$(db "select count(*) from public.players where auth_user_id='$UID_Q'")" "0"
+
 echo "── bug #2: an ADMIN credential is refused in the consumer flow ──"
 # Create the admin OUT-OF-BAND: auth user via the admin API, admins row via SQL (no client path).
 ADM_UID="$(curl -s -X POST "$API/auth/v1/admin/users" -H "apikey: $SERVICE" -H "Authorization: Bearer $SERVICE" \
@@ -116,6 +133,7 @@ read -r TOK_ADM _ <<<"$(signin "$EADM" "$PW")"
 check "admin authenticates at GoTrue"                         "$([ -n "$TOK_ADM" ] && echo yes)" "yes"
 check "admin session is is_admin=true (→ refusal screen)"     "$(rpc "$TOK_ADM" is_admin '{}')" "true"
 check "admin owns NO player row (→ never profile-setup)"      "$(db "select count(*) from public.players where auth_user_id='$ADM_UID'")" "0"
+check "email_has_account(admin) → false (routes to create-account, then refused)" "$(anon_has "$EADM")" "false"
 check "admin complete_signup → is_admin (never a player)"     "$(rpc "$TOK_ADM" complete_signup '{"p_name":"X","p_gender":"men","p_level":"beginner"}' | jqf "d['reason']")" "is_admin"
 
 echo "── FK ON DELETE RESTRICT: anonymise-then-delete is the only path ──"

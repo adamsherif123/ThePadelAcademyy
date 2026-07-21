@@ -14,7 +14,7 @@ import styles from './PlayerSearch.module.css';
  */
 export function PlayerSearch({
   players,
-  placeholder = 'Search name or phone…',
+  placeholder = 'Search name, phone or email…',
   renderTrailing,
 }: {
   players: readonly Player[];

@@ -79,6 +79,15 @@ describe('matchesPlayerQuery (the single shared predicate)', () => {
     expect(matchesPlayerQuery(emailPlayer, '0100')).toBe(false); // no phone → no phone match
     expect(matchesPlayerQuery(emailPlayer, '')).toBe(true);
   });
+
+  it('matches on email (A2.1), case-insensitively, and ignores a null email', () => {
+    const withEmail = { ...mockPlayers[0]!, email: 'ahmed.samir@players.eg' };
+    expect(matchesPlayerQuery(withEmail, 'AHMED.SAMIR@players.eg')).toBe(true);
+    expect(matchesPlayerQuery(withEmail, 'samir@play')).toBe(true);
+    expect(matchesPlayerQuery(withEmail, 'notaplayer@x.eg')).toBe(false);
+    const noEmail = { ...mockPlayers[0]!, email: null };
+    expect(matchesPlayerQuery(noEmail, 'players.eg')).toBe(false); // null email → no email match
+  });
 });
 
 describe('mismatchedActiveBookings', () => {

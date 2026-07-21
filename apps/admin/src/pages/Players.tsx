@@ -60,7 +60,7 @@ export function Players() {
 
       <div className={styles.filters}>
         <div className={styles.search}>
-          <SearchInput value={query} onChange={setQuery} placeholder="Search name or phone" />
+          <SearchInput value={query} onChange={setQuery} placeholder="Search name, phone or email" />
         </div>
         <div className={styles.filterEnd}>
           <SegmentedTabs

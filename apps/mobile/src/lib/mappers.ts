@@ -31,6 +31,7 @@ export function rowToPlayer(r: Row): Player {
   return {
     id: str(r.id) as Player['id'],
     phone: nstr(r.phone),
+    email: nstr(r.email),
     name: str(r.name),
     gender: str(r.gender) as Player['gender'],
     level: str(r.level) as Player['level'],

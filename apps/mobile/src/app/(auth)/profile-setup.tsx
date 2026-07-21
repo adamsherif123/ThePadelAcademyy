@@ -31,10 +31,17 @@ const MIN_PASSWORD = 8;
  * Either way it must not be a dead end: it carries a sign-out escape. An admin never
  * reaches this screen — the guard routes an admin credential to the refusal screen (bug #2).
  */
+// complete_signup's optional-phone rejections → friendly copy. Everything else falls back
+// to a generic message + the sign-out escape.
+const REASON_COPY: Record<string, string> = {
+  phone_taken: 'That phone number is already registered. Try another, or leave it blank.',
+  invalid_phone: 'Enter a valid Egyptian mobile (e.g. 0100 123 4567), or leave it blank.',
+};
+
 export default function ProfileSetupScreen() {
   const router = useRouter();
   const { email: emailParam } = useLocalSearchParams<{ email?: string }>();
-  const { completeProfile, signUpWithEmail, signOut, email: sessionEmail } = useSession();
+  const { completeProfile, signUpWithEmail, signOut, email: sessionEmail, status } = useSession();
   // An email param means the new-signup path (no session yet). Otherwise it's an orphan
   // session that already has a password — collect the profile only.
   const isNewFlow = Boolean(emailParam);
@@ -43,6 +50,7 @@ export default function ProfileSetupScreen() {
   const [name, setName] = useState('');
   const [gender, setGender] = useState<Gender | null>(null);
   const [level, setLevel] = useState<Level | null>(null);
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -61,8 +69,11 @@ export default function ProfileSetupScreen() {
     setError(null);
     try {
       // New player: create the GoTrue auth user first (it owns the password), then the
-      // profile. If the email is already taken, send them to sign in instead of stranding.
-      if (isNewFlow) {
+      // profile. Only sign up if there is NO session yet — if a prior attempt already
+      // created the auth user (e.g. it succeeded but complete_signup then hit phone_taken),
+      // `status` is needs_profile, so we skip straight to completeProfile on retry instead
+      // of re-signing-up the now-existing email.
+      if (isNewFlow && status === 'signed_out') {
         const signUpRes = await signUpWithEmail(emailParam ?? '', password);
         if (!signUpRes.ok) {
           if (signUpRes.taken) {
@@ -73,21 +84,27 @@ export default function ProfileSetupScreen() {
           return;
         }
       }
-      // complete_signup creates the player and grants the 2 trial credits atomically.
-      // completeProfile never throws — it returns {ok:false,error} on any failure.
-      const res = await completeProfile({ name: name.trim(), gender, level });
+      // complete_signup creates the player + grants the 2 trial credits atomically and stores
+      // the optional phone (normalised server-side). completeProfile never throws.
+      const res = await completeProfile({ name: name.trim(), gender, level, phone });
       if (res.ok) {
         // Show the trial-grant celebration; the guard allows it for a ready user.
         router.push('/(auth)/trial-grant');
         return;
       }
-      setError('We couldn’t create your profile. If this keeps happening, sign out below and try again.');
+      setError(
+        REASON_COPY[res.error ?? ''] ??
+          'We couldn’t create your profile. If this keeps happening, sign out below and try again.',
+      );
     } finally {
       // A stuck spinner is a bug even when the error is handled: reset on EVERY path
       // (on success this screen is unmounting anyway, so it's harmless there).
       setSubmitting(false);
     }
   };
+
+  const onHaveAccount = () =>
+    router.replace({ pathname: '/(auth)/password', params: { email: emailParam ?? '' } });
 
   const onSignOut = async () => {
     if (busy) return;
@@ -162,6 +179,21 @@ export default function ProfileSetupScreen() {
         })}
       </View>
 
+      <View style={styles.field}>
+        <Text variant="label">Phone (optional)</Text>
+        <Input
+          placeholder="e.g. 0100 123 4567"
+          keyboardType="phone-pad"
+          autoComplete="tel"
+          textContentType="telephoneNumber"
+          value={phone}
+          onChangeText={setPhone}
+        />
+        <Text variant="caption" tone="muted">
+          Add it so the academy can reach you about your sessions. You can leave this blank.
+        </Text>
+      </View>
+
       {isNewFlow ? (
         <View style={styles.field}>
           <Text variant="label">Choose a password</Text>
@@ -210,6 +242,21 @@ export default function ProfileSetupScreen() {
         </Text>
       ) : null}
 
+      {/* Fallback for a new-flow user who actually already has an account (the routing
+          check sent them here, but e.g. they typed a new email by mistake). */}
+      {isNewFlow ? (
+        <View style={styles.haveAccountRow}>
+          <Text variant="caption" tone="muted">
+            Already have an account?{' '}
+          </Text>
+          <Pressable onPress={onHaveAccount} accessibilityRole="button" disabled={busy}>
+            <Text variant="caption" tone="accent" weight="bold">
+              Sign in
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       {/* The escape hatch: this screen can be forced by the guard, so it must never be
           a dead end. Sign out returns to sign-in to start over with another email. */}
       <Button
@@ -225,6 +272,7 @@ export default function ProfileSetupScreen() {
 const styles = StyleSheet.create({
   content: { gap: space.lg },
   field: { gap: space.sm },
+  haveAccountRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center' },
   genderRow: { flexDirection: 'row', gap: space.md },
   genderCard: {
     flex: 1,

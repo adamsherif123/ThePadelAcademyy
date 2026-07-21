@@ -262,7 +262,9 @@ export type SignupReason =
   | 'invalid_gender'
   | 'invalid_level'
   | 'not_authenticated'
-  | 'is_admin'; // A1/A2: an admin identity can never become a player (defence in depth)
+  | 'is_admin' // A1/A2: an admin identity can never become a player (defence in depth)
+  | 'phone_taken' // A2.1: the optional phone is UNIQUE — another player already has it
+  | 'invalid_phone'; // A2.1: the optional phone isn't a valid EG mobile
 
 export type SignupRpcResult =
   | { ok: true; alreadyCompleted: boolean; playerId: string }
@@ -297,14 +299,30 @@ export async function completeSignupRpc(draft: {
   name: string;
   gender: Gender;
   level: Level;
+  phone?: string | null;
 }): Promise<SignupRpcResult> {
   const d = (await callRpc('complete_signup', {
     p_name: draft.name,
     p_gender: draft.gender,
     p_level: draft.level,
+    // Optional. The server normalises to +20 E.164 and rejects a duplicate/invalid number.
+    p_phone: draft.phone?.trim() ? draft.phone.trim() : null,
   })) as Record<string, unknown>;
   if (d.ok) {
     return { ok: true, alreadyCompleted: Boolean(d.already_completed), playerId: d.player_id as string };
   }
   return { ok: false, reason: d.reason as SignupReason };
+}
+
+/**
+ * Does a player account exist for this email? (A2.1 sign-in routing.) The RPC returns one
+ * bit and nothing else — no name, id, or admin-ness — and is callable unauthenticated (the
+ * caller is on the sign-in screen). false for an admin email (they have no player row), so
+ * the consumer flow routes them to create-account → where signUp/complete_signup refuse
+ * them (A1) and they hit the not-a-player screen. Throws only on transport failure.
+ */
+export async function emailHasAccount(email: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('email_has_account', { p_email: email.trim() });
+  if (error) throw new ApiError(`email_has_account failed: ${error.message}`, error);
+  return Boolean(data);
 }

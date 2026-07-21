@@ -56,8 +56,13 @@ export default function ProfileScreen() {
           <View style={styles.identityText}>
             <Text variant="h2">{player.name}</Text>
             <Text variant="caption" tone="secondary">
-              {email ?? player.phone ?? ''}
+              {email ?? '—'}
             </Text>
+            {player.phone ? (
+              <Text variant="caption" tone="secondary">
+                {player.phone}
+              </Text>
+            ) : null}
           </View>
           <CircleIconButton icon="pencil" accessibilityLabel="Edit profile" onPress={() => {}} />
         </View>

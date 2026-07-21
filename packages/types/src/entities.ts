@@ -28,10 +28,17 @@ export interface Player {
   id: PlayerId;
   /**
    * Nullable since A2: consumer auth moved from phone-OTP to email/password, so a player
-   * signs up with an email (held on the auth user, not here) and has NO phone. Legacy
-   * players keep theirs; the deletion tombstone still writes a 'deleted:'||id sentinel.
+   * signs up with an email and phone is now an OPTIONAL create-account field (A2.1). Stored
+   * as +20 E.164; the deletion tombstone writes a 'deleted:'||id sentinel.
    */
   phone: string | null;
+  /**
+   * The player's email (A2.1). Set server-side by complete_signup from the auth user, held
+   * here so it's queryable (sign-in routing + admin search). Nullable: retired/anonymised
+   * rows have it nulled, and it mirrors auth.users (UNIQUE — one player per email). Optional
+   * like deletedAt — the row mapper always populates it; fixtures may omit it.
+   */
+  email?: string | null;
   name: string;
   gender: Gender;
   level: Level;

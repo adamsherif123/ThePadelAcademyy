@@ -46,6 +46,8 @@ interface ProfileDraft {
   name: string;
   gender: Gender;
   level: Level;
+  /** Optional (A2.1). The server normalises to +20 E.164 and rejects a duplicate. */
+  phone?: string | null;
 }
 
 interface SessionValue {
@@ -175,7 +177,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // email players have none.)
         queryClient.setQueryData<Player>(queryKeys.player, {
           id: res.playerId as Player['id'],
-          phone: null,
+          phone: null, // reconciled below (the server normalises the optional phone)
+          email: session?.user.email ?? null,
           name: draft.name,
           gender: draft.gender,
           level: draft.level,
@@ -191,7 +194,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return { ok: false, error: asMessage(e, 'We couldn’t create your profile. Please try again.') };
       }
     },
-    [],
+    [session],
   );
 
   // Drop THIS device's push token while the session is still valid (own-only RLS
