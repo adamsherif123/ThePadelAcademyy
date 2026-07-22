@@ -8,6 +8,7 @@ import type {
   Booking,
   Coach,
   CreditBatch,
+  CreditRequest,
   IsoInstant,
   LocalTime,
   Notification,
@@ -73,6 +74,22 @@ export function rowToPurchase(r: Row): Purchase {
     paymentMethod: (r.payment_method as Purchase['paymentMethod']) ?? 'cash',
     gatewayOrderId: nstr(r.gateway_order_id),
     gatewayTransactionId: nstr(r.gateway_transaction_id),
+  };
+}
+
+export function rowToCreditRequest(r: Row): CreditRequest {
+  return {
+    id: str(r.id) as CreditRequest['id'],
+    playerId: str(r.player_id) as CreditRequest['playerId'],
+    packageId: str(r.package_id) as CreditRequest['packageId'],
+    paymentMethod: str(r.payment_method) as CreditRequest['paymentMethod'],
+    proofPath: nstr(r.proof_path),
+    status: str(r.status) as CreditRequest['status'],
+    createdAt: iso(r.created_at),
+    resolvedAt: nstr(r.resolved_at) as IsoInstant | null,
+    resolvedBy: nstr(r.resolved_by),
+    rejectReason: nstr(r.reject_reason),
+    purchaseId: nstr(r.purchase_id) as CreditRequest['purchaseId'],
   };
 }
 

@@ -14,6 +14,7 @@ import type {
   Coach,
   CoachId,
   CreditBatch,
+  CreditRequest,
   Gender,
   Level,
   Package,
@@ -33,6 +34,7 @@ import {
   rowToBooking,
   rowToCoach,
   rowToCreditBatch,
+  rowToCreditRequest,
   rowToPackage,
   rowToPlayer,
   rowToPurchase,
@@ -67,6 +69,19 @@ export const fetchSlots = (): Promise<SessionSlot[]> => selectAll('session_slots
 export const fetchCreditBatches = (): Promise<CreditBatch[]> => selectAll('credit_batches', rowToCreditBatch);
 export const fetchBookings = (): Promise<Booking[]> => selectAll('bookings', rowToBooking);
 export const fetchPurchases = (): Promise<Purchase[]> => selectAll('purchases', rowToPurchase);
+export const fetchCreditRequests = (): Promise<CreditRequest[]> => selectAll('credit_requests', rowToCreditRequest);
+
+/**
+ * A short-lived signed URL to display a payment-proof screenshot from the PRIVATE
+ * payment-proofs bucket (the admin has read-all via RLS, but the bucket isn't public so a
+ * plain URL 404s — A3 flagged this). 300s (5 min) is plenty to review one request and short
+ * enough that a copied link doesn't linger; the queue re-signs on demand.
+ */
+export async function proofSignedUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from('payment-proofs').createSignedUrl(path, 300);
+  if (error || !data) throw new ApiError(`Could not load the proof: ${error?.message ?? 'unknown'}`, undefined, error);
+  return data.signedUrl;
+}
 
 /** The signed-in admin's own player row (RLS: exactly zero or one). Drives the auth gate. */
 export async function fetchCurrentPlayer(): Promise<Player | null> {
@@ -139,6 +154,36 @@ export async function recordCashPurchaseRpc(playerId: PlayerId, packageId: Packa
   return d.ok
     ? { ok: true, purchaseId: d.purchase_id as string, creditBatchId: d.credit_batch_id as string }
     : { ok: false, reason: d.reason as CashReason };
+}
+
+// ── credit requests (A3/A4) — the approval queue's money mutations ──────────────
+export type ApproveRequestReason = 'not_admin' | 'request_missing' | 'not_pending' | 'invalid_quantity' | 'invalid_amount';
+export type ApproveRequestResult =
+  | { ok: true; alreadyResolved: boolean; purchaseId: string | null }
+  | { ok: false; reason: ApproveRequestReason };
+/** Approve a request → succeeded purchase + minted credits (real revenue). granted quantity
+ *  and amount are OPTIONAL overrides (null = the package's defaults). Idempotent server-side. */
+export async function approveCreditRequestRpc(
+  requestId: string,
+  grantedQuantity: number | null,
+  amount: number | null,
+): Promise<ApproveRequestResult> {
+  const d = await callRpc('approve_credit_request', {
+    p_request_id: requestId,
+    p_granted_quantity: grantedQuantity,
+    p_amount: amount,
+  });
+  return d.ok
+    ? { ok: true, alreadyResolved: Boolean(d.already_resolved), purchaseId: (d.purchase_id as string) ?? null }
+    : { ok: false, reason: d.reason as ApproveRequestReason };
+}
+
+export type RejectRequestReason = 'not_admin' | 'request_missing' | 'not_pending' | 'reason_required';
+export type RejectRequestResult = { ok: true } | { ok: false; reason: RejectRequestReason };
+/** Reject a request with a required reason (shown to the player). Mints nothing. Idempotent. */
+export async function rejectCreditRequestRpc(requestId: string, reason: string): Promise<RejectRequestResult> {
+  const d = await callRpc('reject_credit_request', { p_request_id: requestId, p_reason: reason });
+  return d.ok ? { ok: true } : { ok: false, reason: d.reason as RejectRequestReason };
 }
 
 export type ConfirmReason = 'not_admin' | 'slot_missing' | 'slot_cancelled' | 'slot_in_past';

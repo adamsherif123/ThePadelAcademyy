@@ -20,3 +20,4 @@ export type BookingId = Brand<string, 'BookingId'>; //             bk_
 export type AvailabilityTemplateId = Brand<string, 'AvailabilityTemplateId'>; // at_
 export type NotificationId = Brand<string, 'NotificationId'>; //    nt_
 export type DeviceTokenId = Brand<string, 'DeviceTokenId'>; //      dpt_
+export type CreditRequestId = Brand<string, 'CreditRequestId'>; //  cr_ (server-minted in request_credits)

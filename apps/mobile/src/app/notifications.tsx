@@ -18,6 +18,7 @@ const ICON: Record<NotificationType, IoniconName> = {
   removed_from_session: 'person-remove-outline',
   session_rescheduled: 'time-outline',
   credits_granted: 'wallet-outline',
+  credit_request_rejected: 'alert-circle-outline',
 };
 
 /**

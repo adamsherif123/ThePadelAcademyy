@@ -15,6 +15,7 @@ import {
   fetchBookings,
   fetchCoaches,
   fetchCreditBatches,
+  fetchCreditRequests,
   fetchPackages,
   fetchPlayers,
   fetchPurchases,
@@ -57,6 +58,8 @@ export const useSlots = () => toResource(useQuery({ queryKey: queryKeys.slots, q
 export const useBatches = () => toResource(useQuery({ queryKey: queryKeys.batches, queryFn: fetchCreditBatches }));
 export const useBookings = () => toResource(useQuery({ queryKey: queryKeys.bookings, queryFn: fetchBookings }));
 export const usePurchases = () => toResource(useQuery({ queryKey: queryKeys.purchases, queryFn: fetchPurchases }));
+export const useCreditRequests = () =>
+  toResource(useQuery({ queryKey: queryKeys.creditRequests, queryFn: fetchCreditRequests }));
 
 /** Collapse several resources into one loading / error / retry gate for a page. */
 export function combine(...rs: Resource<unknown>[]): { isPending: boolean; isError: boolean; refetch: () => void } {

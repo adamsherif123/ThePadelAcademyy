@@ -45,14 +45,23 @@ export type CreditSource = 'purchase' | 'signup_grant' | 'admin_grant';
  * The server-side events that mint a notification (S12). Each is emitted inside the
  * RPC that causes it; the client never invents these. `session_confirmed` fires when
  * a session fills or the admin confirms it; the rest track cancels, removals,
- * reschedules, and credit grants.
+ * reschedules, credit grants (incl. an approved credit request), and a rejected
+ * credit request (A3).
  */
 export type NotificationType =
   | 'session_confirmed'
   | 'session_cancelled'
   | 'removed_from_session'
   | 'session_rescheduled'
-  | 'credits_granted';
+  | 'credits_granted'
+  | 'credit_request_rejected';
+
+/**
+ * A credit request's lifecycle (A3). `pending` until an admin resolves it; `approved`
+ * mints a real purchase + credits; `rejected` carries a reason. The player reports a
+ * payment they've already made (InstaPay/cash) — approval is the academy's confirmation.
+ */
+export type CreditRequestStatus = 'pending' | 'approved' | 'rejected';
 
 /**
  * 0 = Sunday ... 6 = Saturday — matches `Date.prototype.getUTCDay()`.

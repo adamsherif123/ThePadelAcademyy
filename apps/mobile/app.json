@@ -42,6 +42,12 @@
           "icon": "./assets/images/android-icon-monochrome.png",
           "color": "#06122f"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The Padel Academy uses your photos so you can attach a payment screenshot to a credit request."
+        }
       ]
     ],
     "extra": {

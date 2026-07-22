@@ -1,15 +1,17 @@
 import { CREDIT_EXPIRY_DAYS, formatInstantDate } from '@tpa/core';
-import { space } from '@tpa/theme';
-import type { CreditBatch } from '@tpa/types';
+import { color, space } from '@tpa/theme';
+import type { CreditBatch, CreditRequest, Package } from '@tpa/types';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { useBatches } from '../data/queries';
+import { packageById } from '../data/catalog';
+import { useBatches, useMyCreditRequests, usePackages } from '../data/queries';
 import { activeBatches, balanceByType, expiredBatches, totalReadyToBook } from '../data/wallet';
 import { useSession } from '../session/SessionProvider';
 import {
   Badge,
   BalancePills,
+  Button,
   Card,
   CreditsSummaryCard,
   ErrorView,
@@ -36,6 +38,8 @@ export default function WalletScreen() {
   const router = useRouter();
   const { player, now } = useSession();
   const batchesQ = useBatches();
+  const requestsQ = useMyCreditRequests();
+  const packagesQ = usePackages();
   if (!player) return null;
 
   if (batchesQ.isPending || batchesQ.isError) {
@@ -53,6 +57,18 @@ export default function WalletScreen() {
   const active = activeBatches(batches, now);
   const expired = expiredBatches(batches, now);
 
+  // Surface the player's latest OPEN credit request here (the wallet is where credits
+  // appear, so "credits on the way / your last request was declined" belongs here — a
+  // pending request isn't a purchase yet, so purchase-history isn't the place). Newest
+  // first: a pending one (awaiting confirmation) or, if the most recent was rejected, the
+  // reason + a way to try again. Approved requests need no card — the credits are already
+  // in the batches below.
+  const requests = requestsQ.data ?? [];
+  const packages = packagesQ.data ?? [];
+  const openRequest =
+    requests.find((r) => r.status === 'pending') ??
+    (requests[0]?.status === 'rejected' ? requests[0] : undefined);
+
   return (
     <Screen scroll contentContainerStyle={styles.content}>
       <ScreenHeader eyebrow="Wallet" title="Your Credits" onBack={() => router.back()} />
@@ -64,6 +80,14 @@ export default function WalletScreen() {
         >
           <BalancePills balance={balance} />
         </CreditsSummaryCard>
+
+        {openRequest ? (
+          <RequestStatusCard
+            request={openRequest}
+            pkg={packageById(packages, openRequest.packageId)}
+            onAgain={() => router.push('/buy-credits')}
+          />
+        ) : null}
 
         {/* Active batches */}
         <Text variant="label">Active batches</Text>
@@ -87,6 +111,42 @@ export default function WalletScreen() {
           {`Credits are typed — a Group credit books Group sessions only. Every batch expires ${CREDIT_EXPIRY_DAYS} days after purchase.`}
       </Text>
     </Screen>
+  );
+}
+
+function RequestStatusCard({
+  request,
+  pkg,
+  onAgain,
+}: {
+  request: CreditRequest;
+  pkg: Package | undefined;
+  onAgain: () => void;
+}) {
+  const rejected = request.status === 'rejected';
+  const what = pkg ? `${TRAINING_META[pkg.trainingType].label} ${pkg.sessionCount}-pack` : 'credit request';
+  return (
+    <Card style={rejected ? styles.rejectedCard : styles.pendingCard}>
+      <View style={styles.reqHead}>
+        <Badge label={rejected ? 'Declined' : 'Pending'} tone={rejected ? 'danger' : 'warning'} />
+        <Text variant="caption" tone="muted">
+          {formatInstantDate(request.createdAt)}
+        </Text>
+      </View>
+      <Text variant="body" weight="bold" style={styles.reqTitle}>
+        {rejected ? `Your ${what} request was declined` : `${what} — awaiting confirmation`}
+      </Text>
+      <Text variant="caption" tone="secondary">
+        {rejected
+          ? request.rejectReason
+            ? `Reason: ${request.rejectReason}`
+            : 'The academy declined this request.'
+          : 'The academy will add your credits once they confirm your payment. You’ll get a notification.'}
+      </Text>
+      {rejected ? (
+        <Button variant="ghost" label="Request again" onPress={onAgain} />
+      ) : null}
+    </Card>
   );
 }
 
@@ -141,6 +201,10 @@ function BatchCard({
 
 const styles = StyleSheet.create({
   content: { gap: space.md },
+  pendingCard: { gap: space.sm, borderLeftWidth: 3, borderLeftColor: color.status.warning },
+  rejectedCard: { gap: space.sm, borderLeftWidth: 3, borderLeftColor: color.status.danger },
+  reqHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  reqTitle: { marginTop: 2 },
   batchHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space.sm },
   batchBody: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: space.sm },
   batchInfo: { flex: 1, gap: 2 },

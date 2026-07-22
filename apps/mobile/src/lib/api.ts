@@ -12,6 +12,7 @@ import type {
   BookingId,
   Coach,
   CreditBatch,
+  CreditRequest,
   Gender,
   IsoInstant,
   Level,
@@ -34,6 +35,7 @@ import {
   rowToBooking,
   rowToCoach,
   rowToCreditBatch,
+  rowToCreditRequest,
   rowToNotification,
   rowToPackage,
   rowToPlayer,
@@ -269,6 +271,67 @@ export type SignupReason =
 export type SignupRpcResult =
   | { ok: true; alreadyCompleted: boolean; playerId: string }
   | { ok: false; reason: SignupReason };
+
+// ── credit requests (A3/A4) — report an out-of-band payment for admin approval ──
+
+/** The signed-in player's own credit requests, newest first (RLS scopes to caller). */
+export async function fetchMyCreditRequests(): Promise<CreditRequest[]> {
+  const { data, error } = await supabase
+    .from('credit_requests')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw new ApiError(`Failed to load credit requests: ${error.message}`, error);
+  return (data ?? []).map(rowToCreditRequest);
+}
+
+/**
+ * Upload a payment-proof screenshot to the PRIVATE payment-proofs bucket, under the
+ * player's OWN folder (the A3 path convention `<player_id>/…`, enforced by the Storage
+ * RLS). Returns the storage key to hand to request_credits. Throws ApiError on failure —
+ * the caller treats proof as OPTIONAL and submits the request without it if this throws.
+ */
+export async function uploadProof(playerId: PlayerId, uri: string, mimeType?: string): Promise<string> {
+  const mt = mimeType && ['image/jpeg', 'image/png', 'image/webp'].includes(mimeType) ? mimeType : 'image/jpeg';
+  const ext = mt === 'image/png' ? 'png' : mt === 'image/webp' ? 'webp' : 'jpg';
+  const path = `${playerId}/proof-${Date.now()}.${ext}`;
+  // React Native: read the picked file's bytes. fetch(file-uri).arrayBuffer() works with the
+  // url-polyfill already imported for the Supabase client.
+  const bytes = await (await fetch(uri)).arrayBuffer();
+  const { error } = await supabase.storage
+    .from('payment-proofs')
+    .upload(path, bytes, { contentType: mt, upsert: true });
+  if (error) throw new ApiError(`Proof upload failed: ${error.message}`, error);
+  return path;
+}
+
+export type RequestCreditsReason =
+  | 'not_authenticated'
+  | 'invalid_payment_method'
+  | 'already_pending'
+  | 'package_missing'
+  | 'trial_not_sellable'
+  | 'package_inactive'
+  | 'invalid_proof_path';
+
+export type RequestCreditsResult =
+  | { ok: true; requestId: string }
+  | { ok: false; reason: RequestCreditsReason };
+
+/** Submit a credit request (a reported InstaPay/cash payment). Mints nothing — the admin
+ *  approves. proofPath is optional (a cash request may have none). {ok,reason} as data. */
+export async function requestCreditsRpc(
+  packageId: PackageId,
+  method: 'instapay' | 'cash',
+  proofPath: string | null,
+): Promise<RequestCreditsResult> {
+  const d = (await callRpc('request_credits', {
+    p_package_id: packageId,
+    p_payment_method: method,
+    p_proof_path: proofPath,
+  })) as Record<string, unknown>;
+  if (d.ok) return { ok: true, requestId: d.request_id as string };
+  return { ok: false, reason: d.reason as RequestCreditsReason };
+}
 
 /** Run an RPC with an abort timeout so a stalled request can't spin forever. */
 async function callRpc(fn: string, argsPayload: Record<string, unknown>): Promise<unknown> {

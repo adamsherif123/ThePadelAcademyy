@@ -3,6 +3,7 @@ import type {
   BookingId,
   CoachId,
   CreditBatchId,
+  CreditRequestId,
   NotificationId,
   PackageId,
   PlayerId,
@@ -13,6 +14,7 @@ import type { Piastres } from './money';
 import type { IsoInstant, LocalTime } from './temporal';
 import type {
   BookingStatus,
+  CreditRequestStatus,
   CreditSource,
   Gender,
   Level,
@@ -93,6 +95,31 @@ export interface Purchase {
   gatewayOrderId: string | null;
   /** Gateway transaction handle; null until a transaction exists (always null for cash). */
   gatewayTransactionId: string | null;
+}
+
+/**
+ * A player's request to be credited for a payment they've ALREADY made out-of-band —
+ * an InstaPay transfer or cash at the desk (A3). It's a CLAIM; the admin's approval is
+ * the truth (it mints a real `purchase` + credits, linked via `purchaseId`). Never
+ * `paymob` here — that's the online gateway, not a reported payment. Resolution fields
+ * are set together on resolve: `approved` → `purchaseId`, `rejected` → `rejectReason`.
+ */
+export interface CreditRequest {
+  id: CreditRequestId;
+  playerId: PlayerId;
+  packageId: PackageId;
+  paymentMethod: 'instapay' | 'cash';
+  /** Storage key of the uploaded proof screenshot in the private payment-proofs bucket; optional. */
+  proofPath: string | null;
+  status: CreditRequestStatus;
+  createdAt: IsoInstant;
+  resolvedAt: IsoInstant | null;
+  /** The admin (admins.id) who resolved it; null while pending. */
+  resolvedBy: string | null;
+  /** Present iff rejected — shown to the player. */
+  rejectReason: string | null;
+  /** The succeeded purchase minted on approval; null otherwise. */
+  purchaseId: PurchaseId | null;
 }
 
 /**

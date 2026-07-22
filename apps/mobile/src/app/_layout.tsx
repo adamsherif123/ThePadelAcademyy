@@ -81,6 +81,7 @@ function RootNavigator() {
         <Stack.Screen name="wallet" />
         <Stack.Screen name="buy-credits" />
         <Stack.Screen name="package/[id]" />
+        <Stack.Screen name="request-credits" />
         <Stack.Screen name="checkout" />
         <Stack.Screen name="purchase-success" />
         <Stack.Screen name="confirm-booking" />

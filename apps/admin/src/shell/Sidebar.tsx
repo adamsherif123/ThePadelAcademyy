@@ -6,6 +6,7 @@ import {
   Medal,
   Package,
   Users,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
@@ -21,6 +22,7 @@ const NAV: readonly { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/coaches', label: 'Coaches', icon: Medal },
   { to: '/bookings', label: 'Bookings', icon: ClipboardList },
   { to: '/players', label: 'Players', icon: Users },
+  { to: '/credit-requests', label: 'Credit requests', icon: Wallet },
   { to: '/packages', label: 'Packages', icon: Package },
 ];
 

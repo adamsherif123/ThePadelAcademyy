@@ -6,6 +6,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { PLAYER_COUNT, packageById, packageIncludes, perSessionPiastres } from '../../data/catalog';
 import { usePackages } from '../../data/queries';
+import { PAYMOB_ENABLED } from '../../lib/featureFlags';
 import {
   Button,
   Card,
@@ -57,10 +58,19 @@ export default function PackageDetailScreen() {
       scroll
       contentContainerStyle={styles.content}
       footer={
-        <Button
-          label={`Buy for ${formatPiastres(pkg.price)}`}
-          onPress={() => router.push({ pathname: '/checkout', params: { packageId: pkg.id } })}
-        />
+        // Paymob is off (mothballed): route to the report-a-payment request flow. When the
+        // flag is flipped on, the original Paymob checkout journey returns unchanged.
+        PAYMOB_ENABLED ? (
+          <Button
+            label={`Buy for ${formatPiastres(pkg.price)}`}
+            onPress={() => router.push({ pathname: '/checkout', params: { packageId: pkg.id } })}
+          />
+        ) : (
+          <Button
+            label="Request these credits"
+            onPress={() => router.push({ pathname: '/request-credits', params: { packageId: pkg.id } })}
+          />
+        )
       }
     >
       <ScreenHeader

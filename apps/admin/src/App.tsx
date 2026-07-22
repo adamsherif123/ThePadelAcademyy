@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { Bookings } from './pages/Bookings';
 import { Coaches } from './pages/Coaches';
+import { CreditRequests } from './pages/CreditRequests';
 import { Dashboard } from './pages/Dashboard';
 import { Gallery } from './pages/Gallery';
 import { Login } from './pages/Login';
@@ -47,6 +48,7 @@ export function App() {
         <Route path="/coaches" element={<Coaches />} />
         <Route path="/bookings" element={<Bookings />} />
         <Route path="/players" element={<Players />} />
+        <Route path="/credit-requests" element={<CreditRequests />} />
         <Route path="/packages" element={<Packages />} />
         <Route path="/gallery" element={<Gallery />} />
       </Route>

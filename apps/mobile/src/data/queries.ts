@@ -7,6 +7,7 @@ import {
   fetchBookings,
   fetchCoaches,
   fetchCreditBatches,
+  fetchMyCreditRequests,
   fetchNotifications,
   fetchPackages,
   fetchPurchases,
@@ -77,6 +78,10 @@ export const usePurchases = () =>
 /** The player's notifications, newest first — kept live by Realtime (NotificationsBridge). */
 export const useNotifications = () =>
   toResource(useQuery({ queryKey: queryKeys.notifications, queryFn: fetchNotifications }));
+
+/** The player's credit requests, newest first (A4) — the pending/resolved status shown in the wallet. */
+export const useMyCreditRequests = () =>
+  toResource(useQuery({ queryKey: queryKeys.creditRequests, queryFn: fetchMyCreditRequests }));
 
 /** Mark one notification read (on tap / deep-link). read_at is the only writable column. */
 export function useMarkNotificationRead() {

@@ -11,6 +11,7 @@ export type {
   BookingId,
   CoachId,
   CreditBatchId,
+  CreditRequestId,
   DeviceTokenId,
   NotificationId,
   PackageId,
@@ -21,6 +22,7 @@ export type {
 export type { IsoInstant, LocalTime } from './temporal';
 export type {
   BookingStatus,
+  CreditRequestStatus,
   CreditSource,
   Gender,
   Level,
@@ -36,6 +38,7 @@ export type {
   Booking,
   Coach,
   CreditBatch,
+  CreditRequest,
   Notification,
   Package,
   Player,
