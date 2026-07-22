@@ -57,8 +57,38 @@ There is no in-app reset flow (it would need SMTP, which this project doesn't ru
 
 ## Cloud dev project (already configured for testing)
 
-On the dev project (`vvfkqydglgyzhdtymaus`), the admin email credential is
-**`admin@thepadelacademy.eg` / `padel-admin-dev`** — sign into the admin app with those to
-test. This admin is an `admins` row with no player identity (the former `is_admin=true`
-player "Mo" was migrated into `admins` and its player identity retired by the A1
-migration).
+On the dev project (`vvfkqydglgyzhdtymaus`) the admin email is **`admin@thepadelacademy.eg`**.
+The **password is not written down in the repo** — it's set via the script and shared with
+the team out of band. If you don't have it, reset it: re-run `set-admin-credential.mjs`
+against the dev project with a new `ADMIN_PASSWORD` (see above). This admin is an `admins` row
+with no player identity (the former `is_admin=true` player "Mo" was migrated into `admins` and
+its player identity retired by the A1 migration).
+
+## At launch — production (run once)
+
+Do this **once** against the **production** project, with a **real, strong password chosen at
+launch**. That password is **handed to the academy out of band (never committed** — not here,
+not in `.env.example`, not anywhere in the repo):
+
+```bash
+SUPABASE_URL=https://<prod-ref>.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<prod_service_role_key> \
+ADMIN_EMAIL=admin@thepadelacademy.eg \
+ADMIN_PASSWORD='<real-strong-password-chosen-at-launch>' \
+ADMIN_NAME='Rania' \
+node scripts/set-admin-credential.mjs
+```
+
+## Recovery — if the academy forgets the password
+
+There is **no self-service reset** (that needs SMTP, which this project doesn't run). Until
+the post-launch patch below, recovery is: **Adam re-runs `set-admin-credential.mjs`** against
+production with a new `ADMIN_PASSWORD` (same `ADMIN_EMAIL`) and hands the new password over out
+of band. That's the whole recovery story — deliberately simple for a single admin, and safe
+because the script is idempotent and authoritative.
+
+## Known post-launch item — self-service password change
+
+Self-service admin password change (an in-app "change password", which needs SMTP or a
+re-auth flow) is a **deliberate post-launch patch — not built yet**. Noted here so it isn't
+forgotten. Until it ships, the script is the only path (setup, reset, and recovery all).

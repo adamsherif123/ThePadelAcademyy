@@ -75,9 +75,17 @@ node scripts/set-admin-credential.mjs
 
 Reads `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
 `ADMIN_NAME` (no `ADMIN_PHONE` — admins have no phone). Goes through GoTrue's admin API (no
-raw `auth.users`/`crypt()`); refuses if the email already owns a player row. Re-run with the
-same email to reset the password. The service_role key comes from your secrets manager and is
-never committed.
+raw `auth.users`/`crypt()`); refuses if the email already owns a player row. The service_role
+key comes from your secrets manager and is never committed. **The launch password is real,
+strong, and handed to the academy out of band — never committed** (not here, not in
+`.env.example`, not anywhere in the repo).
+
+**Recovery (academy forgets it):** re-run the same script against production with a new
+`ADMIN_PASSWORD`, then hand the new one over out of band. That is the entire recovery path —
+there is **no self-service reset** (it needs SMTP, which this project doesn't run).
+
+**Known post-launch item:** self-service admin password change is a deliberate post-launch
+patch, **not built yet** — flagged so it isn't forgotten. See `apps/admin/ADMIN_ACCESS.md`.
 
 ## 4. Store / project cutover (needs your accounts — not in scope here)
 

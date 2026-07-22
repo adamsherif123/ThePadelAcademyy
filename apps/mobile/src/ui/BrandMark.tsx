@@ -1,31 +1,12 @@
-import { color, radius } from '@tpa/theme';
-import { Image, StyleSheet, View } from 'react-native';
+import { Image } from 'react-native';
 
-// The real academy badge. NOTE: the source is a JPEG on a light-gray backdrop with
-// no transparency, so we clip to a circle and over-scale to crop the gray margins,
-// leaving the blue badge. A clean transparent badge-only asset would remove the
-// need for this trick (see the S3a report).
-const LOGO = require('../../assets/images/brand-logo.jpg');
+// The real academy badge as a clean transparent circular PNG (brand-badge.png, extracted
+// from the source logo in B3). This dropped the old hack: the previous asset was a JPEG on a
+// light-grey backdrop with no transparency, so BrandMark had to clip to a circle and
+// over-scale 1.5× to crop the grey margins. The transparent badge renders directly at any size.
+const BADGE = require('../../assets/images/brand-badge.png');
 
-/** The circular brand badge, cropped from the source asset. */
+/** The circular brand badge. */
 export function BrandMark({ size = 72 }: { size?: number }) {
-  return (
-    <View style={[styles.frame, { width: size, height: size, borderRadius: size / 2 }]}>
-      <Image
-        source={LOGO}
-        resizeMode="cover"
-        style={{ width: size * 1.5, height: size * 1.5 }}
-      />
-    </View>
-  );
+  return <Image source={BADGE} style={{ width: size, height: size }} resizeMode="contain" />;
 }
-
-const styles = StyleSheet.create({
-  frame: {
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: color.bg.inverse,
-    borderRadius: radius.pill,
-  },
-});
