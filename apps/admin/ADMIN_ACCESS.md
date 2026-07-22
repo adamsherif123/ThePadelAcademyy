@@ -13,6 +13,16 @@ admin — minting one is a service_role-only action.
 
 ## Setup / reset — the supported way
 
+> **Single source of truth:** `scripts/set-admin-credential.mjs` is the **only** supported
+> way to set or reset the admin password. The credential is **whatever the last script run
+> set it to** — treat the script as authoritative. **Never** set it any other way, and in
+> particular **never run raw SQL against `auth.users`** (e.g.
+> `update auth.users set encrypted_password = crypt('…', gen_salt('bf'))`). A hand-set SQL
+> password disagrees with what the script knows; the next person who re-runs the script (to
+> add an admin, reset a password) silently overwrites your manual change — which is exactly
+> how someone gets locked out mid-session. If in doubt, re-run the script: it re-establishes
+> the known credential.
+
 Use the script, not raw SQL. It goes through GoTrue's **admin API**
 (`POST` / `PUT /auth/v1/admin/users`) — the supported contract — instead of writing
 `auth.users` with `crypt()/gen_salt()`. Writing the internal auth schema directly is
@@ -29,7 +39,7 @@ a **distinct email** that is not a player's.
 # dashboard (Settings → API). Never commit it; never put it in an app.
 SUPABASE_URL=https://<ref>.supabase.co \
 SUPABASE_SERVICE_ROLE_KEY=<service_role_key> \
-ADMIN_EMAIL=rania@thepadelacademy.eg \
+ADMIN_EMAIL=admin@thepadelacademy.eg \
 ADMIN_PASSWORD='<strong-password>' \
 ADMIN_NAME='Rania' \
 node scripts/set-admin-credential.mjs

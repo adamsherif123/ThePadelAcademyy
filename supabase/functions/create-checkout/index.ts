@@ -12,6 +12,13 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const PAYMOB_BASE = 'https://accept.paymob.com';
 
+// Paymob's billing_data.phone_number is a REQUIRED field — the payment_keys call 400s on an
+// empty/missing value ("This field is required."). Since A2, players.phone is nullable (every
+// email-signup player has none), so we must substitute a syntactically-valid E.164 placeholder
+// rather than send null/''. Paymob does not verify the number is reachable, so a placeholder is
+// accepted; the real payer identity is the authenticated purchase, not this billing phone.
+const PAYMOB_BILLING_PHONE_FALLBACK = '+201000000000';
+
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -57,11 +64,14 @@ Deno.serve(async (req) => {
     // Billing: use the caller's own player row (RLS self) where we can; NA otherwise.
     const { data: player } = await supa.from('players').select('name, phone').maybeSingle();
     const [firstName, ...rest] = (player?.name ?? 'Padel Player').trim().split(' ');
+    // phone is null for every email-signup player (A2) — Paymob requires a non-empty
+    // phone_number, so substitute the placeholder for null OR blank (see the constant above).
+    const phone = player?.phone?.trim() ? player.phone : PAYMOB_BILLING_PHONE_FALLBACK;
     const billing = {
       first_name: firstName || 'Padel',
       last_name: rest.join(' ') || 'Player',
       email: 'player@thepadelacademy.eg',
-      phone_number: player?.phone ?? '+201000000000',
+      phone_number: phone,
       apartment: 'NA', floor: 'NA', street: 'NA', building: 'NA', shipping_method: 'NA',
       postal_code: 'NA', city: 'Cairo', country: 'EG', state: 'NA',
     };

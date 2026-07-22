@@ -58,8 +58,26 @@ Reporting captures unhandled JS errors + promise rejections; the root **error bo
 
 ## 3. Admin credential
 
-Set the admin's email+password with the supported script (see `apps/admin/ADMIN_ACCESS.md`):
-`SUPABASE_URL … SUPABASE_SERVICE_ROLE_KEY … ADMIN_PHONE … ADMIN_EMAIL … ADMIN_PASSWORD … node scripts/set-admin-credential.mjs`. Uses GoTrue's admin API (no raw `auth.users`/`crypt()`); the service_role key comes from your secrets manager and is never committed.
+Set the admin's email+password with the supported script — the **single source of truth**
+for the credential (see `apps/admin/ADMIN_ACCESS.md`). It is the **only** supported way;
+**never** set the password via raw SQL against `auth.users` (a manual change disagrees with
+the script and gets silently overwritten on the next run — the mid-session lockout). The
+exact one-time production sequence:
+
+```bash
+SUPABASE_URL=https://<prod-ref>.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<service_role_key> \
+ADMIN_EMAIL=admin@thepadelacademy.eg \
+ADMIN_PASSWORD='<strong-password>' \
+ADMIN_NAME='Rania' \
+node scripts/set-admin-credential.mjs
+```
+
+Reads `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`,
+`ADMIN_NAME` (no `ADMIN_PHONE` — admins have no phone). Goes through GoTrue's admin API (no
+raw `auth.users`/`crypt()`); refuses if the email already owns a player row. Re-run with the
+same email to reset the password. The service_role key comes from your secrets manager and is
+never committed.
 
 ## 4. Store / project cutover (needs your accounts — not in scope here)
 
@@ -68,8 +86,22 @@ Set the admin's email+password with the supported script (see `apps/admin/ADMIN_
   the SMS landmine is gone since A2). Set all Edge Function secrets (`supabase secrets set …`: Paymob, HMAC,
   `PUSH_TRIGGER_SECRET`, and — if used — `SENTRY_DSN`). Re-schedule the stale-purchase cron
   (`create extension pg_cron; select cron.schedule('fail-stale-purchases','17 * * * *', $$ select public.fail_stale_purchases(); $$);`) and re-point the Paymob callbacks at the prod webhook.
-- **Payments**: switch Paymob from the test integration to the live account (real creds via
-  Edge Function secrets), 3DS on a real card.
+- **Data seed (required before players can transact)**: the production DB must contain the
+  active **packages**, including the **trial package** — a `training_type='trial'`, active,
+  1-session package (A5). Without it the once-per-player trial offer never appears and a new
+  player has nothing to buy. Seed the standard group/duo/individual packages too. (Cloud dev
+  uses `pk_seed_trial1`; production needs its own equivalent active trial row.)
+- **InstaPay (live now)**: the request-credits screen shows the academy's real InstaPay
+  **mobile number `+201003487025`** (tap-to-copy). Fill in the payee **account name** in
+  `apps/mobile/src/app/request-credits.tsx` (`INSTAPAY_PAYEE_NAME`) once Adam confirms it —
+  until then it renders "confirming".
+- **Payments (Paymob is a flag flip)**: Paymob is mothballed behind `EXPO_PUBLIC_PAYMOB_ENABLED`
+  (OFF unless exactly `'true'`) — players currently pay out-of-band via the InstaPay/cash
+  request rail. To turn Paymob on at launch: switch Paymob from the test integration to the
+  **live account** (real creds via Edge Function secrets), verify **3DS on a real card**, THEN
+  set `EXPO_PUBLIC_PAYMOB_ENABLED=true` in the mobile build (EAS secret / `.env`) so the client
+  surfaces the checkout. Also confirm `create-checkout` billing works for email-signup players
+  who have no phone (A6 sends a placeholder `phone_number` — Paymob requires a non-empty one).
 - **Icons / splash / store listings**: final art + store metadata.
 - **iOS push**: APNs key from the Apple account → `eas credentials` → iOS build. Android FCM
   (`google-services.json` + FCM key) for the mobile push proof.

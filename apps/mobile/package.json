@@ -16,6 +16,7 @@
     "@tpa/theme": "workspace:*",
     "@tpa/types": "workspace:*",
     "expo": "~56.0.16",
+    "expo-clipboard": "~56.0.4",
     "expo-constants": "~56.0.21",
     "expo-device": "~56.0.4",
     "expo-font": "~56.0.7",
