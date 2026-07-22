@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "288873839001",
+    "project_id": "tpaandroid-e8c13",
+    "storage_bucket": "tpaandroid-e8c13.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:288873839001:android:089810cfc43f3107747b08",
+        "android_client_info": {
+          "package_name": "com.thepadelacademy.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCwPvvMUk8uWtv57ZXTRXADZXA4Kr5KUIE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

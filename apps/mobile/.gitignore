@@ -18,6 +18,16 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# Firebase / FCM service-account key — the real SECRET. Uploaded to EAS credentials,
+# NEVER committed. (Multiple spellings: adminsdk downloads, hyphenated, and the
+# camelCase name this project's key actually uses.)
+*firebase-adminsdk*.json
+*service-account*.json
+*ServiceAccount*.json
+# NOTE: google-services.json is intentionally NOT ignored. It is public client config that
+# ships inside the APK, and EAS archives ONLY git-tracked files — ignoring it breaks the
+# Android build (google-services.json missing at prebuild). Keep it committed.
+
 # Metro
 .metro-health-check*
 
