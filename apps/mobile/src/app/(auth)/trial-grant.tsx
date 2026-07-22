@@ -59,8 +59,10 @@ export default function TrialOfferScreen() {
           {trial ? (
             <Button
               label="Get my trial session"
+              // push (not replace) so the request screen's back button returns HERE — the
+              // player can still choose "Maybe later" and try the trial another time.
               onPress={() =>
-                router.replace({ pathname: '/request-credits', params: { packageId: trial.id } })
+                router.push({ pathname: '/request-credits', params: { packageId: trial.id } })
               }
             />
           ) : (

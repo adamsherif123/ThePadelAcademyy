@@ -28,8 +28,9 @@ const MIN_PASSWORD = 8;
  *     died after the auth user was created): the password already exists, so it only
  *     collects the profile and runs complete_signup.
  *
- * Either way it must not be a dead end: it carries a sign-out escape. An admin never
- * reaches this screen — the guard routes an admin credential to the refusal screen (bug #2).
+ * Either way it must not be a dead end: the header back control clears any half-finished
+ * session and returns to email entry (see `onBack`). An admin never reaches this screen —
+ * the guard routes an admin credential to the refusal screen (bug #2).
  */
 // complete_signup's optional-phone rejections → friendly copy. Everything else falls back
 // to a generic message + the sign-out escape.
@@ -55,7 +56,6 @@ export default function ProfileSetupScreen() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [leaving, setLeaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const passwordTooShort = isNewFlow && password.length > 0 && password.length < MIN_PASSWORD;
@@ -63,7 +63,7 @@ export default function ProfileSetupScreen() {
   const passwordOk = !isNewFlow || (password.length >= MIN_PASSWORD && confirm === password);
   const complete =
     name.trim().length > 0 && gender !== null && level !== null && trainedBefore !== null && passwordOk;
-  const busy = submitting || leaving;
+  const busy = submitting;
 
   const onCreate = async () => {
     if (!complete || busy || gender === null || level === null) return;
@@ -108,15 +108,19 @@ export default function ProfileSetupScreen() {
   const onHaveAccount = () =>
     router.replace({ pathname: '/(auth)/password', params: { email: emailParam ?? '' } });
 
-  const onSignOut = async () => {
-    if (busy) return;
-    setLeaving(true);
-    await signOut(); // never throws; forces the signed-out state → guard → sign-in
+  // Header back: leave cleanly without stranding a half-finished account. An orphan
+  // needs_profile session would route us straight back here on the next launch (the S9.2
+  // trap), so clear the local session first — signOut() flips to signed_out synchronously,
+  // purges the persisted session from AsyncStorage, and never throws. The guard leaves a
+  // signed_out user put while inside (auth), so navigate to email entry explicitly.
+  const onBack = () => {
+    void signOut();
+    router.replace('/(auth)/sign-in');
   };
 
   return (
     <Screen scroll contentContainerStyle={styles.content}>
-      <ScreenHeader eyebrow="Almost there" title="Set up your Profile" />
+      <ScreenHeader eyebrow="Almost there" title="Set up your Profile" onBack={onBack} />
       <Text variant="bodySecondary">
         This takes 30 seconds and decides which group sessions you&apos;ll see.
       </Text>
@@ -283,15 +287,6 @@ export default function ProfileSetupScreen() {
           </Pressable>
         </View>
       ) : null}
-
-      {/* The escape hatch: this screen can be forced by the guard, so it must never be
-          a dead end. Sign out returns to sign-in to start over with another email. */}
-      <Button
-        label={leaving ? 'Signing out…' : 'Sign out / use a different email'}
-        variant="ghost"
-        onPress={onSignOut}
-        disabled={busy}
-      />
     </Screen>
   );
 }

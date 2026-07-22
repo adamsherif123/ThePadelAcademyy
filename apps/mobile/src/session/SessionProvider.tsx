@@ -204,19 +204,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    // Before clearing the session (RLS still sees this player), unregister the token.
-    await dropThisDeviceToken();
-    try {
-      // `local` scope clears the stored session without a server round-trip, so a
-      // user holding a JWT for a deleted auth user can still get out (a server-side
-      // logout could reject). This is the escape hatch for a stuck profile-setup.
-      await supabase.auth.signOut({ scope: 'local' });
-    } catch {
-      // Ignore — we force the local signed-out state below regardless.
-    }
+    // Flip the state the route guard reacts to FIRST — synchronously and unconditionally.
+    // deriveStatus then sees no session → signed_out, so the UI can never hang on a
+    // "Signing out…" spinner. The OLD order flipped this LAST, after awaiting the
+    // push-token delete + supabase signOut; on an odd/half-provisioned session (a
+    // needs_profile orphan) those awaits could fail to settle, so the flip never ran and
+    // the spinner spun until a force-quit — the profile-setup escape hatch was the bug.
     setSession(null);
     // Drop every cached read so the next player starts clean.
     queryClient.clear();
+    // Best-effort cleanup, and NEITHER can wedge sign-out now:
+    //  • the push-token delete is a server round-trip that can stall on an odd session, so
+    //    it is fire-and-forget — never awaited;
+    //  • `local` scope makes NO server round-trip — it purges the persisted session from
+    //    AsyncStorage (so a relaunch stays signed out) and self-catches, so a JWT for a
+    //    deleted/odd auth user can still get out.
+    void dropThisDeviceToken();
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
   }, [dropThisDeviceToken]);
 
   const deleteAccount = useCallback(async () => {
