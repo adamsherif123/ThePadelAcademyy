@@ -58,7 +58,7 @@ const SOURCE_LABEL: Record<CreditSource, string> = {
   signup_grant: 'Signup trial',
 };
 
-const METHOD_LABEL: Record<PaymentMethod, string> = { paymob: 'Card', cash: 'Cash' };
+const METHOD_LABEL: Record<PaymentMethod, string> = { paymob: 'Card', cash: 'Cash', instapay: 'InstaPay' };
 
 /** Shared fallback for transport failures and any reason a view doesn't name. */
 const GENERIC_ERROR = 'Something went wrong. Please try again.';

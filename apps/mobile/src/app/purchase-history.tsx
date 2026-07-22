@@ -26,8 +26,8 @@ const STATUS_META: Record<PurchaseStatus, { label: string; tone: BadgeTone }> = 
   failed: { label: 'Failed', tone: 'danger' },
 };
 
-/** How the player paid — cash sales are taken at the desk, cards through Paymob. */
-const METHOD_LABEL: Record<PaymentMethod, string> = { paymob: 'Card', cash: 'Cash' };
+/** How the player paid — cash at the desk, InstaPay transfer, or cards through Paymob. */
+const METHOD_LABEL: Record<PaymentMethod, string> = { paymob: 'Card', cash: 'Cash', instapay: 'InstaPay' };
 
 /**
  * Purchase history (undesigned — built to the established pattern). Each purchase

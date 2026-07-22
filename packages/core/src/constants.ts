@@ -99,7 +99,7 @@ export const CREDIT_SOURCES = [
   'admin_grant',
 ] as const satisfies readonly CreditSource[];
 
-export const PAYMENT_METHODS = ['paymob', 'cash'] as const satisfies readonly PaymentMethod[];
+export const PAYMENT_METHODS = ['paymob', 'cash', 'instapay'] as const satisfies readonly PaymentMethod[];
 
 // --- Exhaustiveness guards: fail compilation if an array omits a union member ---
 type Covers<Arr extends readonly unknown[], U> = [Exclude<U, Arr[number]>] extends [never]

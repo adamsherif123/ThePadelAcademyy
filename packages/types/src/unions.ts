@@ -19,12 +19,13 @@ export type Gender = 'men' | 'ladies';
 export type PurchaseStatus = 'pending' | 'succeeded' | 'failed';
 
 /**
- * How the money reached the academy. `paymob` = the online card gateway (S7).
- * `cash` = taken at the desk — Egypt runs on cash, and a cash sale is an ordinary
- * purchase whose only difference from a card one is the channel. A cash purchase
- * settles immediately (`succeeded`) and carries NO gateway references.
+ * How the money reached the academy. `paymob` = the online card gateway (S7, mothballed).
+ * `cash` = taken at the desk. `instapay` = an InstaPay bank transfer the player made
+ * out-of-band, then reported for crediting (A3). Egypt runs on cash + InstaPay; both are
+ * ordinary purchases whose only difference from a card one is the channel. cash/instapay
+ * settle immediately (`succeeded`) and carry NO gateway references — only paymob does.
  */
-export type PaymentMethod = 'paymob' | 'cash';
+export type PaymentMethod = 'paymob' | 'cash' | 'instapay';
 
 export type BookingStatus = 'booked' | 'cancelled' | 'attended' | 'no_show';
 

@@ -47,6 +47,16 @@ racer_cancel() { # $1=admin_uuid $2=slot $3=target_iso $4=outfile
     > "$4" 2>&1 &
 }
 
+# A racer that APPROVES a credit request as the admin (A3 — the new mint path). Authorises
+# via is_admin() on the JWT claim, so no `set role` is needed (definer RPC).
+racer_approve() { # $1=admin_uuid $2=request_id $3=target_iso $4=outfile
+  "${PSQL[@]}" \
+    -c "select set_config('request.jwt.claims', '{\"sub\":\"$1\",\"role\":\"authenticated\"}', false)" \
+    -c "select pg_sleep(greatest(0, extract(epoch from (timestamptz '$3' - clock_timestamp()))))" \
+    -c "select public.approve_credit_request('$2')->>'ok'" \
+    > "$4" 2>&1 &
+}
+
 uuid() { printf '00000000-0000-0000-0000-%012d' "$1"; }  # deterministic test uuids
 
 FAILS=0
@@ -57,13 +67,17 @@ check() { # $1=label $2=got $3=want
 cleanup_rows() {
   # book_slot mints bookings with 'bk_<uuid>' ids, so delete bookings by their
   # slot/player, not by an id prefix (FK-safe order: bookings → batches → slots → players → coaches).
-  sql "delete from public.notifications  where slot_id like 'slr_%' or player_id like 'plr_%';
-       delete from public.bookings       where slot_id like 'slr_%' or player_id like 'plr_%';
-       delete from public.credit_batches where id like 'cbr_%' or player_id like 'plr_%';
-       delete from public.session_slots  where id like 'slr_%';
-       delete from public.players        where id like 'plr_%';
-       delete from public.coaches        where id like 'cor_%';
-       delete from auth.users            where id::text like '00000000-0000-0000-0000-%';" >/dev/null
+  sql "delete from public.notifications   where slot_id like 'slr_%' or player_id like 'plr_%';
+       delete from public.bookings        where slot_id like 'slr_%' or player_id like 'plr_%';
+       delete from public.credit_batches  where id like 'cbr_%' or player_id like 'plr_%';
+       delete from public.credit_requests where player_id like 'plr_%';
+       delete from public.purchases       where player_id like 'plr_%';
+       delete from public.session_slots   where id like 'slr_%';
+       delete from public.packages        where id like 'pkr_%';
+       delete from public.players         where id like 'plr_%';
+       delete from public.admins          where id like 'adr_%';
+       delete from public.coaches         where id like 'cor_%';
+       delete from auth.users             where id::text like '00000000-0000-0000-0000-%';" >/dev/null
 }
 
 # ── setup ────────────────────────────────────────────────────────────────────
@@ -206,6 +220,38 @@ E_UNREFUNDED=$(sql "select count(*) from public.credit_batches where id like 'cb
 check "zero deadlocks (cancel×cancel refund credits in one global order)" "$E_DEADLOCK"   "0"
 check "all $((2*E_KE)) sessions cancelled (no cancel aborted)"            "$E_CANCELLED"   "$((2*E_KE))"
 check "every shared credit refunded by BOTH cancels (ends at 2/2)"       "$E_UNREFUNDED"  "0"
+
+# ── Scenario F: approve_credit_request raced — the A3 mint path mints ONCE ──────
+# Two concurrent approvals hit the SAME pending request. The FOR UPDATE lock serialises
+# them; the loser sees status='approved' and mints nothing. Assert exactly one purchase +
+# one purchase-backed batch per request (no double-mint), and every request approved.
+echo "Scenario F — approve_credit_request raced (2 concurrent approves per request, K=20):"
+F_K=20
+FSETUP="insert into auth.users (id) values ('$(uuid 999)') on conflict do nothing;"
+# uuid 999 is already the admin from Scenario D; re-assert idempotently.
+FSETUP+="insert into public.admins (id,auth_user_id,display_name,created_at) values ('adr_f','$(uuid 999)','Adm',now()) on conflict (auth_user_id) do nothing;"
+FSETUP+="insert into public.packages (id,training_type,session_count,price,name,is_active) values ('pkr_f','group',8,280000,'F8',true);"
+for k in $(seq 1 $F_K); do
+  FSETUP+="insert into auth.users (id) values ('$(uuid $((500+k)))');"
+  FSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_f$k','+2010f55${k}','F','men','beginner',now(),'$(uuid $((500+k)))');"
+  FSETUP+="insert into public.credit_requests (id,player_id,package_id,payment_method,status,created_at) values ('crr_f$k','plr_f$k','pkr_f','instapay','pending',now());"
+done
+sql "$FSETUP" >/dev/null
+
+T=$(target 5)
+for k in $(seq 1 $F_K); do
+  racer_approve "$(uuid 999)" "crr_f$k" "$T" "$TMP/f_a_$k.txt"
+  racer_approve "$(uuid 999)" "crr_f$k" "$T" "$TMP/f_b_$k.txt"
+done
+wait
+F_APPROVED=$(sql "select count(*) from public.credit_requests where player_id like 'plr_f%' and status='approved'")
+F_PURCH=$(sql "select count(*) from public.purchases where player_id like 'plr_f%'")
+F_BATCH=$(sql "select count(*) from public.credit_batches where player_id like 'plr_f%' and source='purchase'")
+F_CREDITS=$(sql "select coalesce(sum(quantity_total),0) from public.credit_batches where player_id like 'plr_f%'")
+check "every request approved (K=$F_K)"                        "$F_APPROVED" "$F_K"
+check "exactly ONE purchase per request (no double-mint)"      "$F_PURCH"    "$F_K"
+check "exactly ONE purchase-backed batch per request"          "$F_BATCH"    "$F_K"
+check "total credits minted = K×8 (each request mints once)"   "$F_CREDITS"  "$((F_K*8))"
 
 # ── teardown ─────────────────────────────────────────────────────────────────
 cleanup_rows
