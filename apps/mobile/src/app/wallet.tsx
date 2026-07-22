@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { packageById } from '../data/catalog';
-import { useBatches, useMyCreditRequests, usePackages } from '../data/queries';
+import { useBatches, useMyCreditRequests, usePackages, useTrialEligible } from '../data/queries';
 import { activeBatches, balanceByType, expiredBatches, totalReadyToBook } from '../data/wallet';
 import { useSession } from '../session/SessionProvider';
 import {
@@ -40,6 +40,7 @@ export default function WalletScreen() {
   const batchesQ = useBatches();
   const requestsQ = useMyCreditRequests();
   const packagesQ = usePackages();
+  const trialEligibleQ = useTrialEligible();
   if (!player) return null;
 
   if (batchesQ.isPending || batchesQ.isError) {
@@ -69,6 +70,13 @@ export default function WalletScreen() {
     requests.find((r) => r.status === 'pending') ??
     (requests[0]?.status === 'rejected' ? requests[0] : undefined);
 
+  // Zero-credit empty state (A5: new players start empty). Nudge them at the once-per-player
+  // trial while they're still eligible and one exists, otherwise the store. Suppressed when a
+  // request is already pending — the pending card above already says "credits on the way".
+  const canGetTrial =
+    Boolean(trialEligibleQ.data) && packages.some((p) => p.trainingType === 'trial' && p.isActive);
+  const showEmpty = active.length === 0 && openRequest?.status !== 'pending';
+
   return (
     <Screen scroll contentContainerStyle={styles.content}>
       <ScreenHeader eyebrow="Wallet" title="Your Credits" onBack={() => router.back()} />
@@ -89,11 +97,30 @@ export default function WalletScreen() {
           />
         ) : null}
 
-        {/* Active batches */}
-        <Text variant="label">Active batches</Text>
-        {active.map((b) => (
-          <BatchCard key={b.id} batch={b} now={now} />
-        ))}
+        {/* Active batches — or the zero-credit nudge for a player who has none yet */}
+        {showEmpty ? (
+          <Card style={styles.emptyCard}>
+            <Text variant="body" weight="bold">
+              No credits yet
+            </Text>
+            <Text variant="caption" tone="secondary">
+              {canGetTrial
+                ? 'Start with a one-time discounted trial session, then book your first class on court.'
+                : 'Buy a credit package to book your first session — a credit is what reserves your spot.'}
+            </Text>
+            <Button
+              label={canGetTrial ? 'Get your trial session' : 'Browse packages'}
+              onPress={() => router.push('/buy-credits')}
+            />
+          </Card>
+        ) : (
+          <>
+            <Text variant="label">Active batches</Text>
+            {active.map((b) => (
+              <BatchCard key={b.id} batch={b} now={now} />
+            ))}
+          </>
+        )}
 
         {/* Expired */}
         {expired.length > 0 ? (
@@ -201,6 +228,7 @@ function BatchCard({
 
 const styles = StyleSheet.create({
   content: { gap: space.md },
+  emptyCard: { gap: space.sm, alignItems: 'flex-start' },
   pendingCard: { gap: space.sm, borderLeftWidth: 3, borderLeftColor: color.status.warning },
   rejectedCard: { gap: space.sm, borderLeftWidth: 3, borderLeftColor: color.status.danger },
   reqHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

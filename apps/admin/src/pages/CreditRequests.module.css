@@ -43,6 +43,13 @@
   color: var(--color-text-secondary);
 }
 
+.pkgCell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
 .actions {
   display: inline-flex;
   gap: var(--space-sm);

@@ -94,7 +94,14 @@ export function CreditRequests() {
           <Avatar name={r.player?.name ?? 'Player'} size={32} />
           <span className={styles.playerText}>
             <span className={styles.playerName}>{r.player?.name ?? 'Unknown player'}</span>
-            <span className={styles.playerSub}>{r.player?.email ?? r.player?.phone ?? '—'}</span>
+            <span className={styles.playerSub}>
+              {r.player?.email ?? r.player?.phone ?? '—'}
+              {r.player?.trainedBefore === false
+                ? ' · says new to TPA'
+                : r.player?.trainedBefore === true
+                  ? ' · says trained before'
+                  : ''}
+            </span>
           </span>
         </button>
       ),
@@ -102,12 +109,12 @@ export function CreditRequests() {
     {
       key: 'package',
       header: 'Package',
-      render: (r) =>
-        r.pkg ? (
-          `${r.pkg.name} · ${r.pkg.sessionCount} sessions`
-        ) : (
-          <span className={styles.muted}>—</span>
-        ),
+      render: (r) => (
+        <span className={styles.pkgCell}>
+          {r.pkg ? `${r.pkg.name} · ${r.pkg.sessionCount} sessions` : <span className={styles.muted}>—</span>}
+          {r.request.isTrial ? <Badge tone="info">Trial · once per player</Badge> : null}
+        </span>
+      ),
     },
     { key: 'price', header: 'Price', render: (r) => <span className={styles.muted}>{r.pkg ? formatPiastres(r.pkg.price) : '—'}</span> },
     { key: 'method', header: 'Method', render: (r) => METHOD_LABEL[r.request.paymentMethod] },

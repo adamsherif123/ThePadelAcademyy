@@ -1,5 +1,5 @@
-import { buildSignupGrant, toInstant } from '@tpa/core';
-import type { CreditBatch, Gender, IsoInstant, Level, Player } from '@tpa/types';
+import { toInstant } from '@tpa/core';
+import type { Gender, IsoInstant, Level, Player } from '@tpa/types';
 import type { Session } from '@supabase/supabase-js';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -48,6 +48,8 @@ interface ProfileDraft {
   level: Level;
   /** Optional (A2.1). The server normalises to +20 E.164 and rejects a duplicate. */
   phone?: string | null;
+  /** Self-reported new-vs-returning (A5), passed through to complete_signup. */
+  trainedBefore?: boolean | null;
 }
 
 interface SessionValue {
@@ -57,7 +59,6 @@ interface SessionValue {
   /** The signed-in email (for the profile screen + the refusal message). null if none. */
   email: string | null;
   player: Player | null;
-  trialGrant: CreditBatch | null;
   /** Sign in a RETURNING user. Returns {ok:false,error} on bad credentials — never throws. */
   signInWithEmail: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   /** Create the auth user (GoTrue owns the password). `taken` when the email already exists. */
@@ -65,7 +66,7 @@ interface SessionValue {
     email: string,
     password: string,
   ) => Promise<{ ok: boolean; error?: string; taken?: boolean }>;
-  /** Create the player + trial grant via complete_signup. */
+  /** Create the player via complete_signup (A5: no credits at signup). */
   completeProfile: (draft: ProfileDraft) => Promise<{ ok: boolean; error?: string }>;
   /** Permanently delete the account (anonymise + drop the auth identity), then sign out. */
   deleteAccount: () => Promise<{ ok: boolean; error?: string }>;
@@ -77,7 +78,6 @@ const SessionContext = createContext<SessionValue | null>(null);
 export function SessionProvider({ children }: { children: ReactNode }) {
   // `undefined` = still restoring from storage; `null` = restored, signed out.
   const [session, setSession] = useState<Session | null | undefined>(undefined);
-  const [trialGrant, setTrialGrant] = useState<CreditBatch | null>(null);
   const [now, setNow] = useState<IsoInstant>(() => toInstant(new Date()));
 
   // Restore the persisted session, then track every auth change (sign-in, sign-up,
@@ -165,28 +165,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const res = await completeSignupRpc(draft);
         if (!res.ok) return { ok: false, error: res.reason };
         const nowIso = toInstant(new Date());
-        // Show the trial grant we know the server just minted (same @tpa/core rule).
-        setTrialGrant(buildSignupGrant(res.playerId as Player['id'], nowIso));
         // SEED the player into the cache SYNCHRONOUSLY. This is the fix for the signup
         // bounce: `status` derives from this query, so writing it here flips status to
-        // `ready` before profile-setup navigates — the guard then sees a ready user on
-        // the trial-grant route (which it exempts) instead of a needs_profile user it
-        // would replace back. No refetch round-trip, so there is no window to lose the
-        // race in. (createdAt is a placeholder — unused in the UI — and the invalidate
-        // below reconciles the whole row to server truth a moment later. phone is null:
-        // email players have none.)
+        // `ready` before the screen navigates — the guard then sees a ready user on the
+        // exempt onboarding route instead of a needs_profile user it would replace back.
+        // (createdAt/phone are placeholders reconciled by the invalidate below. A5: no
+        // credits are minted at signup — a new player starts empty and buys a trial.)
         queryClient.setQueryData<Player>(queryKeys.player, {
           id: res.playerId as Player['id'],
-          phone: null, // reconciled below (the server normalises the optional phone)
+          phone: null,
           email: session?.user.email ?? null,
+          trainedBefore: draft.trainedBefore ?? null,
           name: draft.name,
           gender: draft.gender,
           level: draft.level,
           createdAt: nowIso,
         });
-        // Reconcile the player to the server row + surface the freshly minted credits.
+        // Reconcile the player to the server row.
         await queryClient.invalidateQueries({ queryKey: queryKeys.player });
-        await queryClient.invalidateQueries({ queryKey: queryKeys.creditBatches });
         return { ok: true };
       } catch (e) {
         // e.g. the deleted-auth-user 23502 (a valid JWT whose auth.users row is gone).
@@ -219,7 +215,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // Ignore — we force the local signed-out state below regardless.
     }
     setSession(null);
-    setTrialGrant(null);
     // Drop every cached read so the next player starts clean.
     queryClient.clear();
   }, [dropThisDeviceToken]);
@@ -248,14 +243,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       now,
       email: session?.user.email ?? null,
       player,
-      trialGrant,
       signInWithEmail,
       signUpWithEmail,
       completeProfile,
       deleteAccount,
       signOut,
     }),
-    [status, now, session, player, trialGrant, signInWithEmail, signUpWithEmail, completeProfile, deleteAccount, signOut],
+    [status, now, session, player, signInWithEmail, signUpWithEmail, completeProfile, deleteAccount, signOut],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

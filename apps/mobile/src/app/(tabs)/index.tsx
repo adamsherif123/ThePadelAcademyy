@@ -6,7 +6,15 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { activePackages } from '../../data/catalog';
-import { useBatches, useBookings, useCoaches, usePackages, useSlots, combine } from '../../data/queries';
+import {
+  useBatches,
+  useBookings,
+  useCoaches,
+  usePackages,
+  useSlots,
+  useTrialEligible,
+  combine,
+} from '../../data/queries';
 import { nextSession } from '../../data/schedule';
 import { soonestExpiringBatch, totalReadyToBook } from '../../data/wallet';
 import { NotificationBell } from '../../notifications/NotificationBell';
@@ -38,7 +46,8 @@ export default function HomeScreen() {
   const slots = useSlots();
   const coaches = useCoaches();
   const packagesQ = usePackages();
-  const gate = combine(batches, bookings, slots, coaches, packagesQ);
+  const trialEligibleQ = useTrialEligible();
+  const gate = combine(batches, bookings, slots, coaches, packagesQ, trialEligibleQ);
   // Session-scoped, in-memory dismissals, keyed by batch id — a nag by design:
   // pure view state, resets on relaunch, and keying by id means dismissing one
   // batch's notice doesn't suppress a different batch's later.
@@ -78,7 +87,13 @@ export default function HomeScreen() {
   const total = totalReadyToBook(batches.data ?? [], now);
   const expiring = soonestExpiringBatch(batches.data ?? [], now);
   const next = nextSession(bookings.data ?? [], slots.data ?? [], coaches.data ?? [], now);
-  const packages = activePackages(packagesQ.data ?? []);
+  // A5: only surface the trial while the player can still buy it (never used one) and one
+  // exists — a player who has used their trial never sees it in their options anywhere.
+  const trialActive = (packagesQ.data ?? []).some((p) => p.trainingType === 'trial' && p.isActive);
+  const canGetTrial = Boolean(trialEligibleQ.data) && trialActive;
+  const packages = activePackages(packagesQ.data ?? []).filter(
+    (p) => p.trainingType !== 'trial' || canGetTrial,
+  );
 
   const expiryText = expiring
     ? `${expiring.quantityRemaining} ${TRAINING_META[expiring.trainingType].label} credit${
@@ -105,7 +120,24 @@ export default function HomeScreen() {
         ) : null}
       </CreditsSummaryCard>
 
-      <Button label="Book a Session" onPress={() => router.push('/(tabs)/book')} />
+      {total === 0 ? (
+        <Card style={styles.emptyCredits}>
+          <Text variant="body" weight="bold">
+            You have no credits yet
+          </Text>
+          <Text variant="caption" tone="secondary">
+            {canGetTrial
+              ? 'Grab your one-time discounted trial session to book your first class on court.'
+              : 'Add a credit package — a credit is what reserves your spot in a session.'}
+          </Text>
+          <Button
+            label={canGetTrial ? 'Get your trial session' : 'Browse packages'}
+            onPress={() => router.push('/buy-credits')}
+          />
+        </Card>
+      ) : (
+        <Button label="Book a Session" onPress={() => router.push('/(tabs)/book')} />
+      )}
 
       {next ? (
         <View style={styles.section}>
@@ -161,6 +193,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   headerTrailing: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   content: { gap: space.lg },
+  emptyCredits: { gap: space.sm, alignItems: 'flex-start' },
   section: { gap: space.sm },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   nextRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },

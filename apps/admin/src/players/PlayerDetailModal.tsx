@@ -437,7 +437,8 @@ function GrantView({ player, packages, onBack, onClose }: { player: Player; pack
 // ---- CASH ----
 const sellablePackages = (packages: Package[]): Package[] =>
   packages
-    .filter((p) => p.isActive && p.trainingType !== 'trial')
+    // A5: trial is sellable now — an admin can record a cash trial purchase (once per player).
+    .filter((p) => p.isActive)
     .sort((a, b) => a.trainingType.localeCompare(b.trainingType) || a.sessionCount - b.sessionCount);
 
 function CashView({

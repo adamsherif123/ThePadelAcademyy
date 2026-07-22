@@ -16,13 +16,12 @@ import { runWrite } from './queries';
  */
 
 /**
- * The training types a package may have. Trial is EXCLUDED structurally — the app
- * has no concept of buying a trial (S1.5 deleted the trial package deliberately;
- * trial credits are only ever granted free at signup). The New-package type picker
- * is built from this list, so "a trial package" is not expressible in the UI, and
- * the seam rejects it as a backstop.
+ * The training types a package may have. A5 reversed S4e: trial is now an ordinary,
+ * sellable package (a one-time discounted trial session), so it's included here — the admin
+ * can create, price, toggle and edit a trial package like any other. The once-per-player
+ * limit is enforced in the DB (partial unique indexes) + the money RPCs, not by hiding trial.
  */
-export const SELLABLE_TYPES: readonly TrainingType[] = TRAINING_TYPES.filter((t) => t !== 'trial');
+export const SELLABLE_TYPES: readonly TrainingType[] = TRAINING_TYPES;
 
 /** Round-to-nearest-piastre per-session price (informational; matches liability rounding). */
 export function perSessionPrice(pkg: Package): Piastres {
@@ -106,7 +105,7 @@ export type SavePackageResult =
 
 function validate(draft: PackageDraft): SavePackageResult | null {
   if (draft.name.trim() === '') return { ok: false, reason: 'name_required' };
-  if (draft.trainingType === 'trial') return { ok: false, reason: 'trial_not_sellable' };
+  // A5: trial is sellable now — no trainingType rejection.
   if (draft.sessionCount < 1) return { ok: false, reason: 'sessions_below_one' };
   if (draft.price < 1) return { ok: false, reason: 'price_below_one' };
   return null;

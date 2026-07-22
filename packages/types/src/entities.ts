@@ -41,6 +41,12 @@ export interface Player {
    * like deletedAt — the row mapper always populates it; fixtures may omit it.
    */
   email?: string | null;
+  /**
+   * Self-reported at signup (A5): has this player trained at TPA before? Trusted, not
+   * verified. null for players created before A5. Surfaced to the admin for context when
+   * approving a trial (a "new" member who isn't). Optional — most paths don't read it.
+   */
+  trainedBefore?: boolean | null;
   name: string;
   gender: Gender;
   level: Level;
@@ -109,6 +115,8 @@ export interface CreditRequest {
   playerId: PlayerId;
   packageId: PackageId;
   paymentMethod: 'instapay' | 'cash';
+  /** True if this request is for the once-per-player trial package (A5). */
+  isTrial: boolean;
   /** Storage key of the uploaded proof screenshot in the private payment-proofs bucket; optional. */
   proofPath: string | null;
   status: CreditRequestStatus;

@@ -10,7 +10,7 @@
 -- Run with:  supabase test db
 -- ============================================================================
 begin;
-select plan(57);
+select plan(56);
 
 -- ── seed as postgres ─────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -81,7 +81,7 @@ select throws_ok(
 -- AS PLAYER B — the request-rejection reasons (B has no pending yet)
 -- ════════════════════════════════════════════════════════════════════════════
 select set_config('request.jwt.claims', '{"sub":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","role":"authenticated"}', true);
-select is(public.request_credits('pk_trl','cash',null)->>'reason', 'trial_not_sellable', 'cannot request a trial package');
+-- (trial is SELLABLE since A5 — the once-per-player trial rules live in a5_trial_test.)
 select is(public.request_credits('pk_off','instapay',null)->>'reason', 'package_inactive', 'cannot request a hidden/inactive package');
 select is(public.request_credits('pk_grp','venmo',null)->>'reason', 'invalid_payment_method', 'rejects an unknown payment method');
 select is(public.request_credits('pk_nope','cash',null)->>'reason', 'package_missing', 'rejects a missing package');

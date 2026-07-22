@@ -51,6 +51,7 @@ export default function ProfileSetupScreen() {
   const [gender, setGender] = useState<Gender | null>(null);
   const [level, setLevel] = useState<Level | null>(null);
   const [phone, setPhone] = useState('');
+  const [trainedBefore, setTrainedBefore] = useState<boolean | null>(null);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -60,7 +61,8 @@ export default function ProfileSetupScreen() {
   const passwordTooShort = isNewFlow && password.length > 0 && password.length < MIN_PASSWORD;
   const confirmMismatch = isNewFlow && confirm.length > 0 && confirm !== password;
   const passwordOk = !isNewFlow || (password.length >= MIN_PASSWORD && confirm === password);
-  const complete = name.trim().length > 0 && gender !== null && level !== null && passwordOk;
+  const complete =
+    name.trim().length > 0 && gender !== null && level !== null && trainedBefore !== null && passwordOk;
   const busy = submitting || leaving;
 
   const onCreate = async () => {
@@ -84,12 +86,12 @@ export default function ProfileSetupScreen() {
           return;
         }
       }
-      // complete_signup creates the player + grants the 2 trial credits atomically and stores
-      // the optional phone (normalised server-side). completeProfile never throws.
-      const res = await completeProfile({ name: name.trim(), gender, level, phone });
+      // complete_signup creates the player (A5: NO credits at signup) and stores the optional
+      // phone + the self-reported trained_before. completeProfile never throws.
+      const res = await completeProfile({ name: name.trim(), gender, level, phone, trainedBefore });
       if (res.ok) {
-        // Show the trial-grant celebration; the guard allows it for a ready user.
-        router.push('/(auth)/trial-grant');
+        // First-timers see the trial offer; returning members go straight into the app.
+        router.replace(trainedBefore === false ? '/(auth)/trial-grant' : '/(tabs)');
         return;
       }
       setError(
@@ -177,6 +179,31 @@ export default function ProfileSetupScreen() {
             </Pressable>
           );
         })}
+      </View>
+
+      <View style={styles.field}>
+        <Text variant="label">Have you trained at The Padel Academy before?</Text>
+        <View style={styles.genderRow}>
+          {[
+            { value: true, label: 'Yes' },
+            { value: false, label: 'No, I’m new' },
+          ].map((o) => {
+            const selected = trainedBefore === o.value;
+            return (
+              <Pressable
+                key={o.label}
+                onPress={() => setTrainedBefore(o.value)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                style={[styles.genderCard, selected && styles.selectedCard]}
+              >
+                <Text variant="body" weight="bold" tone={selected ? 'accent' : 'primary'}>
+                  {o.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
       <View style={styles.field}>

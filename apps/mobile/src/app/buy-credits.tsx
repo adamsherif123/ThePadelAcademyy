@@ -1,15 +1,25 @@
+import type { TrainingType } from '@tpa/types';
 import { space } from '@tpa/theme';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { PLAYER_COUNT, PURCHASABLE_TYPES, packagesByType } from '../data/catalog';
-import { usePackages } from '../data/queries';
+import { usePackages, useTrialEligible } from '../data/queries';
 import { ErrorView, IconRow, LoadingView, PackageRow, Screen, ScreenHeader, Text, TRAINING_META } from '../ui';
 
-/** 09 — Buy credits. Sections per purchasable training type; trial never appears. */
+/**
+ * 09 — Buy credits. Sections per training type. A5: the once-per-player trial appears at the
+ * top ONLY while the player is still eligible (never bought/requested one) and an active trial
+ * package exists; a player who has used their trial never sees it here.
+ */
 export default function BuyCreditsScreen() {
   const router = useRouter();
   const packagesQ = usePackages();
+  const trialEligibleQ = useTrialEligible();
+
+  const showTrial =
+    Boolean(trialEligibleQ.data) && packagesByType(packagesQ.data ?? [], 'trial').length > 0;
+  const sections: TrainingType[] = showTrial ? ['trial', ...PURCHASABLE_TYPES] : PURCHASABLE_TYPES;
 
   return (
     <Screen scroll contentContainerStyle={styles.content}>
@@ -23,7 +33,7 @@ export default function BuyCreditsScreen() {
         )
       ) : (
         <>
-          {PURCHASABLE_TYPES.map((type) => (
+          {sections.map((type) => (
             <View key={type} style={styles.section}>
               <IconRow
                 icon={TRAINING_META[type].icon}

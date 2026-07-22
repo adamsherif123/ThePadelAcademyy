@@ -72,10 +72,8 @@ check "email_has_account(A) → true, called unauthenticated with the anon key" 
 check "email_has_account(unknown) → false"                                     "$(anon_has "nobody@nowhere.eg")" "false"
 check "current_player_id() resolves via real auth.uid()" "$(db "select id from public.players where auth_user_id='$UID_A'")" "$PLID_A"
 
-# The 2 trial credits exist, read through RLS with A's own JWT.
-CB_A="$(rest_get "$TOK_A" "credit_batches?select=id,training_type,quantity_remaining,source")"
-check "A sees exactly 1 trial batch (their own)"     "$(echo "$CB_A" | jqf "len(d)")"                  "1"
-check "the batch is a 2-credit signup_grant trial"  "$(echo "$CB_A" | jqf "d[0]['quantity_remaining']==2 and d[0]['source']=='signup_grant' and d[0]['training_type']=='trial'")" "True"
+# A5: a brand-new player has ZERO credits at signup (the free trial grant was removed).
+check "A has ZERO credits at signup (A5 — no free trial grant)" "$(rest_get "$TOK_A" "credit_batches?select=id" | jqf "len(d)")" "0"
 
 echo "── Player B: a second real signup, for read isolation ──"
 read -r TOK_B UID_B <<<"$(signup "$EB" "$PW")"
@@ -84,21 +82,19 @@ PLID_B="$(echo "$RB" | jqf "d['player_id']")"
 check "B completes signup → ok"                 "$(echo "$RB" | jqf "d['ok']")" "True"
 
 # A cannot read B's wallet (RLS), even asking for it by id.
-check "A reading their own wallet still sees only 1 batch" "$(rest_get "$TOK_A" "credit_batches?select=id" | jqf "len(d)")" "1"
 check "A CANNOT read B's credit batches (RLS isolation)"   "$(rest_get "$TOK_A" "credit_batches?player_id=eq.$PLID_B&select=id" | jqf "len(d)")" "0"
 check "A CANNOT read B's player row (RLS isolation)"       "$(rest_get "$TOK_A" "players?id=eq.$PLID_B&select=id" | jqf "len(d)")" "0"
 
-echo "── book_slot on a trial slot, driven by A's real session ──"
+echo "── a zero-credit new player cannot book yet (A5: buy a trial first) ──"
 BK="$(rpc "$TOK_A" book_slot '{"p_slot_id":"sl_auth"}')"
-check "book_slot(sl_auth) as A → ok"           "$(echo "$BK" | jqf "d['ok']")" "True"
-check "the slot took one seat"                 "$(db "select booked_count from public.session_slots where id='sl_auth'")" "1"
-check "A spent one of the two trial credits"   "$(db "select quantity_remaining from public.credit_batches where player_id='$PLID_A'")" "1"
+check "book_slot as a zero-credit player → no_usable_credit" "$(echo "$BK" | jqf "d['reason']")" "no_usable_credit"
+check "the slot took NO seat"                                "$(db "select booked_count from public.session_slots where id='sl_auth'")" "0"
 
-echo "── idempotency: complete_signup twice is one player, one grant ──"
+echo "── idempotency: complete_signup twice is one player, still no credits ──"
 R2="$(rpc "$TOK_A" complete_signup '{"p_name":"Ignored","p_gender":"ladies","p_level":"intermediate"}')"
 check "second complete_signup(A) → already_completed" "$(echo "$R2" | jqf "d['already_completed']")" "True"
 check "still exactly ONE player for A's auth uid"     "$(db "select count(*) from public.players where auth_user_id='$UID_A'")" "1"
-check "still exactly ONE signup_grant for A"          "$(db "select count(*) from public.credit_batches where player_id='$PLID_A' and source='signup_grant'")" "1"
+check "still ZERO credits for A (no signup grant)"    "$(db "select count(*) from public.credit_batches where player_id='$PLID_A'")" "0"
 check "profile was NOT overwritten by the 2nd call"   "$(db "select gender from public.players where id='$PLID_A'")" "men"
 
 echo "── returning player: signInWithPassword re-establishes the session ──"

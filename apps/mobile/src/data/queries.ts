@@ -9,6 +9,7 @@ import {
   fetchCreditBatches,
   fetchMyCreditRequests,
   fetchNotifications,
+  trialEligibleRpc,
   fetchPackages,
   fetchPurchases,
   fetchSlots,
@@ -82,6 +83,10 @@ export const useNotifications = () =>
 /** The player's credit requests, newest first (A4) — the pending/resolved status shown in the wallet. */
 export const useMyCreditRequests = () =>
   toResource(useQuery({ queryKey: queryKeys.creditRequests, queryFn: fetchMyCreditRequests }));
+
+/** Whether the player can still buy the once-per-player trial (A5) — hides trial in the store. */
+export const useTrialEligible = () =>
+  toResource(useQuery({ queryKey: queryKeys.trialEligible, queryFn: trialEligibleRpc }));
 
 /** Mark one notification read (on tap / deep-link). read_at is the only writable column. */
 export function useMarkNotificationRead() {

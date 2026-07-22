@@ -6,7 +6,7 @@
 -- Run with:  supabase test db
 -- ============================================================================
 begin;
-select plan(31);
+select plan(28);
 
 -- ── seed as postgres ─────────────────────────────────────────────────────────
 -- A2: auth users sign up with EMAIL now (not phone). complete_signup no longer reads
@@ -54,21 +54,12 @@ select is((select gender||'/'||level||'/'||coalesce(phone, '<null>') from public
 -- A2.1: the email is set from the auth user (server-side, never a client argument)
 select is((select email from public.players where auth_user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
   'a@players.eg', 'complete_signup stored the email from the authenticated user');
--- exactly ONE player and ONE signup_grant of 2 trial credits, expiring in 30 days
+-- A5: exactly ONE player, and ZERO credits at signup (the 2-free-trial grant was removed).
 select is((select count(*)::int from public.players where auth_user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
   1, 'exactly ONE player for A''s auth user (auth_user_id UNIQUE)');
 select is((select count(*)::int from public.credit_batches c join public.players p on p.id = c.player_id
-           where p.auth_user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' and c.source = 'signup_grant'),
-  1, 'exactly ONE signup_grant (partial index → no double grant on the double call)');
-select is((select quantity_remaining from public.credit_batches c join public.players p on p.id = c.player_id
            where p.auth_user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
-  2, 'the grant is 2 trial credits');
-select is((select training_type from public.credit_batches c join public.players p on p.id = c.player_id
-           where p.auth_user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
-  'trial', 'the credits are trial credits');
-select is((select c.expires_at - c.created_at from public.credit_batches c join public.players p on p.id = c.player_id
-           where p.auth_user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
-  interval '30 days', 'trial credits expire in 30 days (tpa.credit_expiry — no extra time)');
+  0, 'A5: complete_signup mints ZERO credits at signup (no free trial grant)');
 
 -- ── complete_signup: profile validation (as V, who never gets a player) ─────
 select set_config('request.jwt.claims', '{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc","role":"authenticated"}', true);

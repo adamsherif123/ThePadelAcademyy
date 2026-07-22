@@ -95,7 +95,7 @@ select is((select amount from public.purchases where payment_method='cash'), 150
 select is((select coalesce(gateway_order_id,'')||coalesce(gateway_transaction_id,'') from public.purchases where payment_method='cash'), '', 'cash purchase carries no gateway refs');
 select is((select c.source from public.purchases p join public.credit_batches c on c.purchase_id=p.id where p.payment_method='cash'), 'purchase', 'cash credits are ordinary purchase-backed credits');
 select is((select c.quantity_remaining from public.purchases p join public.credit_batches c on c.purchase_id=p.id where p.payment_method='cash'), 4, 'cash mint grants the package session_count');
-select is(public.record_cash_purchase('pl_a','pk_trial',10000)->>'reason', 'trial_not_sellable', 'cash rejects a trial package (structurally unsellable)');
+select is(public.record_cash_purchase('pl_a','pk_trial',10000)->>'ok', 'true', 'cash CAN sell a trial package now (A5 — trial is a one-time purchasable package)');
 select is(public.record_cash_purchase('pl_a','pk_hidden',280000)->>'reason', 'package_inactive', 'cash rejects an INACTIVE package (not looser than the player path)');
 select is(public.record_cash_purchase('pl_a','pk_g4',0)->>'reason', 'amount_below_one', 'cash rejects amount < 1');
 select is(public.record_cash_purchase('pl_a','pk_nope',1)->>'reason', 'package_missing', 'cash rejects an unknown package');

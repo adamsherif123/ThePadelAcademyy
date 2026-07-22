@@ -1,51 +1,73 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { CREDIT_EXPIRY_DAYS, buildSignupGrant, formatInstantDate } from '@tpa/core';
+import { formatPiastres } from '@tpa/core';
 import { color, radius, space } from '@tpa/theme';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { useSession } from '../../session/SessionProvider';
-import { Button, NavyScreen, PillOnNavy, Text } from '../../ui';
+import { usePackages } from '../../data/queries';
+import { Button, LoadingView, NavyScreen, PillOnNavy, Text } from '../../ui';
 
 /**
- * 04 — Trial grant. The credit count comes from SIGNUP_TRIAL_CREDITS and the
- * expiry date from the built grant (buildSignupGrant + formatInstantDate) — never
- * hardcoded. The grant mirrors what complete_signup just minted server-side.
+ * A5 — repurposed from the old "2 free trial credits" celebration (those credits no longer
+ * exist) into the TRIAL OFFER shown to a FIRST-TIME player right after signup. It points them
+ * at the one-time discounted trial session and drops them into the request flow; "Maybe later"
+ * lands them in the app with zero credits (the wallet then nudges them to the trial / store).
+ * Returning members never see this — profile-setup routes them straight into the app.
  */
-export default function TrialGrantScreen() {
+export default function TrialOfferScreen() {
   const router = useRouter();
-  const { player, trialGrant, now } = useSession();
+  const packagesQ = usePackages();
+  const trial = (packagesQ.data ?? []).find((p) => p.trainingType === 'trial' && p.isActive);
 
-  // Fall back to a fresh grant if the user somehow arrives without one.
-  const grant = trialGrant ?? buildSignupGrant(player?.id ?? ('pl_guest' as never), now);
-  const count = grant.quantityTotal;
-  const validUntil = formatInstantDate(grant.expiresAt);
+  if (packagesQ.isPending) {
+    return (
+      <NavyScreen>
+        <LoadingView />
+      </NavyScreen>
+    );
+  }
 
   return (
     <NavyScreen>
       <View style={styles.content}>
         <View style={styles.center}>
           <View style={styles.giftCircle}>
-            <Ionicons name="gift" size={40} color={color.text.inverse} />
+            <Ionicons name="sparkles" size={38} color={color.text.inverse} />
           </View>
 
           <Text variant="label" style={styles.centered}>
-            Welcome to the Academy
+            Welcome to The Padel Academy
           </Text>
           <Text variant="display" tone="inverse" style={styles.centered}>
-            {`You've got ${count} free trial sessions`}
+            {trial ? 'Start with a trial session' : 'You’re all set'}
           </Text>
           <Text variant="body" tone="secondary" style={styles.centered}>
-            {`${count} Trial credits were added to your wallet. Use them to meet our coaches on court — they're valid until ${validUntil}.`}
+            {trial
+              ? 'Book your first session at a special one-time price. Pay by InstaPay or cash, report it, and the academy adds your credit once confirmed — one trial per player.'
+              : 'Browse our packages and request the credits you need to get on court.'}
           </Text>
 
-          <View style={styles.pills}>
-            <PillOnNavy label={`${count} × Trial credits`} icon="sparkles-outline" />
-            <PillOnNavy label={`Valid ${CREDIT_EXPIRY_DAYS} days`} icon="time-outline" />
-          </View>
+          {trial ? (
+            <View style={styles.pills}>
+              <PillOnNavy label={`Trial · ${formatPiastres(trial.price)}`} icon="sparkles-outline" />
+              <PillOnNavy label="One per player" icon="person-outline" />
+            </View>
+          ) : null}
         </View>
 
-        <Button label="Let's go" onPress={() => router.replace('/(tabs)')} />
+        <View style={styles.actions}>
+          {trial ? (
+            <Button
+              label="Get my trial session"
+              onPress={() =>
+                router.replace({ pathname: '/request-credits', params: { packageId: trial.id } })
+              }
+            />
+          ) : (
+            <Button label="Browse packages" onPress={() => router.replace('/buy-credits')} />
+          )}
+          <Button label="Maybe later" variant="ghost" onPress={() => router.replace('/(tabs)')} />
+        </View>
       </View>
     </NavyScreen>
   );
@@ -55,6 +77,7 @@ const styles = StyleSheet.create({
   content: { flex: 1, justifyContent: 'space-between' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: space.md },
   centered: { textAlign: 'center' },
+  actions: { gap: space.sm },
   giftCircle: {
     width: 84,
     height: 84,

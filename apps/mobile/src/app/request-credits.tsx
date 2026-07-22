@@ -43,7 +43,7 @@ const METHOD_BLURB: Record<Method, string> = {
 const REASON_COPY: Partial<Record<RequestCreditsReason, string>> = {
   package_inactive: 'This package is no longer available.',
   package_missing: 'This package is no longer available.',
-  trial_not_sellable: 'Trial credits can’t be purchased.',
+  trial_already_used: 'You’ve already used your one-time trial session.',
 };
 
 export default function RequestCreditsScreen() {

@@ -47,6 +47,7 @@ export const queryKeys = {
   purchases: ['purchases'] as const,
   notifications: ['notifications'] as const,
   creditRequests: ['creditRequests'] as const,
+  trialEligible: ['trialEligible'] as const,
 };
 
 /** What a booking/cancellation changes: the wallet, the player's bookings, and seat counts. */

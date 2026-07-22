@@ -24,10 +24,10 @@ import {
  * against the array-taking creditLiability, which no longer reads packages at all.
  */
 
-describe('trial is structurally unsellable', () => {
-  it('SELLABLE_TYPES never includes trial', () => {
-    expect(SELLABLE_TYPES).not.toContain('trial' as TrainingType);
-    expect([...SELLABLE_TYPES].sort()).toEqual(['duo', 'group', 'individual']);
+describe('trial is sellable (A5 — the one-time discounted trial package)', () => {
+  it('SELLABLE_TYPES includes trial alongside the standard types', () => {
+    expect(SELLABLE_TYPES).toContain('trial' as TrainingType);
+    expect([...SELLABLE_TYPES].sort()).toEqual(['duo', 'group', 'individual', 'trial']);
   });
 });
 

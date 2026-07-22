@@ -74,7 +74,7 @@ export function Packages() {
         <div>
           <p className={styles.footerTitle}>Need a custom bundle?</p>
           <p className={styles.footerBody}>
-            Trial credits are granted automatically at signup and are never sold.
+            The trial is a one-time discounted session a new player can buy once, ever.
           </p>
         </div>
         <Button icon={Plus} onClick={() => setEditing('new')}>

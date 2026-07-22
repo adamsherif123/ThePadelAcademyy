@@ -35,6 +35,7 @@ export function rowToPlayer(r: Row): Player {
     level: str(r.level) as Player['level'],
     createdAt: iso(r.created_at),
     deletedAt: nstr(r.deleted_at) as Player['deletedAt'],
+    trainedBefore: r.trained_before == null ? null : (r.trained_before as boolean),
   };
 }
 
@@ -65,6 +66,7 @@ export function rowToCreditRequest(r: Row): CreditRequest {
     playerId: str(r.player_id) as CreditRequest['playerId'],
     packageId: str(r.package_id) as CreditRequest['packageId'],
     paymentMethod: str(r.payment_method) as CreditRequest['paymentMethod'],
+    isTrial: bool(r.is_trial),
     proofPath: nstr(r.proof_path),
     status: str(r.status) as CreditRequest['status'],
     createdAt: iso(r.created_at),

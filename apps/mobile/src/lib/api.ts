@@ -309,9 +309,16 @@ export type RequestCreditsReason =
   | 'invalid_payment_method'
   | 'already_pending'
   | 'package_missing'
-  | 'trial_not_sellable'
+  | 'trial_already_used' // A5: the once-per-player trial has already been used
   | 'package_inactive'
   | 'invalid_proof_path';
+
+/** Can the signed-in player still buy the once-per-player trial? (A5 — hides trial in the store.) */
+export async function trialEligibleRpc(): Promise<boolean> {
+  const { data, error } = await supabase.rpc('trial_eligible');
+  if (error) throw new ApiError(`trial_eligible failed: ${error.message}`, error);
+  return Boolean(data);
+}
 
 export type RequestCreditsResult =
   | { ok: true; requestId: string }
@@ -363,6 +370,7 @@ export async function completeSignupRpc(draft: {
   gender: Gender;
   level: Level;
   phone?: string | null;
+  trainedBefore?: boolean | null;
 }): Promise<SignupRpcResult> {
   const d = (await callRpc('complete_signup', {
     p_name: draft.name,
@@ -370,6 +378,8 @@ export async function completeSignupRpc(draft: {
     p_level: draft.level,
     // Optional. The server normalises to +20 E.164 and rejects a duplicate/invalid number.
     p_phone: draft.phone?.trim() ? draft.phone.trim() : null,
+    // A5: self-reported new-vs-returning (trusted). null if unanswered.
+    p_trained_before: draft.trainedBefore ?? null,
   })) as Record<string, unknown>;
   if (d.ok) {
     return { ok: true, alreadyCompleted: Boolean(d.already_completed), playerId: d.player_id as string };

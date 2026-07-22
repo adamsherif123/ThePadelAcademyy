@@ -253,6 +253,36 @@ check "exactly ONE purchase per request (no double-mint)"      "$F_PURCH"    "$F
 check "exactly ONE purchase-backed batch per request"          "$F_BATCH"    "$F_K"
 check "total credits minted = K×8 (each request mints once)"   "$F_CREDITS"  "$((F_K*8))"
 
+# ── Scenario G: two concurrent approvals of a TRIAL request → exactly one (A5) ──
+# The once-per-player trial must hold under real parallelism: each player has ONE pending
+# trial request; two admins approve it at the same instant. The FOR UPDATE lock serialises
+# them (loser → already_resolved) and index B (one trial-purchase batch per player) is the
+# ultimate backstop — so exactly one trial credit is minted per player, never two.
+echo "Scenario G — two concurrent TRIAL approvals per player, once-per-player holds (K=20):"
+G_K=20
+GSETUP="insert into auth.users (id) values ('$(uuid 999)') on conflict do nothing;"
+GSETUP+="insert into public.admins (id,auth_user_id,display_name,created_at) values ('adr_f','$(uuid 999)','Adm',now()) on conflict (auth_user_id) do nothing;"
+GSETUP+="insert into public.packages (id,training_type,session_count,price,name,is_active) values ('pkr_gtrial','trial',1,50000,'GTrial',true);"
+for k in $(seq 1 $G_K); do
+  GSETUP+="insert into auth.users (id) values ('$(uuid $((600+k)))');"
+  GSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_g$k','+2010g55${k}','G','men','beginner',now(),'$(uuid $((600+k)))');"
+  GSETUP+="insert into public.credit_requests (id,player_id,package_id,payment_method,status,created_at,is_trial) values ('crg_$k','plr_g$k','pkr_gtrial','instapay','pending',now(),true);"
+done
+sql "$GSETUP" >/dev/null
+
+T=$(target 5)
+for k in $(seq 1 $G_K); do
+  racer_approve "$(uuid 999)" "crg_$k" "$T" "$TMP/g_a_$k.txt"
+  racer_approve "$(uuid 999)" "crg_$k" "$T" "$TMP/g_b_$k.txt"
+done
+wait
+G_BATCH=$(sql "select count(*) from public.credit_batches where player_id like 'plr_g%' and training_type='trial' and source='purchase'")
+G_CREDITS=$(sql "select coalesce(sum(quantity_total),0) from public.credit_batches where player_id like 'plr_g%'")
+G_PURCH=$(sql "select count(*) from public.purchases where player_id like 'plr_g%'")
+check "exactly ONE trial batch per player (K=$G_K, once-per-player under contention)" "$G_BATCH"   "$G_K"
+check "exactly ONE trial purchase per player (no double-mint)"                        "$G_PURCH"   "$G_K"
+check "total trial credits minted = K×1 (never two per player)"                       "$G_CREDITS" "$G_K"
+
 # ── teardown ─────────────────────────────────────────────────────────────────
 cleanup_rows
 echo
