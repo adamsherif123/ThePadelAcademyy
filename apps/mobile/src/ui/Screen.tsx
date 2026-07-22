@@ -46,7 +46,16 @@ export function Screen({
   const body = scroll ? (
     <ScrollView
       style={styles.flex}
+      // Keyboard-aware (the pattern, in one place). `keyboardShouldPersistTaps='handled'`
+      // means a tap on empty space dismisses the keyboard while a tap on a button still
+      // fires on the FIRST tap (no dead-button trap). `automaticallyAdjustKeyboardInsets`
+      // is the iOS built-in (RN ≥0.70): it insets the content by the keyboard height AND
+      // scrolls the focused input into view — so a low input (sign-in) or the last field of
+      // a long form (profile-setup) lifts clear, without reflowing the layout (branding
+      // doesn't jump). No-op when no keyboard is up. Android is covered by the window's
+      // adjustResize soft-input mode (app.json android.softwareKeyboardLayoutMode).
       keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
       contentContainerStyle={[
         padded ? styles.padded : null,
         contentContainerStyle,

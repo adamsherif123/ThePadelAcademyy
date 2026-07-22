@@ -8,10 +8,14 @@
     "scheme": "tpa",
     "userInterfaceStyle": "light",
     "ios": {
-      "bundleIdentifier": "com.thepadelacademy.app"
+      "bundleIdentifier": "com.thepadelacademy.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.thepadelacademy.app",
+      "softwareKeyboardLayoutMode": "resize",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#06122f",
