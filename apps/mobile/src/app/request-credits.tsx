@@ -8,6 +8,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { packageById } from '../data/catalog';
 import { usePackages } from '../data/queries';
 import { requestCreditsRpc, uploadProof, type RequestCreditsReason } from '../lib/api';
+import { resetTo, resetToTab } from '../lib/nav';
 import { queryClient, queryKeys } from '../lib/queryClient';
 import { useSession } from '../session/SessionProvider';
 import {
@@ -20,6 +21,7 @@ import {
   PillOnNavy,
   Screen,
   ScreenHeader,
+  SuccessView,
   Text,
   TRAINING_META,
 } from '../ui';
@@ -129,21 +131,28 @@ export default function RequestCreditsScreen() {
     }
   };
 
-  // ── Terminal states: submitted, or already-have-one-pending ──
+  // ── Terminal states: submitted, or already-have-one-pending. These END the flow, so the
+  // CTAs RESET the stack (a clean back path), never push onto the dead request flow.
   if (outcome) {
     const pending = outcome === 'already_pending';
     return (
-      <Screen scroll contentContainerStyle={styles.content}>
-        <ScreenHeader eyebrow="Add credits" title={pending ? 'Request Pending' : 'Request Submitted'} />
-        <Card>
-          <Text variant="h2">{pending ? 'You already have a request pending' : 'Thanks — request submitted'}</Text>
-          <Text variant="body" tone="secondary" style={styles.gap}>
-            {pending
-              ? 'You have a credit request awaiting the academy’s confirmation. You can track it in your wallet.'
-              : 'Your credits will be added once the academy confirms your payment — this isn’t instant. You’ll get a notification, and you can track the status in your wallet.'}
-          </Text>
-        </Card>
-        <Button label="Go to wallet" onPress={() => router.replace('/wallet')} />
+      <Screen>
+        <SuccessView
+          icon={pending ? 'time-outline' : 'checkmark'}
+          tone={pending ? 'accent' : 'success'}
+          eyebrow={pending ? 'Request pending' : 'Request submitted'}
+          title={pending ? 'You already have a request pending' : 'Thanks — request submitted'}
+          primary={{ label: 'Go to wallet', onPress: () => resetTo('/wallet') }}
+          secondary={{ label: 'Go home', onPress: () => resetToTab('/(tabs)') }}
+        >
+          <Card>
+            <Text variant="body" tone="secondary">
+              {pending
+                ? 'You have a credit request awaiting the academy’s confirmation. Track it in your wallet.'
+                : 'Your credits will be added once the academy confirms your payment — this isn’t instant. You’ll get a notification, and you can track the status in your wallet.'}
+            </Text>
+          </Card>
+        </SuccessView>
       </Screen>
     );
   }

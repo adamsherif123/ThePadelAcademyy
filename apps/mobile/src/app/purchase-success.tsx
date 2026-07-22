@@ -1,13 +1,14 @@
 import { formatInstantDate } from '@tpa/core';
 import { space } from '@tpa/theme';
 import { useQuery } from '@tanstack/react-query';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useBatches } from '../data/queries';
 import { balanceByType } from '../data/wallet';
 import { fetchPurchaseById } from '../lib/api';
+import { resetTo, resetToTab } from '../lib/nav';
 import { queryClient, queryKeys } from '../lib/queryClient';
 import { useSession } from '../session/SessionProvider';
 import {
@@ -43,7 +44,6 @@ const TIMEOUT_MS = 40_000;
  * decline screen, so correctness never depends on the redirect arriving.
  */
 export default function PurchaseSuccessScreen() {
-  const router = useRouter();
   const { player, now } = useSession();
   const { purchaseId, outcome } = useLocalSearchParams<{ purchaseId: string; outcome?: string }>();
   const knownDeclined = outcome === 'failure';
@@ -96,8 +96,8 @@ export default function PurchaseSuccessScreen() {
           icon="close-circle-outline"
           eyebrow="Payment declined"
           title="Payment didn't go through"
-          primary={{ label: 'Try again', onPress: () => router.replace('/buy-credits') }}
-          secondary={{ label: 'Done', onPress: () => router.replace('/(tabs)') }}
+          primary={{ label: 'Try again', onPress: () => resetTo('/buy-credits') }}
+          secondary={{ label: 'Done', onPress: () => resetToTab('/(tabs)') }}
         >
           <Card>
             <Text variant="body" tone="secondary">
@@ -121,8 +121,8 @@ export default function PurchaseSuccessScreen() {
           tone="success"
           eyebrow="Payment confirmed"
           title="Credits added"
-          primary={{ label: 'Go to Wallet', onPress: () => router.replace('/wallet') }}
-          secondary={{ label: 'Done', onPress: () => router.replace('/(tabs)') }}
+          primary={{ label: 'Go to Wallet', onPress: () => resetTo('/wallet') }}
+          secondary={{ label: 'Done', onPress: () => resetToTab('/(tabs)') }}
         >
           <Card>
             <View style={styles.head}>
@@ -154,8 +154,8 @@ export default function PurchaseSuccessScreen() {
           message="We haven't heard back from the payment provider yet. If your card was charged, your credits will appear in your wallet within a few minutes — you won't be charged twice."
         />
         <View style={styles.buttons}>
-          <Button label="Check my wallet" onPress={() => router.replace('/wallet')} />
-          <Button label="Done" variant="secondary" onPress={() => router.replace('/(tabs)')} />
+          <Button label="Check my wallet" onPress={() => resetTo('/wallet')} />
+          <Button label="Done" variant="secondary" onPress={() => resetToTab('/(tabs)')} />
         </View>
       </Screen>
     );

@@ -7,12 +7,13 @@ import {
 } from '@tpa/core';
 import { space } from '@tpa/theme';
 import type { BookingId } from '@tpa/types';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { coachById, slotById } from '../data/booking';
 import { useBatches, useBookings, useCoaches, useSlots, combine } from '../data/queries';
 import { balanceByType } from '../data/wallet';
+import { resetToTab } from '../lib/nav';
 import { useSession } from '../session/SessionProvider';
 import {
   ACADEMY,
@@ -30,7 +31,6 @@ import {
 
 /** 13 — Booked success. Shared SuccessView; every number computed from live data. */
 export default function BookedSuccessScreen() {
-  const router = useRouter();
   const { player, now } = useSession();
   const slotsQ = useSlots();
   const batchesQ = useBatches();
@@ -68,8 +68,8 @@ export default function BookedSuccessScreen() {
         tone="success"
         eyebrow={confirmed ? 'See you on court' : 'Your spot is saved'}
         title="You're booked"
-        primary={{ label: 'View my sessions', onPress: () => router.replace('/(tabs)/sessions') }}
-        secondary={{ label: 'Done', onPress: () => router.replace('/(tabs)') }}
+        primary={{ label: 'View my sessions', onPress: () => resetToTab('/(tabs)/sessions') }}
+        secondary={{ label: 'Done', onPress: () => resetToTab('/(tabs)') }}
       >
         <Card>
           <View style={styles.top}>
