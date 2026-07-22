@@ -103,7 +103,12 @@ export async function registerForPush(): Promise<PushRegistration> {
   try {
     const platform = pushPlatform();
     if (!platform) return { status: 'unavailable', reason: 'unsupported_platform' };
-    if (!Device.isDevice) return { status: 'unavailable', reason: 'simulator' };
+    // The iOS Simulator genuinely can't obtain an APNs token, so skip it. An Android
+    // emulator WITH Google Play services CAN receive FCM, so DON'T skip those — the old
+    // blanket `!Device.isDevice` guard was over-broad and would have silently prevented
+    // registration on any GMS Android emulator (dev) in production too. iOS-only now; a
+    // GMS-less Android emulator simply fails gracefully at getExpoPushTokenAsync below.
+    if (!Device.isDevice && platform === 'ios') return { status: 'unavailable', reason: 'simulator' };
 
     const N = await loadNotifications();
     if (!N) return { status: 'unavailable', reason: 'module_unavailable' };

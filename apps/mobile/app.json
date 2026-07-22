@@ -8,7 +8,6 @@
     "scheme": "tpa",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.thepadelacademy.app"
     },
     "android": {
