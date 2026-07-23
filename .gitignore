@@ -44,3 +44,5 @@ pnpm-debug.log*
 
 # generated design tokens (regenerated from @tpa/theme on dev/build)
 apps/admin/src/tokens.generated.css
+.vercel
+.env*.local
