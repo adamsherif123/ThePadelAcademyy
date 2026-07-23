@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s '__TRACKED_VAR__/rest/v1/session_slots?select=id&limit=1' -H 'apikey: __TRACKED_VAR__' -w '\\\\nhttp=%{http_code}\\\\n')",
+      "Bash(supabase config *)",
+      "Bash(echo \"rc=$?\")",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  }
+}
