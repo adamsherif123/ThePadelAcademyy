@@ -23,10 +23,7 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
@@ -53,7 +50,9 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "The Padel Academy uses your photos so you can attach a payment screenshot to a credit request."
+          "photosPermission": "The Padel Academy uses your photos so you can attach a payment screenshot to a credit request.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ]
     ],
