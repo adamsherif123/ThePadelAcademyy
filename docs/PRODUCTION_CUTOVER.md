@@ -103,13 +103,30 @@ patch, **not built yet** — flagged so it isn't forgotten. See `apps/admin/ADMI
   **mobile number `+201003487025`** (tap-to-copy). Fill in the payee **account name** in
   `apps/mobile/src/app/request-credits.tsx` (`INSTAPAY_PAYEE_NAME`) once Adam confirms it —
   until then it renders "confirming".
-- **Payments (Paymob is a flag flip)**: Paymob is mothballed behind `EXPO_PUBLIC_PAYMOB_ENABLED`
-  (OFF unless exactly `'true'`) — players currently pay out-of-band via the InstaPay/cash
-  request rail. To turn Paymob on at launch: switch Paymob from the test integration to the
-  **live account** (real creds via Edge Function secrets), verify **3DS on a real card**, THEN
-  set `EXPO_PUBLIC_PAYMOB_ENABLED=true` in the mobile build (EAS secret / `.env`) so the client
-  surfaces the checkout. Also confirm `create-checkout` billing works for email-signup players
-  who have no phone (A6 sends a placeholder `phone_number` — Paymob requires a non-empty one).
+- **Payments (Paymob is a flag flip) — deliberately DEFERRED at B2 launch**: the academy's
+  Paymob merchant account is **still test/unverified** — live-merchant creds don't exist yet
+  and will be *different values* from the test ones. B2 therefore shipped production with
+  **`PAYMOB_API_KEY` / `PAYMOB_INTEGRATION_ID` / `PAYMOB_IFRAME_ID` / `PAYMOB_HMAC`
+  deliberately UNSET** on the production Edge Functions — setting test creds in prod was
+  rejected on purpose, because it's exactly the kind of landmine that lets someone flip
+  `EXPO_PUBLIC_PAYMOB_ENABLED` later and transact real money against a test gateway. Players
+  pay out-of-band via the InstaPay/cash request rail in the meantime; `paymob-webhook` is
+  deployed but **inert** with no secrets and the flag off.
+
+  **The Paymob cutover, when live-merchant verification completes, is exactly this order:**
+  1. **Set secrets** — the four `PAYMOB_*` values from the now-verified live account,
+     `supabase secrets set …` against the **production** project (never the test values).
+  2. **Redeploy** `create-checkout` and `paymob-webhook` — secrets apply only on the *next*
+     deploy, so this step is not optional even though the code hasn't changed.
+  3. **Run the full 3-request webhook probe** (missing HMAC → 401/reject; bad HMAC →
+     401/reject; **valid HMAC over a nonexistent order** → clean 404/`not_found`, not a
+     crash) — this proves the *deployed* secret matches the *live* Paymob account. B2 only
+     ran probes 1–2 (no live secret existed to run probe 3 meaningfully); do all three now.
+  4. Verify **3DS on a real card** end-to-end.
+  5. **Only then** set `EXPO_PUBLIC_PAYMOB_ENABLED=true` in the mobile build (EAS secret) so
+     the client surfaces the checkout.
+  6. Confirm `create-checkout` billing for email-signup players with no phone (A6 sends a
+     placeholder `phone_number` — Paymob requires a non-empty one; already handled, re-verify).
 - **Icons / splash / store listings**: final art + store metadata.
 - **iOS push**: APNs key from the Apple account → `eas credentials` → iOS build. Android FCM
   (`google-services.json` + FCM key) for the mobile push proof.
