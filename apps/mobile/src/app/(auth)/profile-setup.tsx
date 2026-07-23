@@ -3,8 +3,9 @@ import { color, radius, space } from '@tpa/theme';
 import type { Gender, Level } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
+import { PRIVACY_POLICY_URL } from '../../lib/legal';
 import { useSession } from '../../session/SessionProvider';
 import { Button, GENDER_LABEL, InfoCard, Input, Screen, ScreenHeader, Text } from '../../ui';
 
@@ -270,6 +271,20 @@ export default function ProfileSetupScreen() {
           {isNewFlow
             ? 'Fill in all fields and choose a password to continue'
             : 'Fill in all three fields to continue'}
+        </Text>
+      ) : null}
+
+      {isNewFlow ? (
+        <Text variant="caption" tone="muted" style={styles.helper}>
+          By creating an account you agree to our{' '}
+          <Text
+            variant="caption"
+            tone="accent"
+            onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}
+          >
+            Privacy Policy
+          </Text>
+          .
         </Text>
       ) : null}
 

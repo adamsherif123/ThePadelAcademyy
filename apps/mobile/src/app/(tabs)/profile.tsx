@@ -1,10 +1,11 @@
 import { space } from '@tpa/theme';
 import { useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Linking, StyleSheet, View } from 'react-native';
 
 import { playerPurchases } from '../../data/purchases';
 import { useBatches, useCoaches, usePurchases, combine } from '../../data/queries';
 import { totalReadyToBook } from '../../data/wallet';
+import { PRIVACY_POLICY_URL } from '../../lib/legal';
 import { useSession } from '../../session/SessionProvider';
 import {
   AcademyCard,
@@ -106,6 +107,15 @@ export default function ProfileScreen() {
         size="sm"
         onPress={() => router.push('/delete-account')}
       />
+
+      <Text
+        variant="caption"
+        tone="muted"
+        style={styles.privacyLink}
+        onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}
+      >
+        Privacy Policy
+      </Text>
     </Screen>
   );
 }
@@ -117,4 +127,5 @@ const styles = StyleSheet.create({
   tags: { flexDirection: 'row', gap: space.sm, marginTop: space.md },
   links: { gap: space.md },
   section: { gap: space.sm },
+  privacyLink: { textAlign: 'center', marginTop: space.xs },
 });

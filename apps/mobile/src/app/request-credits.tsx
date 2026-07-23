@@ -47,9 +47,7 @@ const METHOD_BLURB: Record<Method, string> = {
 // copyable so a player never retypes it (and never sends money to a stranger).
 const INSTAPAY_PHONE = '+201003487025';
 // The registered account name, shown so the player can confirm the payee before sending.
-// Adam is confirming this with the bank; until it arrives the slot renders as "confirming".
-// Set this string (e.g. 'The Padel Academy') the moment the name is known.
-const INSTAPAY_PAYEE_NAME: string | null = null;
+const INSTAPAY_PAYEE_NAME: string | null = 'Aly Hisham Salem';
 
 const REASON_COPY: Partial<Record<RequestCreditsReason, string>> = {
   package_inactive: 'This package is no longer available.',

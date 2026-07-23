@@ -1,0 +1,110 @@
+/* Shared styling for the public legal pages (privacy.html, delete-account.html).
+   Plain, self-hosted, no external fonts/CDN — these pages must render correctly
+   even to a cold, offline-cache-only crawler or a store reviewer with a locked-down
+   browser profile. */
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: #1a1a2e;
+  background: #f4f5f8;
+  line-height: 1.6;
+}
+
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 48px 24px 96px;
+}
+
+header.banner {
+  background: #06122f;
+  color: #ffffff;
+  padding: 32px 24px;
+  text-align: center;
+}
+
+header.banner .eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 13px;
+  color: #9db4e0;
+  margin: 0 0 6px;
+}
+
+header.banner h1 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.updated {
+  color: #5a5a6e;
+  font-size: 14px;
+  margin-bottom: 32px;
+}
+
+h2 {
+  font-size: 20px;
+  margin-top: 40px;
+  border-bottom: 2px solid #e3e6ee;
+  padding-bottom: 8px;
+}
+
+h3 {
+  font-size: 16px;
+  margin-top: 24px;
+}
+
+p, li {
+  font-size: 15px;
+}
+
+ul {
+  padding-left: 22px;
+}
+
+li {
+  margin-bottom: 8px;
+}
+
+a {
+  color: #1d4ed8;
+}
+
+.callout {
+  background: #ffffff;
+  border: 1px solid #e3e6ee;
+  border-left: 4px solid #06122f;
+  border-radius: 6px;
+  padding: 16px 20px;
+  margin: 20px 0;
+}
+
+.contact-box {
+  background: #ffffff;
+  border: 1px solid #e3e6ee;
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 12px;
+}
+
+.contact-box strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+footer.page-footer {
+  margin-top: 56px;
+  padding-top: 20px;
+  border-top: 1px solid #e3e6ee;
+  font-size: 13px;
+  color: #5a5a6e;
+}
+
+footer.page-footer a {
+  color: #5a5a6e;
+}

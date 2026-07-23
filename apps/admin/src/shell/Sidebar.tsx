@@ -66,6 +66,13 @@ export function Sidebar() {
           </button>
         </div>
       ) : null}
+
+      {/* A plain <a>, not react-router's <Link>: /privacy.html is a static file
+          (apps/admin/public/), not a defined Route — Link would be caught by App.tsx's
+          client-side wildcard and redirected to /dashboard instead of ever reaching it. */}
+      <a href="/privacy.html" target="_blank" rel="noreferrer" className={styles.footerLink}>
+        Privacy Policy
+      </a>
     </aside>
   );
 }

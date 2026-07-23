@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Privacy Policy — The Padel Academy</title>
+<link rel="icon" type="image/png" href="/favicon.png" />
+<link rel="stylesheet" href="/legal.css" />
+<!--
+  TODO(Adam) before this page goes live:
+  1. Replace every occurrence of "privacy@thepadelacademy.eg" below with the academy's
+     real, monitored contact inbox — this file currently uses a placeholder, not a
+     confirmed address.
+  2. This is a factual description of what the app's code actually does, written by
+     the engineering team — it is NOT a substitute for legal review. If you want legal
+     assurance (especially around Egyptian and/or EU data-protection law), have a
+     lawyer review it before relying on it for compliance.
+-->
+</head>
+<body>
+  <header class="banner">
+    <p class="eyebrow">The Padel Academy</p>
+    <h1>Privacy Policy</h1>
+  </header>
+  <div class="page">
+    <p class="updated">Last updated: 23 July 2026</p>
+
+    <p>
+      This page describes what information The Padel Academy's mobile app and admin
+      tools collect, why, who it's shared with, and how you can delete your account.
+      It's written to describe exactly what our systems do — plainly, not in legal
+      boilerplate.
+    </p>
+
+    <h2>Information we collect</h2>
+
+    <h3>Account &amp; profile</h3>
+    <ul>
+      <li>Your name, email address, and the password you choose (your password is
+        handled entirely by our authentication provider, Supabase — our own systems
+        never see or store it in readable form).</li>
+      <li>An optional phone number, if you choose to add one.</li>
+      <li>Your group category and skill level, which we use to place you into the
+        right group training sessions.</li>
+      <li>Whether you've trained with the academy before — a single yes/no you tell us
+        at signup, used to tailor your first-session experience.</li>
+    </ul>
+
+    <h3>Bookings, credits &amp; payments</h3>
+    <ul>
+      <li>Which sessions you book or cancel, and your attendance record.</li>
+      <li>Your session-credit balance and purchase history — the packages you've
+        bought or been granted, and how many credits you have left.</li>
+      <li>If you report an InstaPay transfer or a cash payment for a package, we
+        record the payment method and, if you choose to attach one, a screenshot of
+        your transfer as proof. That screenshot is stored privately — only you and
+        academy staff can view it, never the public.</li>
+      <li><strong>Card payments are not processed in the app today.</strong> All
+        purchases currently go through the InstaPay/cash reporting flow above,
+        confirmed manually by academy staff. If online card payment is enabled in the
+        future, it will run through Paymob, a PCI-DSS-compliant payment gateway — your
+        card number is entered directly with Paymob and never reaches our servers; we
+        would only store the payment amount and Paymob's own reference numbers for
+        that transaction.</li>
+    </ul>
+
+    <h3>Push notifications</h3>
+    <p>
+      If you allow notifications, we store a device token used only to deliver you
+      updates — for example, that your session is confirmed or that credits were added
+      to your account. That token, along with the notification's text, is passed to
+      Expo's push-delivery service, which relays it to Apple (APNs) or Google (FCM)
+      depending on your device. We don't send your name, email, or any other account
+      details through this channel.
+    </p>
+
+    <h3>Coach information</h3>
+    <p>
+      Coach names, bios, and photos are provided by the academy and shown to every
+      player in the app. This is business information about our staff, not data we
+      collect from you.
+    </p>
+
+    <h2>Why we collect it</h2>
+    <ul>
+      <li>To create and secure your account.</li>
+      <li>To place you in group sessions that match your category and level.</li>
+      <li>To track your bookings and credit balance so you and the academy both know
+        what you can book.</li>
+      <li>To let you report an out-of-band payment and let academy staff confirm it.</li>
+      <li>To send you timely updates about your sessions and credits.</li>
+      <li>To keep the basic financial records a training business needs to keep.</li>
+    </ul>
+
+    <h2>Who we share it with</h2>
+    <ul>
+      <li><strong>Supabase</strong> — our database, authentication, file storage, and
+        backend hosting provider. All the information above is hosted on our behalf on
+        their infrastructure.</li>
+      <li><strong>Expo, Apple (APNs), and Google (FCM)</strong> — deliver push
+        notifications. They receive only your device's push token and the
+        notification's text, described above.</li>
+      <li><strong>Paymob</strong> — only if and when online card payment is turned on
+        (it is not active today). When active, it receives your name, a phone number,
+        and the payment amount to process a transaction — never your email or
+        password.</li>
+      <li><strong>Sentry</strong> — if our team enables crash and error monitoring,
+        technical diagnostic reports (such as what caused an app crash) are sent there
+        to help us fix bugs. We don't deliberately include your personal details in
+        these reports.</li>
+    </ul>
+    <p>We do not sell your data, and we do not share it with advertisers.</p>
+
+    <h2>How long we keep it</h2>
+    <p>
+      We keep your booking, credit, and purchase records for as long as your account
+      is active, and afterward for as long as needed for the academy's financial
+      recordkeeping. A payment-proof screenshot is kept for as long as it's relevant to
+      the request it was attached to.
+    </p>
+
+    <h2>Deleting your account</h2>
+    <p>
+      You can permanently delete your account at any time from inside the app. See our
+      <a href="/delete-account.html">Account Deletion</a> page for exactly what happens
+      and how, including a manual option if you've uninstalled the app or can't sign
+      in.
+    </p>
+
+    <h2>Your choices</h2>
+    <ul>
+      <li>Notifications are optional — you can decline them and still use every other
+        part of the app.</li>
+      <li>A phone number is optional at signup.</li>
+      <li>Attaching a payment screenshot is optional for cash payments (and helps
+        confirmation go faster for InstaPay).</li>
+    </ul>
+
+    <h2>Changes to this policy</h2>
+    <p>
+      We may update this page from time to time as the app changes. The "last updated"
+      date at the top reflects the latest version.
+    </p>
+
+    <h2>Contact us</h2>
+    <div class="contact-box">
+      <strong>The Padel Academy</strong>
+      Questions about this policy or your data: <a href="mailto:privacy@thepadelacademy.eg">privacy@thepadelacademy.eg</a>
+    </div>
+
+    <footer class="page-footer">
+      <a href="/delete-account.html">Account Deletion</a>
+    </footer>
+  </div>
+</body>
+</html>

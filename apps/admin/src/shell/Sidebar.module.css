@@ -91,3 +91,16 @@
   background: var(--color-pillOnInverse-bg);
   color: var(--color-text-inverse);
 }
+
+.footerLink {
+  display: block;
+  margin-block-start: var(--space-md);
+  padding-inline: var(--space-md);
+  color: var(--color-pillOnInverse-text);
+  font-size: var(--font-size-micro);
+  text-decoration: none;
+}
+.footerLink:hover {
+  color: var(--color-text-inverse);
+  text-decoration: underline;
+}
