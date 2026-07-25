@@ -426,6 +426,46 @@ check "exactly one racer books (capacity 1)"    "$J_WINS" "1"
 check "booked_count = 1 (no oversell)"          "$(sql "select booked_count from public.session_slots where id='slr_j'")" "1"
 check "training_type set to 'duo' by the winner" "$(sql "select training_type from public.session_slots where id='slr_j'")" "duo"
 
+# ── Scenario K: MIXED-GENDER racers, SAME type ('group'), racing one untyped
+# capacity-4 slot — the gender TOCTOU fix. Before the fix, the guarded WHERE
+# re-checked only type + capacity, never gender: the peek-time gender gate
+# reads the unlocked pre-image (still null for everyone racing an untyped
+# slot), so a men racer and a ladies racer could BOTH pass their own peek and
+# then both seat, gated only by capacity — mixing genders in what becomes a
+# single-gender 'group' slot. The fix adds gender to the guarded WHERE too
+# (mirroring the type clause exactly): whichever gender's racer commits first
+# fixes slr_k's gender; the OTHER gender's racers re-evaluate against the
+# now-committed gender and lose cleanly.
+echo "Scenario K — mixed-gender racers, SAME type (group), one untyped capacity-4 slot (gender TOCTOU fix):"
+KSETUP="insert into public.coaches (id,name,bio,is_active) values ('cor_k','C','b',true);"
+KSETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status) values ('slr_k','cor_k',now()+interval '1 day',now()+interval '1 day 1 hour',null,4,0,'published');"
+for k in $(seq 1 4); do
+  KSETUP+="insert into auth.users (id) values ('$(uuid $((740+k)))');"
+  KSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_kl$k','+2010k4${k}','KL','ladies','beginner',now(),'$(uuid $((740+k)))');"
+  KSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_kl$k','plr_kl$k','signup_grant',null,'group',1,1,now()+interval '30 day',now());"
+  KSETUP+="insert into auth.users (id) values ('$(uuid $((760+k)))');"
+  KSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_km$k','+2010k6${k}','KM','men','beginner',now(),'$(uuid $((760+k)))');"
+  KSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_km$k','plr_km$k','signup_grant',null,'group',1,1,now()+interval '30 day',now());"
+done
+sql "$KSETUP" >/dev/null
+
+T=$(target 4)
+for k in $(seq 1 4); do
+  racer_book_typed "$(uuid $((740+k)))" slr_k group "$T" "$TMP/k_l_$k.txt"
+  racer_book_typed "$(uuid $((760+k)))" slr_k group "$T" "$TMP/k_m_$k.txt"
+done
+wait
+K_WINS=$(grep -lFx WIN "$TMP"/k_*.txt 2>/dev/null | wc -l | tr -d ' ')
+K_GENDER_MISMATCH=$(grep -lFx gender_mismatch "$TMP"/k_*.txt 2>/dev/null | wc -l | tr -d ' ')
+K_GENDER=$(sql "select gender from public.session_slots where id='slr_k'")
+K_COUNT=$(sql "select booked_count from public.session_slots where id='slr_k'")
+K_MIXED=$(sql "select count(distinct p.gender) from public.bookings b join public.players p on p.id=b.player_id where b.slot_id='slr_k' and b.status='booked'")
+check "exactly one gender cohort wins all 4 seats (no oversell within the winner)" "$K_WINS" "4"
+check "the other gender's 4 racers all get a clean gender_mismatch"              "$K_GENDER_MISMATCH" "4"
+check "booked_count = 4"                                                         "$K_COUNT" "4"
+check "slot ends with a recorded gender (either ladies or men, never null)"      "$([ -n "$K_GENDER" ] && echo yes || echo no)" "yes"
+check "every seated booking is the SAME gender — no mixed-gender group (the TOCTOU this fixes)" "$K_MIXED" "1"
+
 # ── teardown ─────────────────────────────────────────────────────────────────
 cleanup_rows
 echo

@@ -285,7 +285,7 @@ export function SlotModal({
     return (
       <Modal open onClose={onClose} eyebrow={title} title="Add a player" footer={<Button variant="secondary" icon={ArrowLeft} onClick={() => setView({ k: 'main' })}>Back to session</Button>}>
         <p className={styles.addHint}>
-          Record a WhatsApp or phone booking. Gender/level can be overridden; players with no usable
+          Record a WhatsApp or phone booking. Gender can be overridden; players with no usable
           credit must be granted credit first (Players).
         </p>
         {actionError ? (
