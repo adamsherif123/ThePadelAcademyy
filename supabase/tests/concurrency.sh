@@ -81,6 +81,17 @@ racer_cancel_own() { # $1=player_uuid $2=booking_id $3=target_iso $4=outfile
     > "$4" 2>&1 &
 }
 
+# A racer that deletes a player's OWN account (for the delete_account-vs-
+# cancel_booking race on the SAME booking).
+racer_delete_account() { # $1=player_uuid $2=target_iso $3=outfile
+  "${PSQL[@]}" \
+    -c "set role authenticated" \
+    -c "select set_config('request.jwt.claims', '{\"sub\":\"$1\",\"role\":\"authenticated\"}', false)" \
+    -c "select pg_sleep(greatest(0, extract(epoch from (timestamptz '$2' - clock_timestamp()))))" \
+    -c "select public.delete_account()->>'ok'" \
+    > "$3" 2>&1 &
+}
+
 # A one-off, non-raced call as a given player — used to set up pre-race state
 # (e.g. Scenario H's "X already booked" precondition) without contention.
 call_as() { # $1=uuid $2=sql
@@ -465,6 +476,54 @@ check "the other gender's 4 racers all get a clean gender_mismatch"             
 check "booked_count = 4"                                                         "$K_COUNT" "4"
 check "slot ends with a recorded gender (either ladies or men, never null)"      "$([ -n "$K_GENDER" ] && echo yes || echo no)" "yes"
 check "every seated booking is the SAME gender — no mixed-gender group (the TOCTOU this fixes)" "$K_MIXED" "1"
+
+# ── Scenario L: delete_account racing cancel_booking on the SAME booking, on a
+# slot with a SECOND live booker (the delete_account residual fix). Before the
+# fix, delete_account's cursor (FOR UPDATE OF s — only the slot is locked, not
+# bookings) could deliver a booking row whose 'booked' status came from a
+# STALE snapshot: EvalPlanQual re-fetches only the locked table, so a
+# concurrent cancel_booking that already flipped this exact booking to
+# 'cancelled' was invisible to the cursor's WHERE clause, and the old code
+# called tpa.free_slot_seat unconditionally — freeing a seat (and, if it
+# looked like the last one, reverting the slot) even though a SECOND player
+# (Y) still holds a genuinely live booking on it. The fix makes the guarded
+# booking-cancel UPDATE the arbiter (a fresh, live read, never the stale
+# cursor snapshot) — only free the seat if THIS transaction's own cancel
+# actually landed. Invariants: booked_count always equals live bookings; the
+# slot NEVER reverts while Y's booking is still live; Y is completely
+# untouched; X's credit ends refunded-once or not-at-all, never double.
+echo "Scenario L — delete_account racing cancel_booking on the SAME booking, slot has a 2nd live booker (K=20):"
+L_K=20
+LSETUP=""
+for k in $(seq 1 $L_K); do
+  LSETUP+="insert into public.coaches (id,name,bio,is_active) values ('cor_l$k','C','b',true);"
+  LSETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,gender,level,set_by_booking_at,status) values ('slr_l$k','cor_l$k',now()+interval '5 hour',now()+interval '6 hour','group',4,2,'men','beginner',now(),'published');"
+  LSETUP+="insert into auth.users (id) values ('$(uuid $((900+k)))'),('$(uuid $((950+k)))');"
+  LSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_lx$k','+2010l9${k}','LX','men','beginner',now(),'$(uuid $((900+k)))'),('plr_ly$k','+2010l5${k}','LY','men','beginner',now(),'$(uuid $((950+k)))');"
+  LSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_lx$k','plr_lx$k','signup_grant',null,'group',1,0,now()+interval '30 day',now()),('cbr_ly$k','plr_ly$k','signup_grant',null,'group',1,0,now()+interval '30 day',now());"
+  LSETUP+="insert into public.bookings (id,slot_id,player_id,credit_batch_id,status,booked_at) values ('bkr_lx$k','slr_l$k','plr_lx$k','cbr_lx$k','booked',now()),('bkr_ly$k','slr_l$k','plr_ly$k','cbr_ly$k','booked',now());"
+done
+sql "$LSETUP" >/dev/null
+
+T=$(target 4)
+for k in $(seq 1 $L_K); do
+  racer_cancel_own       "$(uuid $((900+k)))" "bkr_lx$k" "$T" "$TMP/l_cxl_$k.txt"
+  racer_delete_account   "$(uuid $((900+k)))"            "$T" "$TMP/l_del_$k.txt"
+done
+wait
+
+L_DRIFT=$(sql "select count(*) from public.session_slots s where id like 'slr_l%' and booked_count <> (select count(*) from public.bookings b where b.slot_id=s.id and b.status='booked')")
+L_REVERTED=$(sql "select count(*) from public.session_slots where id like 'slr_l%' and training_type is null")
+L_Y_TOUCHED=$(sql "select count(*) from public.bookings where id like 'bkr_ly%' and status <> 'booked'")
+L_X_LIVE=$(sql "select count(*) from public.bookings where id like 'bkr_lx%' and status = 'booked'")
+L_CREDIT_BAD=$(sql "select count(*) from public.credit_batches where id like 'cbr_lx%' and quantity_remaining not in (0,1)")
+L_DEADLOCK=$(grep -rl "deadlock detected" "$TMP"/l_*.txt 2>/dev/null | wc -l | tr -d ' ')
+check "booked_count never drifts from live bookings (no spurious free)"       "$L_DRIFT"      "0"
+check "slot NEVER reverts while Y's booking is still live"                    "$L_REVERTED"   "0"
+check "Y's booking is completely untouched (still booked)"                    "$L_Y_TOUCHED"  "0"
+check "X's booking always ends cancelled (exactly one racer's cancel lands)"  "$L_X_LIVE"     "0"
+check "X's credit ends refunded-once(1) or not-at-all(0), never double"       "$L_CREDIT_BAD" "0"
+check "zero deadlocks"                                                        "$L_DEADLOCK"   "0"
 
 # ── teardown ─────────────────────────────────────────────────────────────────
 cleanup_rows

@@ -17,7 +17,7 @@
 -- Run with:  supabase test db  (alongside rpc_test.sql / rpc_admin_test.sql)
 -- ============================================================================
 begin;
-select plan(71);
+select plan(79);
 
 -- ── seed as postgres (RLS bypassed; constraints still apply) ─────────────────
 insert into auth.users (id) values
@@ -343,6 +343,46 @@ create temporary table tmp_ots_verdict_n as select public.admin_book_player('sl_
 select is((select v->>'ok' from tmp_ots_verdict_n), 'true', 'admin books N (men) onto the now-ladies-recorded sl_ots_ov with override=true — a genuine mismatch, seated anyway');
 select is((select v->>'overridden' from tmp_ots_verdict_n), 'true', 'overridden=TRUE — override was genuinely needed this time (a real gender mismatch existed)');
 drop table tmp_ots_verdict_n;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 10) THE DELETE_ACCOUNT RACE RESIDUAL — deterministic single-session proof of
+--     the "lost race" branch (mirrors concurrency.sh's real Scenario L): O's
+--     booking is ALREADY cancelled (simulating a concurrent cancel_booking
+--     having already won) by the time delete_account runs for her. It must
+--     skip the seat-free entirely — not double-decrement booked_count, not
+--     wrongly revert a slot where P's booking is still live.
+-- ════════════════════════════════════════════════════════════════════════════
+reset role;
+insert into auth.users (id) values ('17171717-1717-1717-1717-171717171717'), ('18181818-1818-1818-1818-181818181818');
+insert into public.players (id, phone, name, gender, level, created_at, auth_user_id) values
+  ('pl_ots_o', '+201900000015', 'OtsO', 'men', 'beginner', now(), '17171717-1717-1717-1717-171717171717'),
+  ('pl_ots_p', '+201900000016', 'OtsP', 'men', 'beginner', now(), '18181818-1818-1818-1818-181818181818');
+insert into public.coaches (id, name, bio, is_active) values ('co_ots_da2','C','b',true);
+insert into public.session_slots (id, coach_id, starts_at, ends_at, training_type, capacity, booked_count, gender, level, set_by_booking_at, status) values
+  ('sl_ots_da2', 'co_ots_da2', now()+interval '5 hour', now()+interval '6 hour', 'group', 4, 2, 'men', 'beginner', now(), 'published');
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
+  ('cb_ots_o_grp', 'pl_ots_o', 'signup_grant', null, 'group', 1, 0, now()+interval '30 day', now()),
+  ('cb_ots_p_grp', 'pl_ots_p', 'signup_grant', null, 'group', 1, 0, now()+interval '30 day', now());
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at) values
+  ('bk_ots_o', 'sl_ots_da2', 'pl_ots_o', 'cb_ots_o_grp', 'booked', now()),
+  ('bk_ots_p', 'sl_ots_da2', 'pl_ots_p', 'cb_ots_p_grp', 'booked', now());
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"17171717-1717-1717-1717-171717171717","role":"authenticated"}', true);
+-- O cancels her OWN booking first — simulates the concurrent cancel_booking
+-- having already WON the race before delete_account's loop reaches it.
+select is(public.cancel_booking('bk_ots_o')->>'ok', 'true', 'O cancels her own booking on sl_ots_da2 BEFORE delete_account runs (simulates the winning racer)');
+select is((select booked_count from public.session_slots where id='sl_ots_da2'), 1, 'sl_ots_da2 booked_count correctly down to 1 (P remains) via the ordinary cancel_booking path');
+select is((select training_type from public.session_slots where id='sl_ots_da2'), 'group', 'sl_ots_da2 stays typed — P is still booked, so it does not revert');
+
+-- O now deletes her account. Her booking is ALREADY cancelled — delete_account's
+-- loop must find zero rows on the guarded booking-cancel and skip the seat-free.
+select is(public.delete_account()->>'ok', 'true', 'O deletes her account after her booking was already cancelled');
+reset role;
+select is((select booked_count from public.session_slots where id='sl_ots_da2'), 1, 'booked_count UNCHANGED by delete_account (1) — NOT double-decremented to 0');
+select is((select training_type from public.session_slots where id='sl_ots_da2'), 'group', 'training_type UNCHANGED — delete_account did NOT wrongly revert a slot where P is still live');
+select is((select status from public.bookings where id='bk_ots_p'), 'booked', 'P''s booking is completely untouched');
+select is((select name from public.players where id='pl_ots_o'), 'Deleted player', 'O''s player row is still anonymised regardless — that part of delete_account is unconditional');
 
 select * from finish();
 rollback;
