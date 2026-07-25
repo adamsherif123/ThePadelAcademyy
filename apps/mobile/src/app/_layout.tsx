@@ -91,7 +91,6 @@ function RootNavigator() {
         <Stack.Screen name="purchase-history" />
         <Stack.Screen name="notifications" />
         <Stack.Screen name="delete-account" />
-        <Stack.Screen name="gallery" options={{ headerShown: true, title: 'Gallery (dev)', presentation: 'modal' }} />
       </Stack>
       {/* Registers the push token, keeps the feed live, and routes tapped pushes
           (incl. cold start). No-ops until a player is ready; renders nothing. */}

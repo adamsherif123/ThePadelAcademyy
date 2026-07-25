@@ -91,7 +91,7 @@ export default function SignInScreen() {
         />
         <Button label={checking ? 'Checking…' : 'Continue'} onPress={onContinue} disabled={checking} />
         <Text variant="caption" tone="muted" style={styles.helper}>
-          New players get 2 free trial sessions. You&apos;ll set a password next.
+          You&apos;ll set a password next.
         </Text>
       </View>
     </NavyScreen>

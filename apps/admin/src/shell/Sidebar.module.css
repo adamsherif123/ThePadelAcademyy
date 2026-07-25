@@ -46,6 +46,22 @@
   font-weight: var(--font-weight-bold);
 }
 
+.navBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding-inline: 5px;
+  margin-inline-start: auto;
+  border-radius: var(--radius-pill);
+  background: var(--color-status-danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
 .user {
   display: flex;
   align-items: center;

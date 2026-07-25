@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { PLAYER_COUNT, packageById, packageIncludes, perSessionPiastres } from '../../data/catalog';
-import { usePackages } from '../../data/queries';
+import { usePackages, useTrialEligible } from '../../data/queries';
 import { PAYMOB_ENABLED } from '../../lib/featureFlags';
 import {
   Button,
@@ -27,6 +27,7 @@ export default function PackageDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const packagesQ = usePackages();
+  const trialEligibleQ = useTrialEligible();
 
   if (packagesQ.isPending || packagesQ.isError) {
     return (
@@ -50,6 +51,22 @@ export default function PackageDetailScreen() {
     );
   }
 
+  const isTrial = pkg.trainingType === 'trial';
+
+  // A package's own listing (buy-credits, home) already hides the trial from an ineligible
+  // player, but this screen is reachable directly by id (a stale link, a share, a bookmark),
+  // so it needs its own trial_eligible() check — "no trial-purchase option anywhere" means
+  // here too, not just in the lists that lead here.
+  if (isTrial && trialEligibleQ.isPending) {
+    return (
+      <Screen>
+        <ScreenHeader eyebrow="Session bundles" title="Package Details" onBack={() => router.back()} />
+        <LoadingView />
+      </Screen>
+    );
+  }
+  const trialBlocked = isTrial && !trialEligibleQ.data;
+
   const meta = TRAINING_META[pkg.trainingType];
   const perSession = perSessionPiastres(pkg) as Piastres;
 
@@ -58,7 +75,9 @@ export default function PackageDetailScreen() {
       scroll
       contentContainerStyle={styles.content}
       footer={
-        // Paymob is off (mothballed): route to the report-a-payment request flow. When the
+        trialBlocked ? (
+          <Button label="Browse other packages" onPress={() => router.replace('/buy-credits')} />
+        ) : // Paymob is off (mothballed): route to the report-a-payment request flow. When the
         // flag is flipped on, the original Paymob checkout journey returns unchanged.
         PAYMOB_ENABLED ? (
           <Button
@@ -102,7 +121,11 @@ export default function PackageDetailScreen() {
 
       <InfoCard
         variant="amber"
-        text="Credits are valid 30 days from purchase. Unused credits expire — plan your month."
+        text={
+          trialBlocked
+            ? 'You’ve already used your one-time trial session — browse our other packages instead.'
+            : 'Credits are valid 30 days from purchase. Unused credits expire — plan your month.'
+        }
       />
     </Screen>
   );

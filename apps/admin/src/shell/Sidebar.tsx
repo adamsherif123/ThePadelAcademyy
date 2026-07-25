@@ -9,8 +9,12 @@ import {
   Wallet,
   type LucideIcon,
 } from 'lucide-react';
+import { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 
+import { useCreditRequests } from '../data/queries';
+import { queryClient, queryKeys } from '../lib/queryClient';
+import { supabase } from '../lib/supabase';
 import { useSession } from '../session/SessionProvider';
 import { Avatar, BrandMark } from '../ui';
 import styles from './Sidebar.module.css';
@@ -29,6 +33,26 @@ const NAV: readonly { to: string; label: string; icon: LucideIcon }[] = [
 /** The navy full-height sidebar: brand, nav (royal pill for the active item), user card. */
 export function Sidebar() {
   const { admin, signOut } = useSession();
+  const creditRequestsQ = useCreditRequests();
+  const pendingCount = (creditRequestsQ.data ?? []).filter((r) => r.status === 'pending').length;
+
+  // Live: any insert/update on credit_requests (a player submits one, or another admin
+  // resolves one) refreshes the shared query cache — the badge count and the Credit
+  // Requests page's own list (which reads the same query key) both update with no manual
+  // reload. Mounted once here, since Sidebar is always on-screen for a signed-in admin
+  // (Shell only renders once `status === 'ready'`) — same one-subscription-for-the-whole-
+  // app shape as the mobile client's NotificationsBridge.
+  useEffect(() => {
+    const channel = supabase
+      .channel('admin:credit_requests')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'credit_requests' }, () => {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.creditRequests });
+      })
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, []);
 
   return (
     <aside className={styles.sidebar}>
@@ -45,6 +69,11 @@ export function Sidebar() {
           >
             <Icon size={20} aria-hidden />
             {label}
+            {to === '/credit-requests' && pendingCount > 0 ? (
+              <span className={styles.navBadge} aria-label={`${pendingCount} pending credit requests`}>
+                {pendingCount > 99 ? '99+' : pendingCount}
+              </span>
+            ) : null}
           </NavLink>
         ))}
       </nav>

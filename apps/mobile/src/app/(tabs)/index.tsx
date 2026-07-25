@@ -182,10 +182,6 @@ export default function HomeScreen() {
         <Text variant="label">The academy</Text>
         <AcademyCard />
       </View>
-
-      <Text variant="caption" tone="muted" style={styles.devLink} onPress={() => router.push('/gallery')}>
-        Dev · Component gallery
-      </Text>
     </Screen>
   );
 }
@@ -200,5 +196,4 @@ const styles = StyleSheet.create({
   nextInfo: { flex: 1, gap: 2 },
   divider: { height: 1, backgroundColor: color.border.subtle, marginVertical: space.md },
   packageScroll: { gap: space.md, paddingVertical: space.xs },
-  devLink: { textAlign: 'center', marginTop: space.md },
 });

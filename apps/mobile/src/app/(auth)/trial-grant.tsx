@@ -4,7 +4,7 @@ import { color, radius, space } from '@tpa/theme';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { usePackages } from '../../data/queries';
+import { usePackages, useTrialEligible } from '../../data/queries';
 import { Button, LoadingView, NavyScreen, PillOnNavy, Text } from '../../ui';
 
 /**
@@ -13,13 +13,22 @@ import { Button, LoadingView, NavyScreen, PillOnNavy, Text } from '../../ui';
  * at the one-time discounted trial session and drops them into the request flow; "Maybe later"
  * lands them in the app with zero credits (the wallet then nudges them to the trial / store).
  * Returning members never see this — profile-setup routes them straight into the app.
+ *
+ * Gated on trial_eligible() (not just "does a trial package exist"): the router guard
+ * deliberately exempts this step from the ready-user redirect (so the happy-path signup
+ * flow isn't bounced), which means a player CAN land back here later — e.g. a stale deep
+ * link — after already using or requesting their trial. Without this check they'd see the
+ * offer and tap through to a request the server correctly rejects, but the UI promise is
+ * "an ineligible player sees no trial-purchase option anywhere."
  */
 export default function TrialOfferScreen() {
   const router = useRouter();
   const packagesQ = usePackages();
-  const trial = (packagesQ.data ?? []).find((p) => p.trainingType === 'trial' && p.isActive);
+  const trialEligibleQ = useTrialEligible();
+  const eligible = Boolean(trialEligibleQ.data);
+  const trial = eligible ? (packagesQ.data ?? []).find((p) => p.trainingType === 'trial' && p.isActive) : undefined;
 
-  if (packagesQ.isPending) {
+  if (packagesQ.isPending || trialEligibleQ.isPending) {
     return (
       <NavyScreen>
         <LoadingView />
