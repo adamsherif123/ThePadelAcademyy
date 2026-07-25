@@ -57,6 +57,39 @@ racer_approve() { # $1=admin_uuid $2=request_id $3=target_iso $4=outfile
     > "$4" 2>&1 &
 }
 
+# Booking rework (Task 4) — a racer that books an UNTYPED slot with an explicit
+# chosen type. Emits 'WIN' on ok:true, else the RPC's reason string (type_mismatch,
+# slot_full, no_usable_credit, ...) — unlike racer(), we need the actual reason to
+# tell "lost to a different type" apart from "lost on capacity".
+racer_book_typed() { # $1=uuid $2=slot $3=training_type $4=target_iso $5=outfile
+  "${PSQL[@]}" \
+    -c "set role authenticated" \
+    -c "select set_config('request.jwt.claims', '{\"sub\":\"$1\",\"role\":\"authenticated\"}', false)" \
+    -c "select pg_sleep(greatest(0, extract(epoch from (timestamptz '$4' - clock_timestamp()))))" \
+    -c "select coalesce(public.book_slot('$2','$3')->>'reason', 'WIN')" \
+    > "$5" 2>&1 &
+}
+
+# A racer that cancels a player's OWN booking (self-cancel, not admin) — for the
+# revert-vs-new-booking race (Task 3's race-safety).
+racer_cancel_own() { # $1=player_uuid $2=booking_id $3=target_iso $4=outfile
+  "${PSQL[@]}" \
+    -c "set role authenticated" \
+    -c "select set_config('request.jwt.claims', '{\"sub\":\"$1\",\"role\":\"authenticated\"}', false)" \
+    -c "select pg_sleep(greatest(0, extract(epoch from (timestamptz '$3' - clock_timestamp()))))" \
+    -c "select public.cancel_booking('$2')->>'ok'" \
+    > "$4" 2>&1 &
+}
+
+# A one-off, non-raced call as a given player — used to set up pre-race state
+# (e.g. Scenario H's "X already booked" precondition) without contention.
+call_as() { # $1=uuid $2=sql
+  "${PSQL[@]}" \
+    -c "set role authenticated" \
+    -c "select set_config('request.jwt.claims', '{\"sub\":\"$1\",\"role\":\"authenticated\"}', false)" \
+    -c "$2"
+}
+
 uuid() { printf '00000000-0000-0000-0000-%012d' "$1"; }  # deterministic test uuids
 
 FAILS=0
@@ -282,6 +315,116 @@ G_PURCH=$(sql "select count(*) from public.purchases where player_id like 'plr_g
 check "exactly ONE trial batch per player (K=$G_K, once-per-player under contention)" "$G_BATCH"   "$G_K"
 check "exactly ONE trial purchase per player (no double-mint)"                        "$G_PURCH"   "$G_K"
 check "total trial credits minted = K×1 (never two per player)"                       "$G_CREDITS" "$G_K"
+
+# ── Scenario H: revert (self-cancel emptying a booking-set slot) racing a NEW,
+# differently-typed booking (Task 3's race-safety claim) ─────────────────────
+# X books an untyped slot as 'individual' (this sets training_type='individual',
+# forces capacity 1, and stashes the ORIGINAL capacity (3) in pre_booking_capacity
+# — done first, un-raced, so the precondition is real, not fabricated). Then we
+# race X's self-cancel (which — since this empties a booking-set slot to zero —
+# should revert the slot to untyped and restore capacity to 3) against Y's
+# book_slot('duo') on the SAME slot. Both valid orderings are asserted for:
+#   (a) cancel commits first  → slot reverts untyped; Y's book_slot sees it
+#       untyped, sets type='duo', books.
+#   (b) Y's book commits first → slot is still typed='individual', capacity 1,
+#       booked_count 1 → Y's guarded update matches zero rows → falls into the
+#       diagnostic branch → training_type is not null and <> 'duo' → clean
+#       type_mismatch; X's cancel then reverts the now-empty slot to untyped.
+# What must NEVER happen: training_type='individual' with booked_count=0 (a
+# stuck typed-but-empty slot — the revert silently failed to fire), or
+# booked_count drifting from the live booking count.
+echo "Scenario H — revert (self-cancel) racing a NEW differently-typed booking (K=20):"
+H_K=20
+HSETUP=""
+for k in $(seq 1 $H_K); do
+  HSETUP+="insert into public.coaches (id,name,bio,is_active) values ('cor_h$k','C','b',true);"
+  HSETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status) values ('slr_h$k','cor_h$k',now()+interval '1 day',now()+interval '1 day 1 hour',null,3,0,'published');"
+  HSETUP+="insert into auth.users (id) values ('$(uuid $((800+k)))'),('$(uuid $((850+k)))');"
+  HSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_hx$k','+2010h8${k}','HX','men','beginner',now(),'$(uuid $((800+k)))'),('plr_hy$k','+2010h5${k}','HY','men','beginner',now(),'$(uuid $((850+k)))');"
+  HSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_hx$k','plr_hx$k','signup_grant',null,'individual',1,1,now()+interval '30 day',now()),('cbr_hy$k','plr_hy$k','signup_grant',null,'duo',1,1,now()+interval '30 day',now());"
+done
+sql "$HSETUP" >/dev/null
+# Pre-step (un-raced): X books 'individual' on every slot — sets the real
+# precondition (typed, capacity forced to 1, pre_booking_capacity=3 stashed).
+for k in $(seq 1 $H_K); do call_as "$(uuid $((800+k)))" "select public.book_slot('slr_h$k','individual')" >/dev/null; done
+H_PRE_OK=$(sql "select count(*) from public.session_slots where id like 'slr_h%' and training_type='individual' and booked_count=1 and capacity=1 and pre_booking_capacity=3")
+check "precondition: all $H_K slots booking-set to individual/1/1 (pre_booking_capacity=3)" "$H_PRE_OK" "$H_K"
+
+T=$(target 4)
+for k in $(seq 1 $H_K); do
+  BK=$(sql "select id from public.bookings where slot_id='slr_h$k' and player_id='plr_hx$k' and status='booked'")
+  racer_cancel_own "$(uuid $((800+k)))" "$BK" "$T" "$TMP/h_cxl_$k.txt"
+  racer_book_typed "$(uuid $((850+k)))" "slr_h$k" "duo" "$T" "$TMP/h_book_$k.txt"
+done
+wait
+H_XLIVE=$(sql "select count(*) from public.bookings where slot_id like 'slr_h%' and player_id like 'plr_hx%' and status='booked'")
+H_STUCK=$(sql "select count(*) from public.session_slots where id like 'slr_h%' and training_type='individual' and booked_count=0")
+H_DRIFT=$(sql "select count(*) from public.session_slots s where id like 'slr_h%' and booked_count <> (select count(*) from public.bookings b where b.slot_id=s.id and b.status='booked')")
+H_WON=$(sql "select count(*) from public.session_slots where id like 'slr_h%' and training_type='duo'")
+H_REVERTED=$(sql "select count(*) from public.session_slots where id like 'slr_h%' and training_type is null")
+H_CAP_BAD=$(sql "select count(*) from public.session_slots where id like 'slr_h%' and capacity <> 3")
+H_DEADLOCK=$(grep -rl "deadlock detected" "$TMP"/h_*.txt 2>/dev/null | wc -l | tr -d ' ')
+check "X's booking always ends cancelled (uncontested single-owner cancel)" "$H_XLIVE" "0"
+check "no stuck typed-but-empty slot (revert always fires when it should)" "$H_STUCK" "0"
+check "booked_count never drifts from live booking count"                  "$H_DRIFT" "0"
+check "every trial resolved to won(duo) or reverted(untyped) — no 3rd state" "$((H_WON+H_REVERTED))" "$H_K"
+check "capacity always ends at 3 (won: untouched; reverted: restored)"     "$H_CAP_BAD" "0"
+check "zero deadlocks"                                                     "$H_DEADLOCK" "0"
+echo "  info — $H_WON/$H_K: Y won (duo set); $H_REVERTED/$H_K: Y lost, slot reverted untyped"
+
+# ── Scenario I: DIFFERENT chosen types racing the SAME untyped slot (Task 0
+# rule 3 — exactly one type wins; the other type gets a clean type_mismatch,
+# no oversell within the winning type) ───────────────────────────────────────
+echo "Scenario I — different types (group vs duo) racing one untyped, capacity-4 slot:"
+ISETUP="insert into public.coaches (id,name,bio,is_active) values ('cor_i','C','b',true);"
+ISETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status) values ('slr_i','cor_i',now()+interval '1 day',now()+interval '1 day 1 hour',null,4,0,'published');"
+for k in $(seq 1 4); do
+  ISETUP+="insert into auth.users (id) values ('$(uuid $((700+k)))');"
+  ISETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_ig$k','+2010i7${k}','IG','men','beginner',now(),'$(uuid $((700+k)))');"
+  ISETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_ig$k','plr_ig$k','signup_grant',null,'group',1,1,now()+interval '30 day',now());"
+  ISETUP+="insert into auth.users (id) values ('$(uuid $((720+k)))');"
+  ISETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_id$k','+2010i2${k}','ID','men','beginner',now(),'$(uuid $((720+k)))');"
+  ISETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_id$k','plr_id$k','signup_grant',null,'duo',1,1,now()+interval '30 day',now());"
+done
+sql "$ISETUP" >/dev/null
+
+T=$(target 4)
+for k in $(seq 1 4); do
+  racer_book_typed "$(uuid $((700+k)))" slr_i group "$T" "$TMP/i_g_$k.txt"
+  racer_book_typed "$(uuid $((720+k)))" slr_i duo   "$T" "$TMP/i_d_$k.txt"
+done
+wait
+I_WINS=$(grep -lFx WIN "$TMP"/i_*.txt 2>/dev/null | wc -l | tr -d ' ')
+I_MISMATCH=$(grep -lFx type_mismatch "$TMP"/i_*.txt 2>/dev/null | wc -l | tr -d ' ')
+I_TYPE=$(sql "select training_type from public.session_slots where id='slr_i'")
+I_COUNT=$(sql "select booked_count from public.session_slots where id='slr_i'")
+I_TYPES_BOOKED=$(sql "select count(distinct cb.training_type) from public.bookings b join public.credit_batches cb on cb.id=b.credit_batch_id where b.slot_id='slr_i' and b.status='booked'")
+check "exactly one type wins all 4 seats (no oversell within the winner)" "$I_WINS" "4"
+check "the other type's 4 racers all get a clean type_mismatch"          "$I_MISMATCH" "4"
+check "booked_count = 4"                                                  "$I_COUNT" "4"
+check "slot ends typed (either group or duo, never null)"                 "$([ -n "$I_TYPE" ] && echo yes || echo no)" "yes"
+check "every winning booking spent a credit of the SAME (winning) type"   "$I_TYPES_BOOKED" "1"
+
+# ── Scenario J: SAME chosen type racing an untyped slot (mirrors Scenario A —
+# the existing same-type proof — but starting from training_type IS NULL, so
+# this also proves the type gets set exactly once under contention) ──────────
+echo "Scenario J — 8 racers, SAME type ('duo'), one untyped capacity-1 slot:"
+JSETUP="insert into public.coaches (id,name,bio,is_active) values ('cor_j','C','b',true);"
+JSETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status) values ('slr_j','cor_j',now()+interval '1 day',now()+interval '1 day 1 hour',null,1,0,'published');"
+for k in $(seq 1 8); do
+  JSETUP+="insert into auth.users (id) values ('$(uuid $((730+k)))');"
+  JSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_j$k','+2010j3${k}','J','men','beginner',now(),'$(uuid $((730+k)))');"
+  JSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_j$k','plr_j$k','signup_grant',null,'duo',1,1,now()+interval '30 day',now());"
+done
+sql "$JSETUP" >/dev/null
+
+T=$(target 4)
+for k in $(seq 1 8); do racer_book_typed "$(uuid $((730+k)))" slr_j duo "$T" "$TMP/j_$k.txt"; done
+wait
+J_WINS=$(grep -lFx WIN "$TMP"/j_*.txt 2>/dev/null | wc -l | tr -d ' ')
+check "exactly one racer books (capacity 1)"    "$J_WINS" "1"
+check "booked_count = 1 (no oversell)"          "$(sql "select booked_count from public.session_slots where id='slr_j'")" "1"
+check "training_type set to 'duo' by the winner" "$(sql "select training_type from public.session_slots where id='slr_j'")" "duo"
 
 # ── teardown ─────────────────────────────────────────────────────────────────
 cleanup_rows

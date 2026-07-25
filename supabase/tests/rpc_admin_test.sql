@@ -9,7 +9,7 @@
 -- Run with:  supabase test db
 -- ============================================================================
 begin;
-select plan(71);
+select plan(72);
 
 -- ── seed as postgres ─────────────────────────────────────────────────────────
 -- S8: auth_user_id now FK-references auth.users — seed the linked auth rows first.
@@ -103,11 +103,17 @@ select is(public.record_cash_purchase('pl_nope','pk_g4',1)->>'reason', 'player_m
 
 -- admin_book_player (override = gender/level ONLY; hard blocks still win)
 select is(public.admin_book_player('sl_gl','pl_a',false)->>'reason', 'gender_mismatch', 'admin_book no-override: gender mismatch blocks');
-select is(public.admin_book_player('sl_gi','pl_a',false)->>'reason', 'level_mismatch',  'admin_book no-override: level mismatch blocks');
+-- Booking rework: level_mismatch is REMOVED (rule 4 — display-only, no code
+-- blocks a mismatched join, admin path included). pl_a's gender matches sl_gi
+-- ('men') and pl_a holds a usable group credit (cb_a_grp), so with level no
+-- longer checked this booking now SUCCEEDS — spending the first of the three
+-- cb_a_grp units the later assertions account for.
+select is(public.admin_book_player('sl_gi','pl_a',false)->>'ok', 'true', 'admin_book no-override: level mismatch no longer blocks (rule 4)');
+select is((select booked_count from public.session_slots where id='sl_gi'), 1, 'level-mismatched booking still took a seat');
 select is(public.admin_book_player('sl_gl','pl_a',true)->>'ok', 'true', 'admin_book override: gender mismatch waived → ok');
 select is(public.admin_book_player('sl_gl','pl_a',true)->>'reason', 'already_booked', 'admin_book: a second live booking → already_booked (constraint, not override)');
 select is((select booked_count from public.session_slots where id='sl_gl'), 1, 'override booking took exactly one seat');
-select is((select quantity_remaining from public.credit_batches where id='cb_a_grp'), 2, 'override booking spent one group credit (3 → 2)');
+select is((select quantity_remaining from public.credit_batches where id='cb_a_grp'), 1, 'sl_gi (level, now allowed) + sl_gl (override) each spent one group credit (3 → 1)');
 select is(public.admin_book_player('sl_full','pl_a',true)->>'reason', 'slot_full', 'HARD BLOCK WINS: full + mismatch + override → slot_full, not ok');
 select is(public.admin_book_player('sl_nc','pl_c',true)->>'reason', 'no_usable_credit', 'HARD BLOCK WINS: no-credit + mismatch + override → no_usable_credit');
 select is(public.admin_book_player('sl_gl','pl_nope',true)->>'reason', 'player_missing', 'admin_book rejects an unknown player');

@@ -70,7 +70,14 @@ select is(public.book_slot('sl_nope')->>'reason',   'slot_missing',   'canBookSl
 select is(public.book_slot('sl_cancel')->>'reason', 'slot_cancelled', 'canBookSlot slot_cancelled ↔ RPC slot_cancelled');
 select is(public.book_slot('sl_past')->>'reason',   'slot_in_past',   'canBookSlot slot_in_past   ↔ RPC slot_in_past');
 select is(public.book_slot('sl_glady')->>'reason',  'gender_mismatch','canBookSlot gender_mismatch ↔ RPC gender_mismatch (A is men, slot ladies)');
-select is(public.book_slot('sl_gint')->>'reason',   'level_mismatch', 'canBookSlot level_mismatch  ↔ RPC level_mismatch (A is beginner, slot intermediate)');
+-- Booking rework: level_mismatch is REMOVED from book_slot (rule 4 — level is
+-- display-only, no code blocks a mismatched join). A's gender matches sl_gint
+-- ('men'), so the level difference no longer intercepts at all; A's only
+-- credit is 'trial', so the real (and only remaining) blocker is the credit
+-- check. This is no longer a canBookSlot parity point for level (that reason
+-- is now unreachable from book_slot; @tpa/core's canBookSlot itself is
+-- deferred to the client-picker session — see the booking-rework report).
+select is(public.book_slot('sl_gint')->>'reason',   'no_usable_credit', 'level no longer blocks (rule 4) — A reaches the credit check with no group credit');
 
 -- ok path: books, takes a seat, spends exactly one credit, records the booking as A's.
 select is(public.book_slot('sl_ok')->>'ok', 'true', 'A books sl_ok → ok');
