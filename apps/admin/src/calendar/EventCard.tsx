@@ -4,7 +4,7 @@ import type { CSSProperties } from 'react';
 
 import { cairoWallMinutes } from '../data/schedule';
 import { coachById } from '../data/selectors';
-import { TRAINING_LABEL, groupTags } from '../ui';
+import { groupTags, trainingLabelFor } from '../ui';
 import styles from './EventCard.module.css';
 
 /**
@@ -37,7 +37,7 @@ export function EventCard({
   // on the capacity pill lets Rania scan which sessions still need players. Cap-1
   // sessions (individual/trial) confirm on the first booking, so they never show it.
   const pending = slot.capacity > 1 && !isSessionConfirmed(slot);
-  const tags = groupTags(slot.gender, slot.level) || TRAINING_LABEL[slot.trainingType];
+  const tags = groupTags(slot.gender, slot.level) || trainingLabelFor(slot.trainingType);
 
   const density = Math.min(lanes, 3); // 1 = full, 2 = half, 3 = third (or narrower)
   const showCoach = density <= 2; // dropped at 1/3
@@ -47,7 +47,7 @@ export function EventCard({
     <button
       type="button"
       className={styles.event}
-      data-type={slot.trainingType}
+      data-type={slot.trainingType ?? 'open'}
       data-lanes={density}
       style={style}
       onClick={onClick}
@@ -64,7 +64,7 @@ export function EventCard({
         </span>
       </span>
       {showCoach ? (
-        <span className={styles.coach}>{coach ? coach.name.split(' ')[0] : TRAINING_LABEL[slot.trainingType]}</span>
+        <span className={styles.coach}>{coach ? coach.name.split(' ')[0] : trainingLabelFor(slot.trainingType)}</span>
       ) : null}
       {showTags ? <span className={styles.tags}>{tags}</span> : null}
     </button>

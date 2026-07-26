@@ -49,22 +49,30 @@ const DAYS = 14;
 // already show how full each slot is, and the pending-vs-confirmed detail (with
 // honest copy) is surfaced at the decision point on confirm-booking. Keeping the
 // browse cards scannable, we don't duplicate it here.
-/** Map a core-derived availability verdict to SlotCard display props. */
+/**
+ * Map a core-derived availability verdict to SlotCard display props. `av.trainingType`
+ * on `bookable` is the RESOLVED type (the slot's own if already typed, else the tab
+ * being browsed) — the credit note always names the type this exact tap would spend,
+ * never `slot.trainingType` directly (which may still be null for an open block).
+ */
 function slotDisplay(
   av: SlotAvailability,
   slot: SessionSlot,
 ): { state: SlotCardState; note?: string; creditNote?: string } {
   switch (av.kind) {
     case 'bookable':
-      return { state: 'bookable', creditNote: `Uses 1 ${TRAINING_META[slot.trainingType].label} credit` };
+      return { state: 'bookable', creditNote: `Uses 1 ${TRAINING_META[av.trainingType].label} credit` };
     case 'full':
       return { state: 'full' };
     case 'booked':
       return { state: 'booked' };
     case 'gender_mismatch':
       return { state: 'unavailable', note: slot.gender === 'men' ? 'Men only' : 'Ladies only' };
-    case 'level_mismatch':
-      return { state: 'unavailable', note: `${slot.level ? LEVEL_LABEL[slot.level] : ''} level` };
+    // A race: this slot's type resolved to something else between the list
+    // loading and now. Same visual as `full` (nothing left for THIS tap here) —
+    // the next refresh moves the card to wherever it actually landed.
+    case 'type_taken':
+      return { state: 'unavailable', note: 'Just taken' };
     case 'credits_expired':
       return { state: 'unavailable', note: 'Credits expired' };
     case 'no_credit':
@@ -109,7 +117,7 @@ export default function BookScreen() {
   const selectedDay = days.find((d) => d.key === dayKey) ?? firstOpen;
 
   const balance = balanceByType(batches, now);
-  const slots = slotsForType(allSlots, type, player, selectedDay);
+  const slots = slotsForType(allSlots, type, player, batches, now, selectedDay);
   const isToday = selectedDay.key === days[0]!.key;
   const dayLabel = isToday ? 'Today' : `${WEEKDAY_ABBR[selectedDay.weekday]} ${selectedDay.day}`;
 
@@ -172,7 +180,15 @@ export default function BookScreen() {
         coaches={coaches}
         now={now}
         onBuy={() => router.push('/buy-credits')}
-        onSlot={(slot) => router.push({ pathname: '/confirm-booking', params: { slotId: slot.id } })}
+        onSlot={(slot) =>
+          // An OPEN block routes to the picker (it may be affordable as more
+          // types than just the tab being browsed); an already-typed slot goes
+          // straight to confirm, unchanged. `preferredType` is a hint only —
+          // the picker still shows every affordable type, pre-selecting this one.
+          slot.trainingType === null
+            ? router.push({ pathname: '/pick-type', params: { slotId: slot.id, preferredType: type } })
+            : router.push({ pathname: '/confirm-booking', params: { slotId: slot.id } })
+        }
       />
     </Screen>
   );
@@ -206,7 +222,7 @@ function BookBody({
   // No usable credits of this type — distinguish lapsed vs never (TASK 5) + CTA (TASK 6).
   if (balance === 0) {
     const lapsed = slots.some(
-      (s) => slotAvailability(s, player, batches, bookings, now).kind === 'credits_expired',
+      (s) => slotAvailability(s, player, batches, bookings, now, type).kind === 'credits_expired',
     );
     return (
       <EmptyState
@@ -236,7 +252,7 @@ function BookBody({
   return (
     <View style={styles.slots}>
       {slots.map((slot) => {
-        const av = slotAvailability(slot, player, batches, bookings, now);
+        const av = slotAvailability(slot, player, batches, bookings, now, type);
         const display = slotDisplay(av, slot);
         return (
           <SlotCard

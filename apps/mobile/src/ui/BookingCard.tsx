@@ -10,7 +10,7 @@ import { Badge, type BadgeTone } from './Badge';
 import { Button } from './Button';
 import { InfoCard } from './InfoCard';
 import { Text } from './Text';
-import { GENDER_LABEL, LEVEL_LABEL, TRAINING_META } from './trainingMeta';
+import { GENDER_LABEL, LEVEL_LABEL, trainingMetaFor } from './trainingMeta';
 
 /** Past-status pill copy + tone. `booked` only appears if a past slot was never marked. */
 const PAST_STATUS: Record<BookingStatus, { label: string; tone: BadgeTone }> = {
@@ -51,7 +51,10 @@ type BookingCardProps = {
  */
 export function BookingCard(props: BookingCardProps) {
   const { slot, coach } = props;
-  const meta = TRAINING_META[slot.trainingType];
+  // A booking always implies a resolved type (the first booking is what fixes
+  // it) — trainingMetaFor's null-fallback here is defense-in-depth, not an
+  // expected path.
+  const meta = trainingMetaFor(slot.trainingType);
   const isGroup = slot.gender !== null && slot.level !== null;
   const coachLine = coach ? `with ${coach.name}` : 'Academy coach';
   const groupTags = isGroup

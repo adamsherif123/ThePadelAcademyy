@@ -8,21 +8,28 @@ import type {
   TrainingType,
 } from '@tpa/types';
 
-import { CANCELLATION_WINDOW_HOURS } from './constants';
+import { CANCELLATION_WINDOW_HOURS, TRAINING_TYPES } from './constants';
 import { parseInstant, toInstant } from './time';
 
 /**
  * Pure, side-effect-free previews of the booking rules. They take `now` as a
  * parameter (never read the clock) so they are deterministic and testable. These
  * are the CLIENT-SIDE preview only; the authoritative enforcement is the DB/RPC
- * layer in S7. Keeping the logic here means the app can grey out a button before
- * a round-trip, but it is never the source of truth.
+ * layer in S7/the booking rework (book_slot / admin_book_player). Keeping the
+ * logic here means the app can grey out a button before a round-trip, but it is
+ * never the source of truth.
  */
 
-/** A group slot carries a required gender + level; other formats never do. */
+/**
+ * A group slot carries a required gender + level; other formats — including an
+ * OPEN (untyped) slot, which is neither `null !== 'group'` nor any other format
+ * until its first booking fixes it — never do. `slot.trainingType === 'group'` is
+ * already null-safe (`null === 'group'` is simply `false`), so an open slot
+ * correctly narrows to `false` here with no special-casing.
+ */
 export function isGroupSlot(
   slot: SessionSlot,
-): slot is SessionSlot & { gender: Gender; level: Level } {
+): slot is SessionSlot & { trainingType: 'group'; gender: Gender; level: Level } {
   return slot.trainingType === 'group';
 }
 
@@ -92,31 +99,54 @@ export function cancellationDeadline(slot: SessionSlot): IsoInstant {
   return toInstant(new Date(parseInstant(slot.startsAt).getTime() - CANCELLATION_WINDOW_HOURS * 3_600_000));
 }
 
+/**
+ * `level_mismatch` is GONE (the booking rework, rule 4): level is display-only —
+ * an intermediate player sees "Beginner" on a group slot and self-selects out,
+ * but no code, client or server, blocks the join. `gender_mismatch` is the one
+ * hard block that survives from the old ladies/men separation.
+ *
+ * `type_mismatch` is NEW: on an OPEN slot, two players can race to fix its type
+ * (see `bookableTypesFor`); the loser's client may still think a since-resolved
+ * slot is open, or a stale render may offer a type someone else's booking has
+ * already ruled out. It's also what a genuinely wrong `chosenType` against an
+ * ALREADY-typed slot resolves to. Mirrors the RPC's own `type_mismatch` reason
+ * exactly — see book_slot in the booking-rework migrations.
+ */
 export type BookBlockReason =
   | 'slot_cancelled'
   | 'slot_in_past'
   | 'slot_full'
   | 'gender_mismatch'
-  | 'level_mismatch'
+  | 'type_mismatch'
   | 'no_usable_credit';
 
 export type CanBookResult =
-  | { ok: true; creditBatchId: CreditBatch['id'] }
+  | { ok: true; creditBatchId: CreditBatch['id']; trainingType: TrainingType }
   | { ok: false; reason: BookBlockReason };
 
 /**
- * Whether `player` could book `slot` given their `creditBatches` at time `now`.
- * On success, names the batch that would pay — the earliest-expiring usable one,
+ * Whether `player` could book `slot` AS `chosenType`, given their `creditBatches`
+ * at time `now`. `chosenType` is mandatory — on an ALREADY-typed slot the caller
+ * just passes `slot.trainingType` (the type isn't theirs to choose, but stating
+ * it lets this function mirror the RPC's own type_mismatch check uniformly); on
+ * an OPEN slot it's the player's actual pick from the type picker. On success,
+ * the result also names the RESOLVED type (== slot.trainingType if it was
+ * already set, else `chosenType`) — callers that don't know whether a slot was
+ * open going in (bookingPreview, the wallet-balance line after booking) can read
+ * it off the result instead of re-deriving `slot.trainingType ?? chosenType`
+ * themselves — and the batch that would pay: the earliest-expiring usable one,
  * so credits are consumed before they lapse. Returns a reason on failure so the
  * UI can explain why a slot isn't bookable.
  *
- * Not a boolean by design: the client needs the reason and the chosen batch.
+ * Not a boolean by design: the client needs the reason, the resolved type, and
+ * the chosen batch.
  */
 export function canBookSlot(
   slot: SessionSlot,
   player: Player,
   creditBatches: readonly CreditBatch[],
   now: IsoInstant,
+  chosenType: TrainingType,
 ): CanBookResult {
   if (slot.status !== 'published') return { ok: false, reason: 'slot_cancelled' };
   if (parseInstant(slot.startsAt).getTime() <= parseInstant(now).getTime()) {
@@ -126,15 +156,60 @@ export function canBookSlot(
   if (slot.gender !== null && slot.gender !== player.gender) {
     return { ok: false, reason: 'gender_mismatch' };
   }
-  if (slot.level !== null && slot.level !== player.level) {
-    return { ok: false, reason: 'level_mismatch' };
+  // level is display-only (rule 4) — never blocks, checked nowhere in this function.
+
+  if (slot.trainingType !== null && slot.trainingType !== chosenType) {
+    return { ok: false, reason: 'type_mismatch' };
   }
+  const trainingType = slot.trainingType ?? chosenType;
 
   const usable = creditBatches
-    .filter((batch) => batch.playerId === player.id && isBatchUsable(batch, slot.trainingType, now))
+    .filter((batch) => batch.playerId === player.id && isBatchUsable(batch, trainingType, now))
     .sort((a, b) => parseInstant(a.expiresAt).getTime() - parseInstant(b.expiresAt).getTime());
 
   const batch = usable[0];
   if (!batch) return { ok: false, reason: 'no_usable_credit' };
-  return { ok: true, creditBatchId: batch.id };
+  return { ok: true, creditBatchId: batch.id, trainingType };
+}
+
+/** One type a player could create/join on a slot right now, with what the picker needs to show it. */
+export interface BookableType {
+  trainingType: TrainingType;
+  creditBatchId: CreditBatch['id'];
+  /** Sum of usable (unexpired, non-zero) quantityRemaining across every batch of this type. */
+  creditsAvailable: number;
+}
+
+/**
+ * Every type `player` could create or join on `slot` right now — the ONE
+ * function the type picker, the schedule's browse-by-type list, and the
+ * block-tap flow all consume, so "what can they afford here" is never derived
+ * twice and can never disagree with what `canBookSlot` itself would decide for
+ * that type. Built directly ON canBookSlot (tries every candidate type through
+ * it), not a parallel reimplementation — that's what the SQL↔TS parity
+ * discipline requires here: one place resolves a chosen type against a slot.
+ *
+ * A TYPED slot has exactly one candidate (its own type) and so yields at most
+ * one entry. An OPEN slot tries all four `TrainingType`s — gender is checked
+ * inside canBookSlot regardless, but is always null on a genuinely open slot
+ * (the group_shape invariant), so it never filters anything out at this stage;
+ * it only ever starts mattering once someone's booking has fixed the type.
+ */
+export function bookableTypesFor(
+  slot: SessionSlot,
+  player: Player,
+  creditBatches: readonly CreditBatch[],
+  now: IsoInstant,
+): readonly BookableType[] {
+  const candidates: readonly TrainingType[] = slot.trainingType !== null ? [slot.trainingType] : TRAINING_TYPES;
+  const results: BookableType[] = [];
+  for (const trainingType of candidates) {
+    const verdict = canBookSlot(slot, player, creditBatches, now, trainingType);
+    if (!verdict.ok) continue;
+    const creditsAvailable = creditBatches
+      .filter((batch) => batch.playerId === player.id && isBatchUsable(batch, trainingType, now))
+      .reduce((sum, batch) => sum + batch.quantityRemaining, 0);
+    results.push({ trainingType, creditBatchId: verdict.creditBatchId, creditsAvailable });
+  }
+  return results;
 }

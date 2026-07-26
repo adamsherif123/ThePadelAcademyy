@@ -43,6 +43,7 @@ const mkSlot = (over: Partial<SessionSlot> = {}): SessionSlot => ({
   status: 'published',
   templateId: null,
   manuallyConfirmedAt: null,
+  setByBookingAt: null,
   ...over,
 });
 const mkPlayer = (over: Partial<Player> = {}): Player => ({
@@ -68,46 +69,57 @@ const groupBatch: CreditBatch = {
 };
 
 describe('classifyAdminBooking (override policy over canBookSlot)', () => {
-  it('ok when the player matches and can pay', () => {
-    const v = classifyAdminBooking(mkSlot(), mkPlayer(), [groupBatch], now, false);
-    expect(v.kind).toBe('ok');
+  it('ok when the player matches and can pay, naming the resolved type', () => {
+    const v = classifyAdminBooking(mkSlot(), mkPlayer(), [groupBatch], now, false, 'group');
+    expect(v).toEqual({ kind: 'ok', creditBatchId: 'cb_x', trainingType: 'group' });
   });
 
   it('OVERRIDES a gender mismatch when the player can still pay + fit', () => {
-    const v = classifyAdminBooking(mkSlot({ gender: 'men' }), mkPlayer({ gender: 'ladies' }), [groupBatch], now, false);
+    const v = classifyAdminBooking(mkSlot({ gender: 'men' }), mkPlayer({ gender: 'ladies' }), [groupBatch], now, false, 'group');
     expect(v.kind).toBe('override');
     expect(v.kind === 'override' && v.reason).toBe('gender_mismatch');
   });
 
-  it('OVERRIDES a level mismatch', () => {
-    const v = classifyAdminBooking(mkSlot({ level: 'beginner' }), mkPlayer({ level: 'intermediate' }), [groupBatch], now, false);
-    expect(v.kind).toBe('override');
-    expect(v.kind === 'override' && v.reason).toBe('level_mismatch');
+  it('a LEVEL mismatch is `ok` outright — never even reaches the override path (rule 4: display-only, never blocking)', () => {
+    const v = classifyAdminBooking(mkSlot({ level: 'beginner' }), mkPlayer({ level: 'intermediate' }), [groupBatch], now, false, 'group');
+    expect(v.kind).toBe('ok');
   });
 
   it('does NOT override full', () => {
-    const v = classifyAdminBooking(mkSlot({ capacity: 4, bookedCount: 4 }), mkPlayer(), [groupBatch], now, false);
+    const v = classifyAdminBooking(mkSlot({ capacity: 4, bookedCount: 4 }), mkPlayer(), [groupBatch], now, false, 'group');
     expect(v).toEqual({ kind: 'blocked', reason: 'slot_full' });
   });
 
   it('does NOT override already-booked', () => {
-    const v = classifyAdminBooking(mkSlot(), mkPlayer(), [groupBatch], now, true);
+    const v = classifyAdminBooking(mkSlot(), mkPlayer(), [groupBatch], now, true, 'group');
     expect(v).toEqual({ kind: 'blocked', reason: 'already_booked' });
   });
 
   it('does NOT override no usable credit', () => {
-    const v = classifyAdminBooking(mkSlot(), mkPlayer(), [], now, false);
+    const v = classifyAdminBooking(mkSlot(), mkPlayer(), [], now, false, 'group');
     expect(v).toEqual({ kind: 'blocked', reason: 'no_usable_credit' });
   });
 
   it('a hard block hiding behind a mismatch wins (mismatch + no credit → blocked, not override)', () => {
-    const v = classifyAdminBooking(mkSlot({ gender: 'men' }), mkPlayer({ gender: 'ladies' }), [], now, false);
+    const v = classifyAdminBooking(mkSlot({ gender: 'men' }), mkPlayer({ gender: 'ladies' }), [], now, false, 'group');
     expect(v).toEqual({ kind: 'blocked', reason: 'no_usable_credit' });
   });
 
   it('an expired credit is not usable → blocked', () => {
     const expired = { ...groupBatch, expiresAt: daysFrom(-1) };
-    const v = classifyAdminBooking(mkSlot(), mkPlayer(), [expired], now, false);
+    const v = classifyAdminBooking(mkSlot(), mkPlayer(), [expired], now, false, 'group');
+    expect(v).toEqual({ kind: 'blocked', reason: 'no_usable_credit' });
+  });
+
+  it('an OPEN slot: ok for whichever type the admin picks that the player can pay for', () => {
+    const open = mkSlot({ trainingType: null, gender: null, level: null });
+    const v = classifyAdminBooking(open, mkPlayer(), [groupBatch], now, false, 'group');
+    expect(v).toEqual({ kind: 'ok', creditBatchId: 'cb_x', trainingType: 'group' });
+  });
+
+  it('an OPEN slot: blocked no_usable_credit if the admin picks a type the player holds no credit for', () => {
+    const open = mkSlot({ trainingType: null, gender: null, level: null });
+    const v = classifyAdminBooking(open, mkPlayer(), [groupBatch], now, false, 'duo');
     expect(v).toEqual({ kind: 'blocked', reason: 'no_usable_credit' });
   });
 });

@@ -112,7 +112,10 @@ export function rowToSlot(r: Row): SessionSlot {
     coachId: str(r.coach_id) as SessionSlot['coachId'],
     startsAt: iso(r.starts_at),
     endsAt: iso(r.ends_at),
-    trainingType: str(r.training_type) as SessionSlot['trainingType'],
+    // Nullable since the booking rework — an OPEN block has training_type null
+    // until its first booking fixes it. Matches the gender/level pattern below,
+    // not str()'s blind cast (str() would silently forward null typed as string).
+    trainingType: (r.training_type as SessionSlot['trainingType']) ?? null,
     capacity: num(r.capacity),
     bookedCount: num(r.booked_count),
     gender: (r.gender as SessionSlot['gender']) ?? null,
@@ -120,6 +123,7 @@ export function rowToSlot(r: Row): SessionSlot {
     status: str(r.status) as SessionSlot['status'],
     templateId: (nstr(r.template_id) as SessionSlot['templateId']) ?? null,
     manuallyConfirmedAt: nstr(r.manually_confirmed_at) as IsoInstant | null,
+    setByBookingAt: nstr(r.set_by_booking_at) as IsoInstant | null,
   };
 }
 

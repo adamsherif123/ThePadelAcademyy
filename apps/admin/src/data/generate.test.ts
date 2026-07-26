@@ -168,4 +168,16 @@ describe('createOneOffSlot — validation rejections (return before any network 
     );
     expect(res.ok ? null : res.reason).toBe('group_requires_gender_level');
   });
+
+  it('an OPEN one-off (trainingType null) needs no gender/level — passes local validation regardless', async () => {
+    // No working supabase mock here (by design — this suite only proves PRE-network
+    // rejections), so a draft that clears validation reaches insertSlots and gets a
+    // 'network' result. The point: it must NOT be rejected as group_requires_gender_level
+    // just because gender/level are null — an open block has neither yet, by design.
+    const res = await createOneOffSlot(
+      { coachId: 'co_hany' as CoachId, trainingType: null, capacity: 4, gender: null, level: null, startsAt: future.startsAt, endsAt: future.endsAt },
+      now,
+    );
+    expect(res.ok ? null : res.reason).not.toBe('group_requires_gender_level');
+  });
 });

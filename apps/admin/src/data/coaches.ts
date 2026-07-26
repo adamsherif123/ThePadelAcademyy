@@ -31,7 +31,8 @@ function cairoWeekBounds(now: IsoInstant): { startMs: number; endMs: number } {
 }
 
 export interface CoachTypeCount {
-  type: TrainingType;
+  /** null = OPEN (untyped) blocks — counted, never silently dropped. */
+  type: TrainingType | null;
   count: number;
 }
 
@@ -63,16 +64,17 @@ export function coachWeekStats(
     (s) => s.status === 'published' && ms(s.startsAt) >= startMs && ms(s.startsAt) < endMs,
   );
 
-  const counts = new Map<TrainingType, number>();
+  // Keyed by TrainingType | null — an OPEN block (trainingType null) gets counted
+  // under its own bucket instead of silently vanishing from the breakdown.
+  const counts = new Map<TrainingType | null, number>();
   let seatsBooked = 0;
   for (const s of week) {
     counts.set(s.trainingType, (counts.get(s.trainingType) ?? 0) + 1);
     seatsBooked += s.bookedCount;
   }
-  const typeCounts = TRAINING_TYPES.filter((t) => (counts.get(t) ?? 0) > 0).map((t) => ({
-    type: t,
-    count: counts.get(t)!,
-  }));
+  const typeCounts = [...TRAINING_TYPES, null]
+    .filter((t) => (counts.get(t) ?? 0) > 0)
+    .map((t) => ({ type: t, count: counts.get(t)! }));
 
   const coachSlotIds = new Set(coachSlots.map((s) => s.id));
   let attended = 0;

@@ -195,6 +195,7 @@ export function generateSlots(
           status: 'published',
           templateId: template.id,
           manuallyConfirmedAt: null, // freshly generated → pending until it fills or is confirmed
+          setByBookingAt: null, // template-generated → always pre-typed, never booking-set
         },
       });
     }
@@ -227,10 +228,16 @@ export async function commitGeneration(plan: GenerationPlan): Promise<CommitGene
  * from Cairo wall time via @tpa/core in the modal). Coach overlap is deliberately
  * NOT blocked here — the modal warns, matching the reschedule seam's "warn, don't
  * block" stance; the DB EXCLUDE constraint is the real guard. S10 → INSERT.
+ *
+ * `trainingType` is nullable (the booking rework): null creates an OPEN block —
+ * "first player chooses" — with gender/level forced null regardless of what the
+ * form happens to hold (there's nothing to normalize against yet). Recurring
+ * templates do NOT get this option; AvailabilityTemplate.trainingType stays
+ * required (see the session report for why this is deferred, not fixed here).
  */
 export interface OneOffDraft {
   coachId: CoachId;
-  trainingType: TrainingType;
+  trainingType: TrainingType | null;
   capacity: number;
   gender: Gender | null;
   level: Level | null;
@@ -252,7 +259,7 @@ export async function createOneOffSlot(draft: OneOffDraft, now: IsoInstant): Pro
   if (ms(draft.startsAt) <= ms(now)) return { ok: false, reason: 'in_past' };
   if (draft.capacity < 1) return { ok: false, reason: 'capacity_below_one' };
 
-  const needsGenderLevel = templateRequiresGenderLevel(draft.trainingType);
+  const needsGenderLevel = draft.trainingType !== null && templateRequiresGenderLevel(draft.trainingType);
   if (needsGenderLevel && (draft.gender === null || draft.level === null)) {
     return { ok: false, reason: 'group_requires_gender_level' };
   }
@@ -270,6 +277,11 @@ export async function createOneOffSlot(draft: OneOffDraft, now: IsoInstant): Pro
     status: 'published',
     templateId: null,
     manuallyConfirmedAt: null,
+    // The admin is setting this type at creation (or leaving it unset) — never
+    // booking-set, so this is always null here (mirrors book_slot's own rule:
+    // set_by_booking_at is populated ONLY by a first booking, never by the
+    // admin's own insert path).
+    setByBookingAt: null,
   };
   // The DB EXCLUDE constraint is the real coach-overlap guard (the modal only warns).
   const res = await runWrite(() => insertSlots([slot]), TOUCHED.slots);

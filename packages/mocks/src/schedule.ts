@@ -97,6 +97,9 @@ function generateSlots(): SessionSlot[] {
         // derivation (booked_count >= capacity), so both apps get confirmed + pending
         // fixtures with this null.
         manuallyConfirmedAt: null,
+        // Every template-generated slot is pre-typed by the admin (the template
+        // itself carries a concrete trainingType) — never booking-set.
+        setByBookingAt: null,
       });
       idx += 1;
     }
@@ -158,6 +161,7 @@ const adHocSlots: SessionSlot[] = [
     status: 'published',
     templateId: null,
     manuallyConfirmedAt: null, // 1/1 individual → confirmed by derivation (full)
+    setByBookingAt: null, // ad-hoc slots in this fixture set are all pre-typed at creation
   },
   // A duo session ~5 days out, paid from a batch that has since expired. Cancelling
   // outside the window returns the credit to that batch — where it's already dead.
@@ -174,6 +178,27 @@ const adHocSlots: SessionSlot[] = [
     status: 'published',
     templateId: null,
     manuallyConfirmedAt: null, // 1/2 duo → pending (derived)
+    setByBookingAt: null,
+  },
+  // An OPEN block (the booking rework): untyped, so gender/level are null too
+  // until a first booking fixes one of them (group_shape). Exercises the
+  // "open block" rendering + type-picker flow in both apps' fixtures — a case
+  // the generated grid can never produce, since every template already carries
+  // a concrete trainingType.
+  {
+    id: 'sl_open_20260716' as SlotId,
+    coachId: 'co_hany' as CoachId,
+    startsAt: hoursFromNow(72),
+    endsAt: hoursFromNow(73),
+    trainingType: null,
+    capacity: 4,
+    bookedCount: 0,
+    gender: null,
+    level: null,
+    status: 'published',
+    templateId: null,
+    manuallyConfirmedAt: null,
+    setByBookingAt: null,
   },
 ];
 

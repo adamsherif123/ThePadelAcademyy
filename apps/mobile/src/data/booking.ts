@@ -1,4 +1,5 @@
 import {
+  bookableTypesFor,
   cairoCalendarDate,
   canBookSlot,
   cancellationDeadline,
@@ -90,19 +91,34 @@ export function dateStrip(
 }
 
 /**
- * Published slots of `trainingType` on `day`, sorted by start. Group slots are
- * matched to the player's profile (gender AND level); duo/individual/trial don't.
+ * Published slots BOOKABLE AS `trainingType` on `day`, sorted by start — either
+ * already typed `trainingType`, or OPEN (untyped) and affordable as
+ * `trainingType` per bookableTypesFor (so an open block appears under every
+ * tab the player could actually create it as, not just one). A typed group
+ * slot is gated to the player's GENDER (the one hard block, rule 4); level is
+ * display-only and never excludes a session from this list — an intermediate
+ * player still sees a beginner slot and self-selects out, they just aren't
+ * hidden from it. An open block carries no gender/level yet (group_shape), so
+ * it's never gender-filtered here — anyone can attempt it, exactly per Task 2.
  */
 export function slotsForType(
   slots: SessionSlot[],
   trainingType: TrainingType,
   player: Player,
+  batches: CreditBatch[],
+  now: IsoInstant,
   day: CairoDay,
 ): SessionSlot[] {
   return slots
-    .filter((s) => s.status === 'published' && s.trainingType === trainingType)
+    .filter((s) => s.status === 'published')
     .filter((s) => sameCairoDay(s.startsAt, day))
-    .filter((s) => trainingType !== 'group' || (s.gender === player.gender && s.level === player.level))
+    .filter((s) => {
+      if (s.trainingType === trainingType) return trainingType !== 'group' || s.gender === player.gender;
+      if (s.trainingType === null) {
+        return bookableTypesFor(s, player, batches, now).some((bt) => bt.trainingType === trainingType);
+      }
+      return false;
+    })
     .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
 }
 
@@ -133,37 +149,50 @@ export interface BookingPreview {
   alreadyBooked: boolean;
 }
 
+/**
+ * `chosenType` is the type this booking attempt would use — the slot's own
+ * type if it's already fixed, or the player's pick from the type picker if
+ * it's still open. Returns null (same "not found" contract as a missing slot)
+ * if the slot is open and no chosenType was supplied: a correct client always
+ * routes an open block through the picker first, so this combination should
+ * be unreachable — see the confirm-booking screen's guard.
+ */
 export function bookingPreview(
   ctx: { slots: SessionSlot[]; coaches: Coach[]; batches: CreditBatch[]; bookings: Booking[] },
   player: Player,
   slotId: SlotId,
   now: IsoInstant,
+  chosenType: TrainingType | null,
 ): BookingPreview | null {
   const slot = slotById(ctx.slots, slotId);
   if (!slot) return null;
-  const verdict = canBookSlot(slot, player, ctx.batches, now);
+  const effectiveType = slot.trainingType ?? chosenType;
+  if (effectiveType === null) return null;
+  const verdict = canBookSlot(slot, player, ctx.batches, now, effectiveType);
   const batch = verdict.ok ? ctx.batches.find((b) => b.id === verdict.creditBatchId) : undefined;
   return {
     slot,
     coach: coachById(ctx.coaches, slot.coachId),
     verdict,
     batch,
-    typeBalance: balanceByType(ctx.batches, now)[slot.trainingType],
+    typeBalance: balanceByType(ctx.batches, now)[verdict.ok ? verdict.trainingType : effectiveType],
     alreadyBooked: bookedSlotIds(ctx.bookings).has(slotId),
   };
 }
 
 /**
- * Why a slot can or can't be booked, for the current player, right now. Wraps
- * canBookSlot and adds two UI-only distinctions core doesn't make: `booked` and
- * `credits_expired` vs `no_credit`.
+ * Why a slot can or can't be booked AS `chosenType`, for the current player,
+ * right now. Wraps canBookSlot and adds UI-only distinctions core doesn't
+ * make: `booked`, `credits_expired` vs `no_credit`, and `type_taken` (a race —
+ * see below). `level_mismatch` is GONE (rule 4: level never blocks; the
+ * browse list still SHOWS the level, it just doesn't hide or grey the card).
  */
 export type SlotAvailability =
-  | { kind: 'bookable'; creditBatchId: CreditBatchId }
+  | { kind: 'bookable'; creditBatchId: CreditBatchId; trainingType: TrainingType }
   | { kind: 'booked' }
   | { kind: 'full' }
   | { kind: 'gender_mismatch' }
-  | { kind: 'level_mismatch' }
+  | { kind: 'type_taken' }
   | { kind: 'no_credit' }
   | { kind: 'credits_expired' }
   | { kind: 'past' }
@@ -175,26 +204,34 @@ export function slotAvailability(
   batches: CreditBatch[],
   bookings: Booking[],
   now: IsoInstant,
+  chosenType: TrainingType,
 ): SlotAvailability {
   if (bookedSlotIds(bookings).has(slot.id)) return { kind: 'booked' };
 
-  const res = canBookSlot(slot, player, batches, now);
-  if (res.ok) return { kind: 'bookable', creditBatchId: res.creditBatchId };
+  const res = canBookSlot(slot, player, batches, now, chosenType);
+  if (res.ok) return { kind: 'bookable', creditBatchId: res.creditBatchId, trainingType: res.trainingType };
 
   switch (res.reason) {
     case 'slot_full':
       return { kind: 'full' };
     case 'gender_mismatch':
       return { kind: 'gender_mismatch' };
-    case 'level_mismatch':
-      return { kind: 'level_mismatch' };
     case 'slot_in_past':
       return { kind: 'past' };
     case 'slot_cancelled':
       return { kind: 'cancelled' };
+    // A race: this slot was open (or typed differently) when the list was
+    // built, and someone else's booking has since fixed a different type —
+    // slotsForType only ever put it in THIS tab because it looked affordable,
+    // so reaching type_mismatch here means the world moved. The next
+    // query-cache refresh drops it from this tab (or shows it, correctly, in
+    // whichever tab actually won) — see Task 4's UNBOOKABLE_MESSAGE for the
+    // matching confirm-screen copy.
+    case 'type_mismatch':
+      return { kind: 'type_taken' };
     case 'no_usable_credit': {
       const lapsed = batches
-        .filter((b) => b.trainingType === slot.trainingType)
+        .filter((b) => b.trainingType === chosenType)
         .some((b) => b.quantityRemaining > 0 && creditExpiryState(b.expiresAt, now) === 'expired');
       return { kind: lapsed ? 'credits_expired' : 'no_credit' };
     }

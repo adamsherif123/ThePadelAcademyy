@@ -1,4 +1,4 @@
-import type { BookingId, IsoInstant, NotificationId, SlotId } from '@tpa/types';
+import type { BookingId, IsoInstant, NotificationId, SlotId, TrainingType } from '@tpa/types';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import {
@@ -144,11 +144,17 @@ async function bookedBookingId(slotId: SlotId): Promise<BookingId | null> {
   return bookings.find((b) => b.slotId === slotId && b.status !== 'cancelled')?.id ?? null;
 }
 
+export interface BookSlotInput {
+  slotId: SlotId;
+  /** The player's picked type on an OPEN block; null for an already-typed slot. */
+  trainingType: TrainingType | null;
+}
+
 export function useBookSlot() {
-  return useMutation<BookOutcome, never, SlotId>({
-    mutationFn: async (slotId) => {
+  return useMutation<BookOutcome, never, BookSlotInput>({
+    mutationFn: async ({ slotId, trainingType }) => {
       try {
-        const res = await bookSlotRpc(slotId);
+        const res = await bookSlotRpc(slotId, trainingType);
         await refetchBookingTouched();
         return res.ok
           ? { status: 'booked', reconciled: false, bookingId: res.bookingId }

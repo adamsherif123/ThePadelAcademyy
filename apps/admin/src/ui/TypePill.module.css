@@ -31,3 +31,8 @@
 .dot[data-type='trial'] {
   background: var(--tint-trial-fg);
 }
+/* An open (untyped) block — not one of the four trainingTint colours, since
+   "open" isn't a training type; a neutral accent dot instead. */
+.dot[data-type='open'] {
+  background: var(--color-accent-default);
+}

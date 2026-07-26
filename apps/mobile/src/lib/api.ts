@@ -27,6 +27,7 @@ import type {
   PurchaseId,
   SessionSlot,
   SlotId,
+  TrainingType,
 } from '@tpa/types';
 
 import { supabase } from './supabase';
@@ -237,11 +238,22 @@ export async function fetchIsAdmin(): Promise<boolean> {
 
 // ── RPC result contracts (mirror the jsonb the functions return) ──────────────
 
+/**
+ * type_required / invalid_type are RPC-only defensive reasons — unreachable
+ * from a correct client (the picker only ever offers types bookableTypesFor
+ * says are affordable, and the confirm screen always resolves a concrete
+ * chosenType before calling book_slot). Modelled here so the exhaustive
+ * switch in confirm-booking.tsx must still account for them: if the RPC ever
+ * actually returns one, that's a real bug to report to Sentry, not silently
+ * swallow — see Task 4.
+ */
 export type BookReason =
   | BookBlockReason
   | 'slot_missing'
   | 'already_booked'
-  | 'not_authenticated';
+  | 'not_authenticated'
+  | 'type_required'
+  | 'invalid_type';
 
 export type BookRpcResult =
   | { ok: true; bookingId: BookingId; creditBatchId: string }
@@ -349,8 +361,17 @@ async function callRpc(fn: string, argsPayload: Record<string, unknown>): Promis
   return data;
 }
 
-export async function bookSlotRpc(slotId: SlotId): Promise<BookRpcResult> {
-  const d = (await callRpc('book_slot', { p_slot_id: slotId })) as Record<string, unknown>;
+/**
+ * `trainingType` is the player's pick from the type picker on an OPEN block;
+ * null for an already-typed slot (the RPC's own default — book_slot resolves
+ * the type from the slot itself when it's already set, same as before the
+ * booking rework).
+ */
+export async function bookSlotRpc(slotId: SlotId, trainingType: TrainingType | null): Promise<BookRpcResult> {
+  const d = (await callRpc('book_slot', { p_slot_id: slotId, p_training_type: trainingType })) as Record<
+    string,
+    unknown
+  >;
   if (d.ok) {
     return { ok: true, bookingId: d.booking_id as BookingId, creditBatchId: d.credit_batch_id as string };
   }

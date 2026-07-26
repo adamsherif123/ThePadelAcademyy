@@ -87,6 +87,9 @@
 .legendDot[data-type='trial'] {
   background: var(--tint-trial-fg);
 }
+.legendDot[data-type='open'] {
+  background: var(--color-accent-default);
+}
 
 /* ---- Scroll viewport (midday→midnight content; opens scrolled to 5 PM) ---- */
 .scroll {

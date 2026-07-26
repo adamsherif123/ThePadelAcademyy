@@ -113,3 +113,14 @@
 .event[data-type='trial'] .time {
   color: var(--tint-trial-fg);
 }
+
+/* An OPEN (untyped) block — not one of the four trainingTint colours (open
+   isn't a training type); a dashed accent border says "nothing decided yet"
+   instead of a fill, mirroring the player app's open-block card. */
+.event[data-type='open'] {
+  background: var(--color-bg-canvas);
+  border: 1px dashed var(--color-accent-default);
+}
+.event[data-type='open'] .time {
+  color: var(--color-accent-default);
+}

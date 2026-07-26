@@ -34,6 +34,23 @@ export const TRAINING_META = {
   individual: { label: 'Individual', icon: 'person-outline' },
 } as const satisfies Record<TrainingType, { label: string; icon: IoniconName }>;
 
+/**
+ * Null-safe TRAINING_META lookup — a slot's trainingType is nullable (the
+ * booking rework: an OPEN block has no type until its first booking sets one).
+ * Every card that renders a slot's type badge/label should go through this
+ * instead of indexing TRAINING_META directly, so a still-open slot gets an
+ * honest "Open" meta instead of a `Record` lookup crash. In practice, every
+ * screen that reaches this with a null trainingType is one that shows an
+ * open BLOCK (not yet a session) — e.g. the schedule/browse list; screens that
+ * only ever render an EXISTING booking (Sessions tab, cancel screen) never see
+ * null here by construction (a booking implies a resolved type), but still
+ * route through this for a single, consistent fallback instead of an assumed
+ * invariant at each call site.
+ */
+export function trainingMetaFor(trainingType: TrainingType | null): { label: string; icon: IoniconName } {
+  return trainingType === null ? { label: 'Open', icon: 'add-circle-outline' } : TRAINING_META[trainingType];
+}
+
 /** Human name for a credit batch — "Group 8-Pack" or "Welcome Trial Credits". */
 export function batchLabel(batch: CreditBatch): string {
   if (batch.source === 'signup_grant') return 'Welcome Trial Credits';

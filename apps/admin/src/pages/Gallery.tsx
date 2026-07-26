@@ -45,6 +45,7 @@ const DEMO_SLOT: SessionSlot = {
   level: 'intermediate',
   status: 'published',
   templateId: null,
+  setByBookingAt: null,
 };
 
 /** Self-contained fixtures so the dev gallery renders without live data. */

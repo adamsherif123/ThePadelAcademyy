@@ -138,16 +138,16 @@ describe('slots', () => {
     );
     expect(mockSlots.some((s) => s.status === 'cancelled')).toBe(true);
   });
-  it('cover the full training-type mix', () => {
+  it('cover the full training-type mix, PLUS at least one OPEN (untyped) block', () => {
     expect(new Set(mockSlots.map((s) => s.trainingType))).toEqual(
-      new Set(['trial', 'group', 'duo', 'individual']),
+      new Set(['trial', 'group', 'duo', 'individual', null]),
     );
   });
   it('the current player can book at least one upcoming group slot', () => {
     const bookable = mockSlots.filter(
       (s) =>
         s.trainingType === 'group' &&
-        canBookSlot(s, mockCurrentPlayer, mockCreditBatches, MOCK_NOW).ok,
+        canBookSlot(s, mockCurrentPlayer, mockCreditBatches, MOCK_NOW, 'group').ok,
     );
     expect(bookable.length).toBeGreaterThan(0);
   });
@@ -156,8 +156,18 @@ describe('slots', () => {
     const bookable = mockSlots.filter(
       (s) =>
         s.trainingType === 'trial' &&
-        canBookSlot(s, mockCurrentPlayer, mockCreditBatches, MOCK_NOW).ok,
+        canBookSlot(s, mockCurrentPlayer, mockCreditBatches, MOCK_NOW, 'trial').ok,
     );
     expect(bookable.length).toBeGreaterThan(0);
+  });
+
+  it('the OPEN block is untyped AND carries no gender/level yet (group_shape)', () => {
+    const open = mockSlots.filter((s) => s.trainingType === null);
+    expect(open.length).toBeGreaterThan(0);
+    for (const s of open) {
+      expect(s.gender).toBeNull();
+      expect(s.level).toBeNull();
+      expect(s.setByBookingAt).toBeNull();
+    }
   });
 });

@@ -36,6 +36,7 @@ import {
   ScreenHeader,
   Text,
   TRAINING_META,
+  trainingMetaFor,
 } from '../../ui';
 
 export default function HomeScreen() {
@@ -153,10 +154,7 @@ export default function HomeScreen() {
                   {next.coach ? `with ${next.coach.name}` : ''}
                 </Text>
               </View>
-              <Badge
-                label={TRAINING_META[next.slot.trainingType].label}
-                icon={TRAINING_META[next.slot.trainingType].icon}
-              />
+              <Badge label={trainingMetaFor(next.slot.trainingType).label} icon={trainingMetaFor(next.slot.trainingType).icon} />
             </View>
             <View style={styles.divider} />
             <IconRow icon="location-outline" title={ACADEMY.locationLine} />

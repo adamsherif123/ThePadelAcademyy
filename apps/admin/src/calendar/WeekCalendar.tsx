@@ -72,6 +72,10 @@ export function WeekCalendar({
                 {TRAINING_LABEL[t]}
               </li>
             ))}
+            <li className={styles.legendItem}>
+              <span className={styles.legendDot} data-type="open" />
+              Open
+            </li>
           </ul>
           <Button icon={Plus} onClick={onAddOneOff}>
             Add one-off slot

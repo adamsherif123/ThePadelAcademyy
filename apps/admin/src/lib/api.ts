@@ -126,16 +126,41 @@ export async function removeBookingRpc(bookingId: Booking['id'], refund: boolean
     : { ok: false, reason: d.reason as RemoveBookingReason };
 }
 
+/**
+ * level_mismatch is GONE (rule 4: level is display-only, never blocking —
+ * neither the hard-reject path nor the override computation reference it
+ * anymore). type_required / invalid_type / type_mismatch are new: an OPEN
+ * slot needs a chosen type (type_required if omitted, invalid_type if it
+ * isn't one of the four, type_mismatch if it disagrees with an already-typed
+ * slot — including a race with a concurrent booking).
+ */
 export type AdminBookReason =
   | 'not_admin' | 'slot_missing' | 'player_missing' | 'slot_cancelled' | 'slot_in_past'
-  | 'gender_mismatch' | 'level_mismatch' | 'no_usable_credit' | 'slot_full' | 'already_booked';
+  | 'gender_mismatch' | 'no_usable_credit' | 'slot_full' | 'already_booked'
+  | 'type_required' | 'invalid_type' | 'type_mismatch';
 export type AdminBookResult =
-  | { ok: true; bookingId: string; creditBatchId: string }
+  | { ok: true; bookingId: string; creditBatchId: string; overridden: boolean }
   | { ok: false; reason: AdminBookReason };
-export async function adminBookPlayerRpc(slotId: SlotId, playerId: PlayerId, override: boolean): Promise<AdminBookResult> {
-  const d = await callRpc('admin_book_player', { p_slot_id: slotId, p_player_id: playerId, p_override: override });
+/** `trainingType` is the admin's pick for an OPEN slot; null for an already-typed one. */
+export async function adminBookPlayerRpc(
+  slotId: SlotId,
+  playerId: PlayerId,
+  override: boolean,
+  trainingType: TrainingType | null,
+): Promise<AdminBookResult> {
+  const d = await callRpc('admin_book_player', {
+    p_slot_id: slotId,
+    p_player_id: playerId,
+    p_override: override,
+    p_training_type: trainingType,
+  });
   return d.ok
-    ? { ok: true, bookingId: d.booking_id as string, creditBatchId: d.credit_batch_id as string }
+    ? {
+        ok: true,
+        bookingId: d.booking_id as string,
+        creditBatchId: d.credit_batch_id as string,
+        overridden: Boolean(d.overridden),
+      }
     : { ok: false, reason: d.reason as AdminBookReason };
 }
 

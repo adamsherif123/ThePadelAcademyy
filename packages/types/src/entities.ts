@@ -195,16 +195,24 @@ export interface AvailabilityTemplate {
  * deliberately NO separate single/multi flag: "Single" is a UI toggle that just
  * means capacity 1. `bookedCount` tracks live occupancy (0..capacity).
  *
- * `gender` / `level`: non-null only for `group` slots; null otherwise. The
- * invariant is enforced by @tpa/core (`isGroupSlot`) rather than the type, so the
- * shape maps 1:1 to the flat, nullable S5 columns.
+ * `trainingType`: nullable (the booking rework) — a slot may start OPEN (no
+ * type yet); the first booking picks it, and that choice is then permanent
+ * until the slot empties back to zero bookings (see `setByBookingAt`). Every
+ * pre-rework slot, and every admin-created one that pre-sets a type, has this
+ * non-null from creation — null is reachable only for a genuinely open block.
+ *
+ * `gender` / `level`: non-null only for `group` slots; null otherwise
+ * (including every UNTYPED slot — an open block carries neither until its
+ * first booking sets both, if that booking chooses group). The invariant is
+ * enforced by @tpa/core (`isGroupSlot`) rather than the type, so the shape
+ * maps 1:1 to the flat, nullable S5 columns.
  */
 export interface SessionSlot {
   id: SlotId;
   coachId: CoachId;
   startsAt: IsoInstant;
   endsAt: IsoInstant;
-  trainingType: TrainingType;
+  trainingType: TrainingType | null;
   /** Integer >= 1. The only thing that decides how many players fit. */
   capacity: number;
   bookedCount: number;
@@ -221,6 +229,16 @@ export interface SessionSlot {
    * via @tpa/core's isSessionConfirmed, never this field alone.
    */
   manuallyConfirmedAt: IsoInstant | null;
+  /**
+   * When a BOOKING (not the admin) set `trainingType` — null while untyped, and
+   * also null for an admin-preset type (that path never populates it). The
+   * single fact that distinguishes "this type is reversible" (reverts to open
+   * when the slot empties back to zero) from "this type is permanent" (admin
+   * chose it at creation/edit, so it never reverts). Display-only on the
+   * client — e.g. the admin's slot detail shows "typed by booking" vs a plain
+   * pre-set type — never gates a UI decision the RPC doesn't also make.
+   */
+  setByBookingAt: IsoInstant | null;
 }
 
 /**

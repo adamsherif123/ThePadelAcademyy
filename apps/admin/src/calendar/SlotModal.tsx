@@ -13,6 +13,7 @@ import type {
   CreditBatch,
   Player,
   SessionSlot,
+  TrainingType,
   Weekday,
 } from '@tpa/types';
 import { AlertTriangle, ArrowLeft, Ban, CalendarClock, Check, Trash2, UserPlus, Users, X } from 'lucide-react';
@@ -56,10 +57,11 @@ import {
   PlayerSearch,
   Select,
   StatusChip,
-  TRAINING_LABEL,
-  TYPE_PLAYERS,
+  trainingLabelFor,
+  typePlayersFor,
   groupTags,
 } from '../ui';
+import { SESSION_TYPE_OPTIONS } from './sessionForm';
 import styles from './SlotModal.module.css';
 
 const BLOCK_TEXT: Record<string, string> = {
@@ -68,9 +70,16 @@ const BLOCK_TEXT: Record<string, string> = {
   already_booked: 'Already booked',
   slot_in_past: 'Session started',
   slot_cancelled: 'Session cancelled',
+  type_mismatch: 'Someone just set a different type',
 };
 
-/** Seam reason → admin-facing copy. Always has a fallback (network / unknown). */
+/**
+ * Seam reason → admin-facing copy. Always has a fallback (network / unknown).
+ * level_mismatch is GONE (rule 4: display-only, never blocking). type_mismatch/
+ * type_required/invalid_type are new — an OPEN slot needs a chosen type; the
+ * admin UI always resolves one before calling admin_book_player, so
+ * type_required/invalid_type should be unreachable here (a bug if seen).
+ */
 const REASON_COPY: Record<string, string> = {
   not_admin: "You don't have permission.",
   slot_missing: 'That session no longer exists.',
@@ -83,7 +92,9 @@ const REASON_COPY: Record<string, string> = {
   already_booked: 'That player is already booked on this session.',
   no_usable_credit: 'That player has no usable credit for this session.',
   gender_mismatch: "That player is outside this session's gender filter.",
-  level_mismatch: "That player is outside this session's level filter.",
+  type_mismatch: 'Someone just started a different session type here — refresh and try again.',
+  type_required: 'Choose a session type first.',
+  invalid_type: 'That session type isn’t valid — please try again.',
   capacity_below_booked: 'Capacity can’t be below the number already booked.',
   end_before_start: 'The session must end after it starts.',
   in_past: 'That start time is in the past.',
@@ -157,6 +168,10 @@ export function SlotModal({
   const [durationMin, setDurationMin] = useState(duration0);
   const [refund, setRefund] = useState(true); // remove-player: refund is the default, never forfeit
   const [showHistory, setShowHistory] = useState(false);
+  // The admin's pick for an OPEN slot's "Add a player" flow — null until they
+  // choose one. For an already-typed slot this is simply that type (nothing
+  // to pick; the Select doesn't render).
+  const [addType, setAddType] = useState<TrainingType | null>(slot.trainingType);
 
   const isGroup = slot.gender !== null && slot.level !== null;
   const activeRoster = activeBookingsForSlot(bookings, slot.id);
@@ -194,7 +209,7 @@ export function SlotModal({
   const history = bookingsForSlot(bookings, slot.id).filter((b) => b.status === 'cancelled');
 
   const eyebrow = `${formatInstantDate(slot.startsAt)} · ${formatInstantTime(slot.startsAt)} – ${formatInstantTime(slot.endsAt)}`;
-  const title = `${TRAINING_LABEL[slot.trainingType]} session`;
+  const title = slot.trainingType === null ? 'Open block' : `${trainingLabelFor(slot.trainingType)} session`;
 
   // New wall time → UTC instants (all conversion via @tpa/core, DST-correct).
   const [yy, mm, dd] = dateStr.split('-').map(Number);
@@ -238,18 +253,30 @@ export function SlotModal({
 
   // ---- ADD view: a searchable roster of bookable players ----
   const book = async (playerId: Player['id'], override: boolean) => {
+    if (addType === null) return; // guarded by the disabled Select below too
     setActionError(null);
-    const res = await addPlayerToSlot(slot.id, playerId, override);
+    const res = await addPlayerToSlot(slot.id, playerId, override, slot.trainingType === null ? addType : null);
     if (!res.ok) setActionError(copyFor(res.reason));
   };
   function AddTrailing({ player }: { player: Player }) {
-    const credit = usableCreditFor(batches, player.id, slot.trainingType, now);
+    // No type chosen yet on an OPEN slot — nothing to classify against; the
+    // admin must pick one first (the Select above this list).
+    if (addType === null) {
+      return (
+        <span className={styles.blocked}>
+          <Ban size={13} aria-hidden />
+          Choose a type first
+        </span>
+      );
+    }
+    const credit = usableCreditFor(batches, player.id, addType, now);
     const verdict = classifyAdminBooking(
       slot,
       player,
       batchesForPlayer(batches, player.id),
       now,
       isActivelyBooked(bookings, slot.id, player.id),
+      addType,
     );
     return (
       <>
@@ -265,7 +292,7 @@ export function SlotModal({
             size="sm"
             variant="secondary"
             className={styles.overrideBtn}
-            title={`${verdict.reason === 'gender_mismatch' ? GENDER_LABEL[player.gender] : LEVEL_LABEL[player.level]} — outside this slot's filter`}
+            title={`${GENDER_LABEL[player.gender]} — outside this slot's filter`}
             onClick={() => void book(player.id, true)}
           >
             <AlertTriangle size={13} aria-hidden />
@@ -288,6 +315,14 @@ export function SlotModal({
           Record a WhatsApp or phone booking. Gender can be overridden; players with no usable
           credit must be granted credit first (Players).
         </p>
+        {slot.trainingType === null ? (
+          <Select
+            label="Session type"
+            value={addType ?? ''}
+            onChange={(e) => setAddType(e.target.value === '' ? null : (e.target.value as TrainingType))}
+            options={[{ value: '', label: 'Choose a type…' }, ...SESSION_TYPE_OPTIONS.map((t) => ({ value: t.value, label: t.label }))]}
+          />
+        ) : null}
         {actionError ? (
           <p className={styles.error}>
             <AlertTriangle size={15} aria-hidden />
@@ -338,7 +373,7 @@ export function SlotModal({
             <p className={styles.removeSub}>{player?.phone ?? 'No phone'}</p>
           </div>
         </div>
-        <p className={styles.removeQ}>What happens to their 1 {TRAINING_LABEL[slot.trainingType]} credit?</p>
+        <p className={styles.removeQ}>What happens to their 1 {trainingLabelFor(slot.trainingType)} credit?</p>
         <button type="button" className={styles.choice} data-on={refund} onClick={() => setRefund(true)}>
           <span className={styles.choiceTitle}>Refund it (default)</span>
           <span className={styles.choiceBody}>Academy-initiated — coach swap, court problem, our fault. Returned with its original expiry.</span>
@@ -506,7 +541,7 @@ export function SlotModal({
                 : `${occupied} of ${slot.capacity} booked`}
             </p>
             <p className={styles.summarySub}>
-              {isPast ? 'Session ended' : TYPE_PLAYERS[slot.trainingType]} · coached by {originalCoach}
+              {isPast ? 'Session ended' : typePlayersFor(slot.trainingType)} · coached by {originalCoach}
             </p>
           </div>
           <div className={styles.pills}>
@@ -532,6 +567,15 @@ export function SlotModal({
                 <Badge tone="neutral">{GENDER_LABEL[slot.gender!]}</Badge>
                 <Badge tone="neutral">{LEVEL_LABEL[slot.level!]}</Badge>
               </>
+            ) : null}
+            {/* What this block became, and how — Task 5: the admin can see
+                typed-by-booking vs a type she set herself at creation. An
+                admin-preset type never shows this (set_by_booking_at is only
+                ever populated by a first BOOKING, never the admin's own insert). */}
+            {slot.trainingType === null ? (
+              <Badge tone="neutral">Open — first player chooses</Badge>
+            ) : slot.setByBookingAt !== null ? (
+              <Badge tone="neutral">Set by first booking</Badge>
             ) : null}
           </div>
         </div>
@@ -665,7 +709,10 @@ export function SlotModal({
             min={1}
             value={capacity}
             onChange={(e) => setCapacity(Number(e.target.value))}
-            hint={`${TRAINING_LABEL[slot.trainingType]}: ${TYPE_PLAYERS[slot.trainingType]}`}
+            // FILED, NOT FIXED (see the session report): nothing here stops the
+            // admin widening an 'individual' slot's capacity past 1 — the same
+            // gap reschedule_session has server-side. Out of this session's scope.
+            hint={`${trainingLabelFor(slot.trainingType)}: ${typePlayersFor(slot.trainingType)}`}
           />
         </div>
 

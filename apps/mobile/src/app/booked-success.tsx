@@ -26,7 +26,7 @@ import {
   Screen,
   SuccessView,
   Text,
-  TRAINING_META,
+  trainingMetaFor,
 } from '../ui';
 
 /** 13 — Booked success. Shared SuccessView; every number computed from live data. */
@@ -52,8 +52,11 @@ export default function BookedSuccessScreen() {
   if (!player || !booking || !slot) return <Screen />;
 
   const coach = coachById(coachesQ.data ?? [], slot.coachId);
-  const meta = TRAINING_META[slot.trainingType];
-  const left = balanceByType(batchesQ.data ?? [], now)[slot.trainingType];
+  // A booking always implies a resolved type (this booking either used an
+  // already-typed slot or just fixed one) — trainingMetaFor's null-fallback
+  // is defense-in-depth, not an expected path here.
+  const meta = trainingMetaFor(slot.trainingType);
+  const left = slot.trainingType !== null ? balanceByType(batchesQ.data ?? [], now)[slot.trainingType] : 0;
 
   // The SEAT is always booked; what may still be pending is whether the SESSION
   // runs. Confirmed → confident copy; pending → honest "runs once it fills" (no
@@ -61,13 +64,18 @@ export default function BookedSuccessScreen() {
   // auto-confirms on the first booking, so a 1-on-1 lands here as confirmed.
   const confirmed = isSessionConfirmed(slot);
   const toFill = spotsUntilConfirmed(slot);
+  // Exactly one active booking on a capacity>1 slot means THIS booking was the
+  // one that just fixed the type (rule 1) — set the creator's expectations
+  // ("your session is created") rather than the generic "you're booked" line
+  // a later joiner sees.
+  const isCreator = slot.bookedCount === 1 && slot.capacity > 1;
 
   return (
     <Screen>
       <SuccessView
         tone="success"
-        eyebrow={confirmed ? 'See you on court' : 'Your spot is saved'}
-        title="You're booked"
+        eyebrow={confirmed ? 'See you on court' : isCreator ? 'You started it' : 'Your spot is saved'}
+        title={isCreator ? `Your ${meta.label} session is created` : "You're booked"}
         primary={{ label: 'View my sessions', onPress: () => resetToTab('/(tabs)/sessions') }}
         secondary={{ label: 'Done', onPress: () => resetToTab('/(tabs)') }}
       >
@@ -105,9 +113,15 @@ export default function BookedSuccessScreen() {
             variant="neutral"
             icon="people-outline"
             style={styles.pendingNote}
-            text={`Your spot and credit are saved. This session runs once ${toFill} more ${
-              toFill === 1 ? 'player joins' : 'players join'
-            }.`}
+            text={
+              isCreator
+                ? `Your ${meta.label} session is created — it confirms when ${toFill} more ${
+                    toFill === 1 ? 'player joins' : 'players join'
+                  }.`
+                : `Your spot and credit are saved. This session runs once ${toFill} more ${
+                    toFill === 1 ? 'player joins' : 'players join'
+                  }.`
+            }
           />
         )}
 

@@ -84,6 +84,7 @@ function RootNavigator() {
         <Stack.Screen name="request-credits" />
         <Stack.Screen name="checkout" />
         <Stack.Screen name="purchase-success" />
+        <Stack.Screen name="pick-type" />
         <Stack.Screen name="confirm-booking" />
         <Stack.Screen name="booked-success" />
         <Stack.Screen name="cancel-booking" options={{ presentation: 'modal' }} />

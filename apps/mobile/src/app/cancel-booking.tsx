@@ -19,7 +19,7 @@ import {
   Screen,
   ScreenHeader,
   Text,
-  TRAINING_META,
+  trainingMetaFor,
 } from '../ui';
 
 /**
@@ -76,7 +76,9 @@ export default function CancelBookingScreen() {
   }
 
   const { slot, coach, refundable, refundExpired, batch } = preview;
-  const meta = TRAINING_META[slot.trainingType];
+  // An existing booking always implies a resolved type — trainingMetaFor's
+  // null-fallback is defense-in-depth, not an expected path here.
+  const meta = trainingMetaFor(slot.trainingType);
   const submitting = cancelMutation.isPending;
 
   const onConfirm = async () => {

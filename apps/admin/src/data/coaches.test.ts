@@ -46,4 +46,25 @@ describe('coachWeekStats — computed from the fetched rows', () => {
     expect(stats.typeCounts).toEqual([]);
     expect(stats.attendancePct).toBe(null);
   });
+
+  it('an OPEN (untyped) block is counted under its own bucket, never silently dropped', () => {
+    const coachId = 'co_open_test' as CoachId;
+    const openSlot = {
+      ...seededSlots()[0]!,
+      id: 'sl_open_test' as (typeof mockSlots)[number]['id'],
+      coachId,
+      trainingType: null,
+      gender: null,
+      level: null,
+      startsAt: now,
+      bookedCount: 0,
+      status: 'published' as const,
+    };
+    const stats = coachWeekStats([openSlot], [], coachId, now);
+    expect(stats.sessionsThisWeek).toBe(1);
+    // The invariant the earlier test cross-checks — chip total == sessions —
+    // would silently fail here (0 vs 1) if the open bucket were dropped.
+    expect(stats.typeCounts.reduce((s, c) => s + c.count, 0)).toBe(1);
+    expect(stats.typeCounts).toEqual([{ type: null, count: 1 }]);
+  });
 });

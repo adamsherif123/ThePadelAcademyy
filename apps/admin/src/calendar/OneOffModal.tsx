@@ -1,5 +1,5 @@
 import { cairoCalendarDate, formatInstantTime } from '@tpa/core';
-import type { AvailabilityTemplate, Coach, CoachId, SessionSlot, SlotId, Weekday } from '@tpa/types';
+import type { AvailabilityTemplate, Coach, CoachId, SessionSlot, SlotId, TrainingType, Weekday } from '@tpa/types';
 import { AlertTriangle, CalendarClock } from 'lucide-react';
 import { useState } from 'react';
 
@@ -7,12 +7,12 @@ import { createOneOffSlot } from '../data/generate';
 import { closedWeekdays, findCoachConflict, slotTimesFromWall } from '../data/schedule';
 import { coachById } from '../data/selectors';
 import { useSession } from '../session/SessionProvider';
-import { Button, Input, Modal, Select, TYPE_PLAYERS } from '../ui';
+import { Button, Input, Modal, Select, typePlayersFor } from '../ui';
 import {
   DURATION_OPTIONS,
   GENDER_OPTIONS,
   LEVEL_OPTIONS,
-  SESSION_TYPE_OPTIONS,
+  ONE_OFF_TYPE_OPTIONS,
   useSessionDraft,
 } from './sessionForm';
 import styles from './sessionForm.module.css';
@@ -57,6 +57,11 @@ export function OneOffModal({
     gender: null,
     level: null,
   });
+  // Separate from the shared draft's (always-concrete) trainingType: an open
+  // one-off has NO type yet, so this stays independent rather than widening
+  // useSessionDraft's contract (TemplateModal shares that hook and must never
+  // be able to leave a recurring rule untyped).
+  const [openSelected, setOpenSelected] = useState(false);
   const [dateStr, setDateStr] = useState(`${today.year}-${pad(today.month)}-${pad(today.day)}`);
   const [startStr, setStartStr] = useState('17:00');
   const [durationMin, setDurationMin] = useState(90);
@@ -84,10 +89,10 @@ export function OneOffModal({
     const res = await createOneOffSlot(
       {
         coachId: draft.coachId,
-        trainingType: draft.trainingType,
+        trainingType: openSelected ? null : draft.trainingType,
         capacity: draft.capacity,
-        gender: draft.effectiveGender,
-        level: draft.effectiveLevel,
+        gender: openSelected ? null : draft.effectiveGender,
+        level: openSelected ? null : draft.effectiveLevel,
         startsAt,
         endsAt,
       },
@@ -128,9 +133,17 @@ export function OneOffModal({
           <Input label="Date" type="date" value={dateStr} onChange={(e) => setDateStr(e.target.value)} />
           <Select
             label="Session type"
-            value={draft.trainingType}
-            onChange={(e) => draft.setTrainingType(e.target.value as typeof draft.trainingType)}
-            options={SESSION_TYPE_OPTIONS.map((t) => ({ value: t.value, label: t.label }))}
+            value={openSelected ? 'open' : draft.trainingType}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === 'open') {
+                setOpenSelected(true);
+              } else {
+                setOpenSelected(false);
+                draft.setTrainingType(v as TrainingType);
+              }
+            }}
+            options={ONE_OFF_TYPE_OPTIONS.map((t) => ({ value: t.value, label: t.label }))}
           />
 
           <Input label="Start" type="time" value={startStr} onChange={(e) => setStartStr(e.target.value)} />
@@ -147,9 +160,9 @@ export function OneOffModal({
             min={1}
             value={draft.capacity}
             onChange={(e) => draft.setCapacity(Number(e.target.value))}
-            hint={TYPE_PLAYERS[draft.trainingType]}
+            hint={openSelected ? 'First player chooses the type — this is the physical seat ceiling' : typePlayersFor(draft.trainingType)}
           />
-          {draft.requiresGenderLevel ? (
+          {!openSelected && draft.requiresGenderLevel ? (
             <Select
               label="Gender group"
               value={draft.gender}
@@ -160,7 +173,7 @@ export function OneOffModal({
             <div />
           )}
 
-          {draft.requiresGenderLevel ? (
+          {!openSelected && draft.requiresGenderLevel ? (
             <Select
               label="Level"
               value={draft.level}

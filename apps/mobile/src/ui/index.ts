@@ -32,5 +32,12 @@ export { SlotCard, type SlotCardState } from './SlotCard';
 export { StatusChip } from './StatusChip';
 export { SuccessView, type SuccessTone } from './SuccessView';
 export { Text, type TextProps, type TextTone, type TextVariant } from './Text';
-export { GENDER_LABEL, LEVEL_LABEL, TRAINING_META, batchLabel, type IoniconName } from './trainingMeta';
+export {
+  GENDER_LABEL,
+  LEVEL_LABEL,
+  TRAINING_META,
+  batchLabel,
+  trainingMetaFor,
+  type IoniconName,
+} from './trainingMeta';
 export { TypeCard } from './TypeCard';

@@ -74,6 +74,7 @@ export {
 } from './templates';
 
 export {
+  bookableTypesFor,
   canBookSlot,
   cancellationDeadline,
   isBatchUsable,
@@ -82,6 +83,7 @@ export {
   isSessionConfirmed,
   slotRemainingCapacity,
   spotsUntilConfirmed,
+  type BookableType,
   type BookBlockReason,
   type CanBookResult,
 } from './rules';

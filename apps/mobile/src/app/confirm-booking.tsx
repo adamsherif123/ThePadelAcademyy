@@ -6,7 +6,7 @@ import {
   spotsUntilConfirmed,
 } from '@tpa/core';
 import { color, space } from '@tpa/theme';
-import type { Gender, Level, SlotId } from '@tpa/types';
+import type { Gender, Level, SlotId, TrainingType } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
@@ -34,18 +34,31 @@ import {
   batchLabel,
 } from '../ui';
 import type { BookReason } from '../lib/api';
+import { captureException } from '../lib/reporting';
 
+/**
+ * type_required / invalid_type are RPC-only defensive reasons — unreachable
+ * from this screen (it always resolves a concrete chosenType before calling
+ * book_slot: either the slot's own type, or the picker's pick). If the RPC
+ * ever actually returns one, that's a real bug: report it and show a generic
+ * message rather than crash or lie about why.
+ */
 const UNBOOKABLE_MESSAGE: Record<BookReason, string> = {
   slot_full: 'This session just filled up. Pick another slot.',
   slot_in_past: 'This session has already started.',
   slot_cancelled: 'This session was cancelled.',
   gender_mismatch: "This session isn't for your group.",
-  level_mismatch: "This session isn't for your level.",
+  type_mismatch: 'Someone just started a different session here. Go back and pick again.',
   no_usable_credit: 'You no longer have a usable credit for this session.',
   slot_missing: 'This session is no longer available.',
   already_booked: "You've already booked this session.",
   not_authenticated: 'Your session expired. Please sign in again.',
+  type_required: 'Something went wrong choosing your session type. Please try again.',
+  invalid_type: 'Something went wrong choosing your session type. Please try again.',
 };
+
+/** Reasons that should be structurally unreachable from this screen — worth a Sentry report if the RPC ever sends one. */
+const UNEXPECTED_REASONS: readonly BookReason[] = ['type_required', 'invalid_type'];
 
 /** 12 — Confirm booking. Read-through preview + the real credit-spend RPC. */
 export default function ConfirmBookingScreen() {
@@ -58,7 +71,8 @@ export default function ConfirmBookingScreen() {
   const gate = combine(slotsQ, batchesQ, bookingsQ, coachesQ);
   const bookMutation = useBookSlot();
   const [error, setError] = useState<string | null>(null);
-  const { slotId } = useLocalSearchParams<{ slotId: string }>();
+  const { slotId, trainingType } = useLocalSearchParams<{ slotId: string; trainingType?: string }>();
+  const chosenType = (trainingType as TrainingType | undefined) ?? null;
   if (!player) return null;
 
   if (gate.isPending || gate.isError) {
@@ -80,6 +94,7 @@ export default function ConfirmBookingScreen() {
     player,
     slotId as SlotId,
     now,
+    chosenType,
   );
   if (!preview) {
     return (
@@ -93,7 +108,10 @@ export default function ConfirmBookingScreen() {
   }
 
   const { slot, coach, verdict, batch, typeBalance, alreadyBooked } = preview;
-  const meta = TRAINING_META[slot.trainingType];
+  // The RESOLVED type — the slot's own if already typed, else the picker's
+  // pick — never slot.trainingType directly (still null for an open block).
+  const resolvedType = verdict.ok ? verdict.trainingType : (slot.trainingType ?? chosenType);
+  const meta = resolvedType ? TRAINING_META[resolvedType] : TRAINING_META.trial;
   const isGroup = slot.gender !== null && slot.level !== null;
   const confirmed = isSessionConfirmed(slot);
   const toFill = spotsUntilConfirmed(slot);
@@ -101,14 +119,37 @@ export default function ConfirmBookingScreen() {
   const canConfirm = verdict.ok && batch !== undefined && !alreadyBooked && !submitting;
   const leftAfter = typeBalance - 1;
 
-  const onConfirm = async () => {
+  // The race, honestly handled: someone else's booking fixed this slot's type
+  // WHILE this screen was open, to something other than what was picked here.
+  // Rather than a dead end, check whether the type it actually became is one
+  // this player could ALSO join — an honest "someone just started a Group
+  // session here — join it instead?" recovery (Task 4), not just a refusal.
+  const rejoinType = !verdict.ok && verdict.reason === 'type_mismatch' ? slot.trainingType : null;
+  const rejoinPreview = rejoinType
+    ? bookingPreview(
+        { slots: slotsQ.data ?? [], coaches: coachesQ.data ?? [], batches: batchesQ.data ?? [], bookings: bookingsQ.data ?? [] },
+        player,
+        slot.id,
+        now,
+        rejoinType,
+      )
+    : null;
+  const canRejoin = rejoinPreview !== null && rejoinPreview.verdict.ok;
+
+  const attemptBook = async (asType: TrainingType | null) => {
     setError(null);
     // The RPC is the enforcement; canBookSlot above was only the preview. If they
     // disagree, the RPC wins and its reason is shown here.
-    const outcome = await bookMutation.mutateAsync(slot.id);
+    const outcome = await bookMutation.mutateAsync({ slotId: slot.id, trainingType: asType });
     if (outcome.status === 'booked') {
       router.replace({ pathname: '/booked-success', params: { bookingId: outcome.bookingId } });
     } else if (outcome.status === 'rejected') {
+      if (UNEXPECTED_REASONS.includes(outcome.reason)) {
+        captureException(new Error(`book_slot returned unreachable reason: ${outcome.reason}`), {
+          slotId: slot.id,
+          chosenType: asType,
+        });
+      }
       setError(UNBOOKABLE_MESSAGE[outcome.reason] ?? 'This session is unavailable.');
     } else {
       // Lost response after a possible success — never claim failure. The wallet /
@@ -118,6 +159,8 @@ export default function ConfirmBookingScreen() {
       );
     }
   };
+  const onConfirm = () => attemptBook(chosenType);
+  const onRejoin = () => rejoinType && attemptBook(rejoinType);
 
   return (
     <Screen
@@ -220,10 +263,24 @@ export default function ConfirmBookingScreen() {
               ? "You've already booked this session."
               : verdict.ok
                 ? 'This session is unavailable.'
-                : (UNBOOKABLE_MESSAGE[verdict.reason] ?? 'This session is unavailable.')
+                : rejoinType
+                  ? `Someone just started a ${TRAINING_META[rejoinType].label} session here instead of ${meta.label}.`
+                  : (UNBOOKABLE_MESSAGE[verdict.reason] ?? 'This session is unavailable.')
           }
         />
       )}
+
+      {/* The race, honestly resolved: the slot became a DIFFERENT type than
+          picked, but this player can also join THAT one — offer it directly
+          instead of sending them all the way back to the picker. */}
+      {!verdict.ok && rejoinType && canRejoin ? (
+        <Button
+          label={`Join as ${TRAINING_META[rejoinType].label} instead`}
+          variant="secondary"
+          disabled={submitting}
+          onPress={() => void onRejoin()}
+        />
+      ) : null}
 
       {/* Runtime booking error (RPC rejection or an unconfirmed/lost response) */}
       {error ? <InfoCard variant="amber" icon="alert-circle-outline" text={error} /> : null}

@@ -66,8 +66,14 @@ function slot(over: Partial<SessionSlot> & Pick<SessionSlot, 'id'>): SessionSlot
     status: 'published',
     templateId: null,
     manuallyConfirmedAt: null,
+    setByBookingAt: null,
     ...over,
   };
+}
+
+/** An OPEN block: untyped, so gender/level are null too until a first booking sets one. */
+function openSlot(over: Partial<SessionSlot> & Pick<SessionSlot, 'id'>): SessionSlot {
+  return slot({ trainingType: null, gender: null, level: null, ...over });
 }
 
 function batch(over: Partial<CreditBatch> & Pick<CreditBatch, 'id'>): CreditBatch {
@@ -130,30 +136,51 @@ describe('slotAvailability', () => {
   it('reports `booked` for a slot the player already holds', () => {
     const s = slot({ id: 'sl_1' as SessionSlot['id'] });
     const bookings = [booking({ id: 'bk_1' as Booking['id'], slotId: s.id })];
-    expect(slotAvailability(s, player, [usableGroup], bookings, NOW).kind).toBe('booked');
+    expect(slotAvailability(s, player, [usableGroup], bookings, NOW, 'group').kind).toBe('booked');
   });
 
-  it('reports `bookable` for a fresh matching slot with a usable credit', () => {
+  it('reports `bookable` for a fresh matching slot with a usable credit, naming the resolved type', () => {
     const s = slot({ id: 'sl_2' as SessionSlot['id'] });
-    const av = slotAvailability(s, player, [usableGroup], [], NOW);
-    expect(av.kind).toBe('bookable');
+    const av = slotAvailability(s, player, [usableGroup], [], NOW, 'group');
+    expect(av).toEqual({ kind: 'bookable', creditBatchId: 'cb_g', trainingType: 'group' });
   });
 
   it('reports `full` when the slot is at capacity', () => {
     const s = slot({ id: 'sl_3' as SessionSlot['id'], capacity: 4, bookedCount: 4 });
-    expect(slotAvailability(s, player, [usableGroup], [], NOW).kind).toBe('full');
+    expect(slotAvailability(s, player, [usableGroup], [], NOW, 'group').kind).toBe('full');
   });
 
   it('distinguishes `no_credit` (never had) from `credits_expired` (lapsed)', () => {
     const s = slot({ id: 'sl_4' as SessionSlot['id'] });
-    expect(slotAvailability(s, player, [], [], NOW).kind).toBe('no_credit');
+    expect(slotAvailability(s, player, [], [], NOW, 'group').kind).toBe('no_credit');
     const expired = batch({ id: 'cb_exp' as CreditBatch['id'], expiresAt: iso(-1), quantityRemaining: 2 });
-    expect(slotAvailability(s, player, [expired], [], NOW).kind).toBe('credits_expired');
+    expect(slotAvailability(s, player, [expired], [], NOW, 'group').kind).toBe('credits_expired');
   });
 
-  it('reports `gender_mismatch` for a ladies-only slot', () => {
+  it('reports `gender_mismatch` for a ladies-only slot — the one hard block that survives (rule 4)', () => {
     const s = slot({ id: 'sl_5' as SessionSlot['id'], gender: 'ladies' });
-    expect(slotAvailability(s, player, [usableGroup], [], NOW).kind).toBe('gender_mismatch');
+    expect(slotAvailability(s, player, [usableGroup], [], NOW, 'group').kind).toBe('gender_mismatch');
+  });
+
+  it('a LEVEL mismatch is `bookable`, never a blocking kind — display-only (rule 4)', () => {
+    const s = slot({ id: 'sl_6' as SessionSlot['id'], level: 'intermediate' }); // player is 'beginner'
+    expect(slotAvailability(s, player, [usableGroup], [], NOW, 'group').kind).toBe('bookable');
+  });
+
+  it('reports `type_taken` when chosenType disagrees with an already-typed slot (the race outcome)', () => {
+    const s = slot({ id: 'sl_7' as SessionSlot['id'], trainingType: 'group' });
+    const duoCredit = batch({ id: 'cb_duo' as CreditBatch['id'], trainingType: 'duo' });
+    expect(slotAvailability(s, player, [duoCredit], [], NOW, 'duo').kind).toBe('type_taken');
+  });
+
+  it('an OPEN slot is `bookable` as any type the player can afford, naming that resolved type', () => {
+    const s = openSlot({ id: 'sl_8' as SessionSlot['id'] });
+    const duoCredit = batch({ id: 'cb_duo2' as CreditBatch['id'], trainingType: 'duo' });
+    expect(slotAvailability(s, player, [duoCredit], [], NOW, 'duo')).toEqual({
+      kind: 'bookable',
+      creditBatchId: 'cb_duo2',
+      trainingType: 'duo',
+    });
   });
 });
 
@@ -167,8 +194,36 @@ describe('slotsForType', () => {
       slot({ id: 'd3' as SessionSlot['id'], trainingType: 'duo', gender: null, level: null, startsAt: iso(3, 10) }), // wrong day
       slot({ id: 'dc' as SessionSlot['id'], trainingType: 'duo', gender: null, level: null, status: 'cancelled', startsAt: iso(2, 8) }),
     ];
-    const out = slotsForType(slots, 'duo', player, day);
+    const out = slotsForType(slots, 'duo', player, [], NOW, day);
     expect(out.map((s) => s.id)).toEqual(['d1', 'd2']);
+  });
+
+  it('a LEVEL-mismatched group slot is still included (display-only, never hidden)', () => {
+    const day = cairoCalendarDate(iso(2));
+    const s = slot({ id: 'g_int' as SessionSlot['id'], trainingType: 'group', level: 'intermediate' });
+    expect(slotsForType([s], 'group', player, [], NOW, day).map((x) => x.id)).toEqual(['g_int']);
+  });
+
+  it('a GENDER-mismatched group slot is excluded (the one hard block, rule 4)', () => {
+    const day = cairoCalendarDate(iso(2));
+    const s = slot({ id: 'g_ladies' as SessionSlot['id'], trainingType: 'group', gender: 'ladies' });
+    expect(slotsForType([s], 'group', player, [], NOW, day)).toEqual([]);
+  });
+
+  it('an OPEN block appears under every tab the player can afford it as, and ONLY those', () => {
+    const day = cairoCalendarDate(iso(2));
+    const open = openSlot({ id: 'open_1' as SessionSlot['id'] });
+    const duoCredit = batch({ id: 'cb_o_duo' as CreditBatch['id'], trainingType: 'duo' });
+    expect(slotsForType([open], 'duo', player, [duoCredit], NOW, day).map((s) => s.id)).toEqual(['open_1']);
+    expect(slotsForType([open], 'individual', player, [duoCredit], NOW, day)).toEqual([]);
+  });
+
+  it('an OPEN block with zero usable credits appears under NO tab', () => {
+    const day = cairoCalendarDate(iso(2));
+    const open = openSlot({ id: 'open_2' as SessionSlot['id'] });
+    for (const t of ['group', 'duo', 'individual', 'trial'] as const) {
+      expect(slotsForType([open], t, player, [], NOW, day)).toEqual([]);
+    }
   });
 });
 
@@ -214,7 +269,7 @@ describe('operatingWeekdays / dateStrip (from active templates)', () => {
 
     // On that open Monday the slot list is simply empty — "open, nothing available",
     // which the Book screen renders as an empty state, NOT a closed day.
-    expect(slotsForType([], 'trial', player, mondays[0]!)).toEqual([]);
+    expect(slotsForType([], 'trial', player, [], NOW, mondays[0]!)).toEqual([]);
   });
 });
 

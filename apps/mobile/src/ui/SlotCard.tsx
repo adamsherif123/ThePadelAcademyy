@@ -19,7 +19,13 @@ export type SlotCardState = 'bookable' | 'full' | 'booked' | 'unavailable';
  * gender/level tags. Unbookable states read as unavailable (greyed) and MUST
  * carry a reason: `full` shows a lock+FULL pill; `unavailable` shows the `note`;
  * `booked` shows a Booked pill; `bookable` shows a chevron + which credit is
- * spent. Presentation only — the screen maps availability to state/note. RTL-safe.
+ * spent. Presentation only — the screen maps availability to state/note.
+ *
+ * An OPEN block (slot.trainingType === null) is a genuinely different kind of
+ * card, not just a `bookable` one — it's an invitation, not a class (Task 2):
+ * a dashed border instead of a solid one, no gender/level row (there isn't one
+ * yet), and an "Open — you choose" line instead of the credit note (the type,
+ * and so the credit it'll spend, isn't decided until the tap). RTL-safe.
  */
 export function SlotCard({
   slot,
@@ -39,10 +45,11 @@ export function SlotCard({
   onPress?: () => void;
 }) {
   const bookable = state === 'bookable';
+  const isOpen = slot.trainingType === null;
   const isGroup = slot.gender !== null && slot.level !== null;
 
   const body = (
-    <View style={[styles.card, !bookable && styles.dimmed]}>
+    <View style={[styles.card, isOpen && styles.open, !bookable && !isOpen && styles.dimmed]}>
       <View style={styles.top}>
         <Avatar name={coach?.name ?? 'Coach'} imageUrl={coach?.photoUrl} size={44} />
         <View style={styles.info}>
@@ -53,7 +60,7 @@ export function SlotCard({
             {`${coach ? `Coach ${coach.name.split(' ')[0]}` : 'Coach'} · ${slot.bookedCount}/${slot.capacity} booked`}
           </Text>
         </View>
-        <StatusPill state={state} note={note} />
+        <StatusPill state={state} note={note} isOpen={isOpen} />
       </View>
 
       <View style={styles.bottom}>
@@ -61,10 +68,14 @@ export function SlotCard({
           <Text variant="micro" tone="muted">
             {`${GENDER_LABEL[slot.gender as Gender]} · ${LEVEL_LABEL[slot.level as Level]}`}
           </Text>
+        ) : isOpen ? (
+          <Text variant="micro" tone="accent">
+            Open — you choose the session type
+          </Text>
         ) : (
           <View />
         )}
-        <CapacityDots booked={slot.bookedCount} capacity={slot.capacity} muted={!bookable} />
+        <CapacityDots booked={slot.bookedCount} capacity={slot.capacity} muted={!bookable && !isOpen} />
       </View>
 
       {bookable && creditNote ? (
@@ -85,7 +96,17 @@ export function SlotCard({
   return body;
 }
 
-function StatusPill({ state, note }: { state: SlotCardState; note?: string }) {
+function StatusPill({ state, note, isOpen }: { state: SlotCardState; note?: string; isOpen?: boolean }) {
+  if (state === 'bookable' && isOpen) {
+    return (
+      <View style={[styles.pill, styles.pillOpen]}>
+        <Ionicons name="add-circle-outline" size={12} color={color.accent.default} />
+        <Text variant="micro" tone="accent">
+          Open
+        </Text>
+      </View>
+    );
+  }
   if (state === 'bookable') {
     return <Ionicons name="chevron-forward" size={20} color={color.text.muted} />;
   }
@@ -128,6 +149,10 @@ const styles = StyleSheet.create({
     gap: space.md,
   },
   dimmed: { opacity: 0.6 },
+  // An open block is an invitation, not a class yet — a dashed accent border
+  // (instead of the solid neutral one every typed session gets) says "nothing
+  // is decided here" at a glance, without adding a badge to every card.
+  open: { borderStyle: 'dashed', borderColor: color.accent.default, borderWidth: 1.5 },
   pressed: { opacity: 0.85 },
   top: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   info: { flex: 1, gap: 2 },
@@ -142,4 +167,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.sm,
   },
   pillOutline: { borderWidth: 1, borderColor: color.border.strong, backgroundColor: color.bg.surface },
+  pillOpen: { borderWidth: 1, borderColor: color.accent.default, backgroundColor: color.bg.surface },
 });

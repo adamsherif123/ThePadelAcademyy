@@ -29,4 +29,6 @@ export {
   LEVEL_OPTIONS,
   TYPE_PLAYERS,
   groupTags,
+  trainingLabelFor,
+  typePlayersFor,
 } from './trainingLabel';

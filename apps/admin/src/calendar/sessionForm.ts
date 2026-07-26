@@ -23,6 +23,19 @@ export const SESSION_TYPE_OPTIONS: readonly { value: TrainingType; label: string
   { value: 'trial', label: 'Trial' },
 ];
 
+/**
+ * ONE-OFF slots may be left untyped (the booking rework: "Open — first player
+ * chooses"). Recurring TEMPLATES do NOT get this option — AvailabilityTemplate.
+ * trainingType stays required (deferred; see the session report) — so this is a
+ * SEPARATE list from SESSION_TYPE_OPTIONS, not a superset TemplateModal also
+ * consumes; sharing one list would let an admin accidentally leave a recurring
+ * rule untyped, which the DB would reject anyway but with a worse error.
+ */
+export const ONE_OFF_TYPE_OPTIONS: readonly { value: TrainingType | 'open'; label: string }[] = [
+  { value: 'open', label: 'Open — first player chooses' },
+  ...SESSION_TYPE_OPTIONS,
+];
+
 export const WEEKDAY_OPTIONS: readonly { value: Weekday; label: string }[] = [
   { value: 0, label: 'Sunday' },
   { value: 1, label: 'Monday' },

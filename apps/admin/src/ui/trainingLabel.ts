@@ -9,6 +9,22 @@ export const TRAINING_LABEL: Record<TrainingType, string> = {
   individual: 'Individual',
 };
 
+/**
+ * Null-safe TRAINING_LABEL lookup — a slot's trainingType is nullable (the
+ * booking rework: an OPEN block has no type until its first booking sets
+ * one). Every call site that reads a SLOT's type (not a package/credit
+ * batch's, which stay non-null) should go through this instead of indexing
+ * TRAINING_LABEL directly.
+ */
+export function trainingLabelFor(trainingType: TrainingType | null): string {
+  return trainingType === null ? 'Open' : TRAINING_LABEL[trainingType];
+}
+
+/** Null-safe TYPE_PLAYERS lookup — see trainingLabelFor. */
+export function typePlayersFor(trainingType: TrainingType | null): string {
+  return trainingType === null ? 'first booking decides' : TYPE_PLAYERS[trainingType];
+}
+
 /** Gender labels (possessive, as the schedule/modal read them). */
 export const GENDER_LABEL: Record<Gender, string> = {
   men: "Men's",

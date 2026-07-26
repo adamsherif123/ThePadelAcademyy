@@ -6,7 +6,7 @@ import { CoachModal } from '../coaches/CoachModal';
 import { coachWeekStats } from '../data/coaches';
 import { useAdminData } from '../data/queries';
 import { useSession } from '../session/SessionProvider';
-import { Avatar, Badge, Button, ErrorView, LoadingView, PageHeader, TRAINING_LABEL } from '../ui';
+import { Avatar, Badge, Button, ErrorView, LoadingView, PageHeader, trainingLabelFor } from '../ui';
 import styles from './Coaches.module.css';
 
 /** Coaches route: one card per coach with query-computed stats + add/edit. */
@@ -111,8 +111,8 @@ function CoachCard({
           <>
             <span className={styles.weekLabel}>This week</span>
             {stats.typeCounts.map((c) => (
-              <span key={c.type} className={styles.chip}>
-                {c.count}× {TRAINING_LABEL[c.type]}
+              <span key={c.type ?? 'open'} className={styles.chip}>
+                {c.count}× {trainingLabelFor(c.type)}
               </span>
             ))}
           </>
