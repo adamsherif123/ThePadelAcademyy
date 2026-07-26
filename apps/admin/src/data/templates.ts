@@ -7,9 +7,14 @@ import {
 } from '@tpa/core';
 import type { AvailabilityTemplate, AvailabilityTemplateId } from '@tpa/types';
 
-import { deleteTemplate as deleteTemplateApi, insertTemplate, updateTemplate as updateTemplateApi } from '../lib/api';
+import {
+  deleteTemplateRpc,
+  insertTemplate,
+  updateTemplate as updateTemplateApi,
+  type DeleteTemplateResult,
+} from '../lib/api';
 import { TOUCHED } from '../lib/queryClient';
-import { runWrite } from './queries';
+import { runRpc, runWrite } from './queries';
 
 /**
  * Availability-template CRUD. @tpa/core's buildAvailabilityTemplate still validates
@@ -48,8 +53,16 @@ export async function setTemplateActive(id: AvailabilityTemplateId, isActive: bo
   return res.ok ? { ok: true, template: res.value } : { ok: false, reason: 'network' };
 }
 
-/** Delete a rule; its already-generated sessions stay on the calendar. */
-export async function deleteTemplate(id: AvailabilityTemplateId): Promise<{ ok: boolean }> {
-  const res = await runWrite(() => deleteTemplateApi(id), TOUCHED.templates);
-  return { ok: res.ok };
+/**
+ * Retire a rule: cancels every FUTURE session it generated (refund + notify via
+ * the existing cancel_session RPC, one call per slot — the atomic delete_template
+ * RPC does the cancelling, the retiring, and the idempotency check all in one
+ * transaction) and marks it deleted. Past sessions are untouched. Touches
+ * templates AND everything cancel_session touches (bookings/slots/batches), so
+ * the caller's list refreshes with the right counts with no manual refetch.
+ */
+export function deleteTemplate(
+  id: AvailabilityTemplateId,
+): Promise<DeleteTemplateResult | { ok: false; reason: 'network' }> {
+  return runRpc(() => deleteTemplateRpc(id), [...TOUCHED.templates, ...TOUCHED.booking]);
 }

@@ -174,3 +174,13 @@
   font-size: var(--font-size-caption);
   line-height: 1.5;
 }
+.error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--expiry-expired-fg);
+  background: var(--expiry-expired-bg);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-caption);
+}

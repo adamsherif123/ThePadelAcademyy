@@ -66,6 +66,7 @@ export function Schedule() {
           coaches={data.coaches}
           templates={data.templates}
           slots={data.slots}
+          now={now}
           onNew={() => setTemplateTarget({ mode: 'new' })}
           onEdit={(template) => setTemplateTarget({ mode: 'edit', template })}
           onGenerate={() => setGenerating(true)}

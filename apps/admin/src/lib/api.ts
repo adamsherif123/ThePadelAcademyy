@@ -296,9 +296,22 @@ export function updateTemplate(id: AvailabilityTemplate['id'], f: Partial<Templa
   if (f.isActive !== undefined) patch.is_active = full.isActive;
   return writeRow(supabase.from('availability_templates').update(patch).eq('id', id).select().single(), rowToAvailabilityTemplate, 'Update template');
 }
-export async function deleteTemplate(id: AvailabilityTemplate['id']): Promise<void> {
-  const { error } = await supabase.from('availability_templates').delete().eq('id', id);
-  if (error) throw new ApiError(`Delete template failed: ${error.message}`, error.code, error);
+export type DeleteTemplateReason = 'not_admin' | 'template_missing';
+export type DeleteTemplateResult =
+  | { ok: true; alreadyDeleted: boolean; cancelledCount: number }
+  | { ok: false; reason: DeleteTemplateReason };
+/**
+ * Retires a recurring rule via the delete_template RPC: cancels every FUTURE
+ * session it generated (refunding + notifying through cancel_session, one
+ * call per slot — no separate refund path here) and marks the rule deleted.
+ * Past sessions are untouched. Idempotent — a second call on an
+ * already-deleted rule reports alreadyDeleted, cancels nothing further.
+ */
+export async function deleteTemplateRpc(id: AvailabilityTemplate['id']): Promise<DeleteTemplateResult> {
+  const d = await callRpc('delete_template', { p_template_id: id });
+  return d.ok
+    ? { ok: true, alreadyDeleted: Boolean(d.already_deleted), cancelledCount: Number(d.cancelled_count ?? 0) }
+    : { ok: false, reason: d.reason as DeleteTemplateReason };
 }
 
 export type RescheduleReason =

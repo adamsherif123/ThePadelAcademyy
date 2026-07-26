@@ -192,9 +192,13 @@ select lives_ok(
 select lives_ok(
   $$ update public.availability_templates set capacity = 6 where id = 'at_tmp' $$,
   'admin can update a template');
-select lives_ok(
+-- Quick fix — raw DELETE on availability_templates is REVOKED: deletion is now
+-- exclusively the delete_template RPC (atomic retire + future-session cancel),
+-- so even an admin's direct DELETE is refused at the privilege layer.
+select throws_ok(
   $$ delete from public.availability_templates where id = 'at_tmp' $$,
-  'admin can delete a template');
+  '42501', null,
+  'admin can no longer raw-DELETE a template — delete_template is the only path now');
 select lives_ok(
   $$ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_type, capacity, status)
      values ('sl_admin', 'co_active', timestamptz '2031-06-01 18:00+02', timestamptz '2031-06-01 19:00+02', 'trial', 4, 'published') $$,

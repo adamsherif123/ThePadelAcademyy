@@ -186,6 +186,17 @@ export interface AvailabilityTemplate {
   gender: Gender | null;
   level: Level | null;
   isActive: boolean;
+  /**
+   * Set when the rule was deleted (retired, not removed) — null for a live
+   * rule. session_slots.template_id has no ON DELETE clause, so a hard DELETE
+   * is permanently impossible once any slot (past or future) has ever
+   * referenced this rule; a deleted rule is retired instead (deleted_at set,
+   * isActive forced false) so it never generates again and is never shown as
+   * a resumable pause, while every past session it produced keeps its real
+   * template_id untouched. The admin's template list filters these out —
+   * same convention as Player.deletedAt / activePlayers().
+   */
+  deletedAt?: IsoInstant | null;
 }
 
 /**

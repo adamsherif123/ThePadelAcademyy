@@ -152,5 +152,6 @@ export function rowToAvailabilityTemplate(r: Row): AvailabilityTemplate {
     gender: (r.gender as AvailabilityTemplate['gender']) ?? null,
     level: (r.level as AvailabilityTemplate['level']) ?? null,
     isActive: bool(r.is_active),
+    deletedAt: nstr(r.deleted_at) as IsoInstant | null,
   };
 }
