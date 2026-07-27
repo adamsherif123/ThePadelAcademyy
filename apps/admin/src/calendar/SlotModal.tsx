@@ -742,7 +742,7 @@ export function SlotModal({
         {closedDay && !inPast ? (
           <p className={styles.note}>
             <CalendarClock size={15} aria-hidden />
-            That’s normally a closed day (Thu–Sat) — allowed for a one-off, but worth a glance.
+            That’s normally a closed day — moving it here opens it on the calendar, for this date only.
           </p>
         ) : null}
         {actionError ? (

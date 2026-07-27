@@ -47,9 +47,12 @@ export {
   materializeTemplateSlot,
   parseInstant,
   parseLocalTime,
+  sameCairoDate,
   toInstant,
   type CairoDate,
 } from './time';
+
+export { isDayOpen, templateCoveredWeekdays } from './availability';
 
 export {
   formatCompactEgp,

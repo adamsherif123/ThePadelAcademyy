@@ -170,9 +170,17 @@ export interface CreditBatch {
  * A recurring weekly availability rule in Cairo LOCAL wall-clock time (not an
  * instant). Materialized into concrete SessionSlots by @tpa/core.
  *
+ * `trainingType`: nullable (mirrors SessionSlot — the one-off "open" block was
+ * lifted to recurring templates too) — a rule may generate OPEN slots every
+ * occurrence, each independently typed by its own first booking. Null is a
+ * deliberate admin choice at creation, not a transient state like a slot's
+ * (which starts null and gets fixed); a template stays exactly as typed or
+ * untyped as the admin set it until they edit it again.
+ *
  * `gender` / `level` are only meaningful for `group` training (the academy
  * separates men/ladies and places by level); they are null for trial/duo/
- * individual. See the same nullable invariant on SessionSlot.
+ * individual AND for an untyped (open) rule. See the same nullable invariant
+ * on SessionSlot.
  */
 export interface AvailabilityTemplate {
   id: AvailabilityTemplateId;
@@ -180,7 +188,7 @@ export interface AvailabilityTemplate {
   weekday: Weekday;
   startTime: LocalTime;
   endTime: LocalTime;
-  trainingType: TrainingType;
+  trainingType: TrainingType | null;
   /** Max players the generated slot holds; integer >= 1. */
   capacity: number;
   gender: Gender | null;

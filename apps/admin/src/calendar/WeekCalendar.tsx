@@ -33,7 +33,7 @@ export function WeekCalendar({
   onSlotClick: (slot: SessionSlot) => void;
   onAddOneOff: () => void;
 }) {
-  const columns = weekColumns(templates, now, weekOffset);
+  const columns = weekColumns(templates, slots, now, weekOffset);
   const first = columns[0]!;
   const last = columns[6]!;
   const rangeLabel = `${formatMonthDay(first.dayStart)} – ${formatMonthDay(last.dayStart)}, ${last.date.year}`;

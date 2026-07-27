@@ -147,7 +147,11 @@ export function rowToAvailabilityTemplate(r: Row): AvailabilityTemplate {
     weekday: num(r.weekday) as Weekday,
     startTime: hhmm(r.start_time),
     endTime: hhmm(r.end_time),
-    trainingType: str(r.training_type) as AvailabilityTemplate['trainingType'],
+    // Nullable — an OPEN (untyped) recurring rule generates untyped slots, each
+    // independently fixed by its own first booking. Matches rowToSlot's pattern
+    // above, not str()'s blind cast (str() would silently forward null typed as
+    // string).
+    trainingType: (r.training_type as AvailabilityTemplate['trainingType']) ?? null,
     capacity: num(r.capacity),
     gender: (r.gender as AvailabilityTemplate['gender']) ?? null,
     level: (r.level as AvailabilityTemplate['level']) ?? null,

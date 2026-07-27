@@ -133,6 +133,52 @@ describe('generateSlots — past excluded, inactive ignored', () => {
   });
 });
 
+describe('generateSlots — an OPEN (untyped) recurring template generates untyped slots', () => {
+  it('copies trainingType/gender/level straight through — an open template yields a CHECK-legal untyped slot for free', () => {
+    const openTemplate: AvailabilityTemplate = {
+      id: 'at_open_test' as AvailabilityTemplateId,
+      coachId: 'co_karim' as CoachId,
+      weekday: 5, // Friday — outside the fixture coaches' usual days, avoids conflicts
+      startTime: '17:00' as LocalTime,
+      endTime: '18:00' as LocalTime,
+      trainingType: null,
+      capacity: 4,
+      gender: null,
+      level: null,
+      isActive: true,
+    };
+    const plan = generateSlots([openTemplate], [], { fromDate: '2026-08-01', toDate: '2026-08-07' }, now);
+    expect(plan.toCreate.length).toBeGreaterThan(0);
+    for (const p of plan.toCreate) {
+      // The exact CHECK-legal untyped shape (availability_templates_group_shape's
+      // mirror on session_slots): all three null together, never a partial mix.
+      expect(p.slot.trainingType).toBeNull();
+      expect(p.slot.gender).toBeNull();
+      expect(p.slot.level).toBeNull();
+      expect(p.slot.templateId).toBe(openTemplate.id);
+      expect(p.slot.setByBookingAt).toBeNull(); // template-generated, not booking-set
+    }
+  });
+
+  it('a PAUSED open template is still skipped like any other inactive rule', () => {
+    const pausedOpen: AvailabilityTemplate = {
+      id: 'at_open_paused' as AvailabilityTemplateId,
+      coachId: 'co_karim' as CoachId,
+      weekday: 5,
+      startTime: '17:00' as LocalTime,
+      endTime: '18:00' as LocalTime,
+      trainingType: null,
+      capacity: 4,
+      gender: null,
+      level: null,
+      isActive: false,
+    };
+    const plan = generateSlots([pausedOpen], [], { fromDate: '2026-08-01', toDate: '2026-08-07' }, now);
+    expect(plan.toCreate.length).toBe(0);
+    expect(plan.skipped.length).toBe(0); // inactive templates are filtered before the skip/create split
+  });
+});
+
 describe('createOneOffSlot — validation rejections (return before any network call)', () => {
   const future = slotTimesFromWall(2026, 8, 10, 8 * 60, 90); // 8 AM — outside operating hours, allowed
 

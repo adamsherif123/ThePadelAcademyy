@@ -107,6 +107,12 @@ export interface CairoDate {
   day: number;
 }
 
+/** Whether `instant` falls on the Cairo calendar date `date` (weekday-agnostic). */
+export function sameCairoDate(instant: IsoInstant, date: CairoDate): boolean {
+  const c = cairoCalendarDate(instant);
+  return c.year === date.year && c.month === date.month && c.day === date.day;
+}
+
 /** Cairo-local midnight (00:00) of a Cairo calendar date, as a UTC instant. */
 export function cairoMidnight(date: CairoDate): IsoInstant {
   return cairoWallTimeToInstant(date.year, date.month, date.day, 0, 0);

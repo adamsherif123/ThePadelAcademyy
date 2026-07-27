@@ -4,7 +4,7 @@ import { AlertTriangle, CalendarPlus, Pencil, Plus, Repeat, Trash2 } from 'lucid
 import { useState } from 'react';
 
 import { deleteTemplate, setTemplateActive } from '../data/templates';
-import { Avatar, Badge, Button, Card, EmptyState, Modal, TypePill, groupTags } from '../ui';
+import { Avatar, Badge, Button, Card, EmptyState, Modal, TypePill, groupTags, trainingLabelFor } from '../ui';
 import styles from './TemplatesPanel.module.css';
 
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -118,7 +118,7 @@ export function TemplatesPanel({
                             <button
                               type="button"
                               className={styles.iconBtn}
-                              aria-label={`Edit ${DAY_SHORT[t.weekday]} ${t.trainingType} recurring session`}
+                              aria-label={`Edit ${DAY_SHORT[t.weekday]} ${trainingLabelFor(t.trainingType)} recurring session`}
                               onClick={() => onEdit(t)}
                             >
                               <Pencil size={15} aria-hidden />
@@ -126,7 +126,7 @@ export function TemplatesPanel({
                             <button
                               type="button"
                               className={`${styles.iconBtn} ${styles.danger}`}
-                              aria-label={`Delete ${DAY_SHORT[t.weekday]} ${t.trainingType} recurring session`}
+                              aria-label={`Delete ${DAY_SHORT[t.weekday]} ${trainingLabelFor(t.trainingType)} recurring session`}
                               onClick={() => setDeleting(t)}
                             >
                               <Trash2 size={15} aria-hidden />

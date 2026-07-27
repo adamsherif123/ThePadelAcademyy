@@ -1,4 +1,5 @@
 import { MOCK_NOW, mockSlots, mockTemplates } from '@tpa/mocks';
+import type { SessionSlot } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -10,6 +11,26 @@ import {
   weekColumns,
   weekTimeRange,
 } from './schedule';
+
+const addHours = (instant: SessionSlot['startsAt'], hours: number): SessionSlot['startsAt'] =>
+  new Date(new Date(instant).getTime() + hours * 3_600_000).toISOString() as SessionSlot['startsAt'];
+
+function oneOffSlot(over: Partial<SessionSlot> & Pick<SessionSlot, 'startsAt' | 'endsAt'>): SessionSlot {
+  return {
+    id: 'sl_oneoff_test' as SessionSlot['id'],
+    coachId: mockTemplates[0]!.coachId,
+    trainingType: null,
+    capacity: 1,
+    bookedCount: 0,
+    gender: null,
+    level: null,
+    status: 'published',
+    templateId: null,
+    manuallyConfirmedAt: null,
+    setByBookingAt: null,
+    ...over,
+  };
+}
 
 /**
  * Week-calendar layout math. S10b killed the mock store: the selectors now take
@@ -25,9 +46,39 @@ describe('closedWeekdays', () => {
   });
 });
 
+describe('weekColumns isClosed — the isDayOpen union (@tpa/core)', () => {
+  it('a published one-off on a template-uncovered day opens ONLY that date, not the whole weekday', () => {
+    const baseline = weekColumns(mockTemplates, [], MOCK_NOW, 0);
+    const thursday = baseline.find((c) => c.weekday === 4)!;
+    expect(thursday.isClosed).toBe(true); // sanity: Thursday has no active template
+
+    const oneOff = oneOffSlot({ startsAt: addHours(thursday.dayStart, 18), endsAt: addHours(thursday.dayStart, 19) });
+
+    const thisWeek = weekColumns(mockTemplates, [oneOff], MOCK_NOW, 0);
+    expect(thisWeek.find((c) => c.weekday === 4)!.isClosed).toBe(false);
+
+    // Next week's Thursday is untouched — the slot side opens a DATE, not a weekday.
+    const nextWeek = weekColumns(mockTemplates, [oneOff], MOCK_NOW, 1);
+    expect(nextWeek.find((c) => c.weekday === 4)!.isClosed).toBe(true);
+  });
+
+  it('a cancelled-only one-off does not open a template-uncovered day', () => {
+    const baseline = weekColumns(mockTemplates, [], MOCK_NOW, 0);
+    const thursday = baseline.find((c) => c.weekday === 4)!;
+    const cancelledOneOff = oneOffSlot({
+      status: 'cancelled',
+      startsAt: addHours(thursday.dayStart, 18),
+      endsAt: addHours(thursday.dayStart, 19),
+    });
+
+    const cols = weekColumns(mockTemplates, [cancelledOneOff], MOCK_NOW, 0);
+    expect(cols.find((c) => c.weekday === 4)!.isClosed).toBe(true);
+  });
+});
+
 describe('weekTimeRange', () => {
   it('spans at least midday→midnight and covers every slot this week', () => {
-    const cols = weekColumns(mockTemplates, MOCK_NOW, 0);
+    const cols = weekColumns(mockTemplates, mockSlots, MOCK_NOW, 0);
     const { startMin, endMin } = weekTimeRange(mockSlots, cols);
     expect(startMin).toBeLessThanOrEqual(12 * 60);
     expect(endMin).toBeGreaterThanOrEqual(24 * 60);
@@ -67,7 +118,7 @@ describe('eventBox — the escape invariant', () => {
 
 describe('layoutDay', () => {
   it('keeps every box inside the grid and within its lane, across the whole week', () => {
-    const cols = weekColumns(mockTemplates, MOCK_NOW, 0);
+    const cols = weekColumns(mockTemplates, mockSlots, MOCK_NOW, 0);
     const { startMin, endMin } = weekTimeRange(mockSlots, cols);
     const gridPx = ((endMin - startMin) / 60) * HOUR_PX;
     let total = 0;

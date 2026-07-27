@@ -273,7 +273,7 @@ export function updatePackage(id: PackageId, f: Partial<PackageFields>): Promise
 
 export interface TemplateFields {
   coachId: CoachId; weekday: Weekday; startTime: string; endTime: string;
-  trainingType: TrainingType; capacity: number; gender: Gender | null; level: Level | null; isActive: boolean;
+  trainingType: TrainingType | null; capacity: number; gender: Gender | null; level: Level | null; isActive: boolean;
 }
 function templateRow(f: TemplateFields): Record<string, unknown> {
   return { coach_id: f.coachId, weekday: f.weekday, start_time: f.startTime, end_time: f.endTime, training_type: f.trainingType, capacity: f.capacity, gender: f.gender, level: f.level, is_active: f.isActive };

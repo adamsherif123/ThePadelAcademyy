@@ -1,13 +1,13 @@
-import type { AvailabilityTemplate, Coach, CoachId, LocalTime, Weekday } from '@tpa/types';
+import type { AvailabilityTemplate, Coach, CoachId, LocalTime, TrainingType, Weekday } from '@tpa/types';
 import { AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 
 import { createTemplate, updateTemplate, type SaveTemplateResult } from '../data/templates';
-import { Button, Input, Modal, Select, Toggle, TYPE_PLAYERS } from '../ui';
+import { Button, Input, Modal, Select, Toggle, typePlayersFor } from '../ui';
 import {
   GENDER_OPTIONS,
   LEVEL_OPTIONS,
-  SESSION_TYPE_OPTIONS,
+  TYPE_OPTIONS_WITH_OPEN,
   WEEKDAY_OPTIONS,
   useSessionDraft,
 } from './sessionForm';
@@ -27,6 +27,11 @@ const ERROR_TEXT: Record<string, string> = {
  * comes from the shared useSessionDraft; this modal adds the weekly-rule time
  * fields (weekday + start/end wall clock). The seam (via @tpa/core) is the real
  * validator — the form just previews the same rules and disables Save when it can.
+ *
+ * `openSelected` mirrors OneOffModal: an open (untyped) rule has NO type yet, so
+ * this stays independent of the shared draft's (always-concrete) trainingType
+ * rather than widening useSessionDraft's contract — every OTHER call site
+ * (sessionForm's own gender/level logic) still only ever sees a real TrainingType.
  */
 export function TemplateModal({
   template,
@@ -47,6 +52,7 @@ export function TemplateModal({
     gender: template?.gender ?? null,
     level: template?.level ?? null,
   });
+  const [openSelected, setOpenSelected] = useState(editing && template.trainingType === null);
   const [weekday, setWeekday] = useState<Weekday>(template?.weekday ?? 0);
   const [startTime, setStartTime] = useState<string>(template?.startTime ?? '17:00');
   const [endTime, setEndTime] = useState<string>(template?.endTime ?? '18:30');
@@ -62,10 +68,10 @@ export function TemplateModal({
       weekday,
       startTime: startTime as LocalTime,
       endTime: endTime as LocalTime,
-      trainingType: draft.trainingType,
+      trainingType: openSelected ? null : draft.trainingType,
       capacity: draft.capacity,
-      gender: draft.effectiveGender,
-      level: draft.effectiveLevel,
+      gender: openSelected ? null : draft.effectiveGender,
+      level: openSelected ? null : draft.effectiveLevel,
       isActive,
     };
     const res: SaveTemplateResult = editing
@@ -114,9 +120,17 @@ export function TemplateModal({
           />
           <Select
             label="Session type"
-            value={draft.trainingType}
-            onChange={(e) => draft.setTrainingType(e.target.value as typeof draft.trainingType)}
-            options={SESSION_TYPE_OPTIONS.map((t) => ({ value: t.value, label: t.label }))}
+            value={openSelected ? 'open' : draft.trainingType}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === 'open') {
+                setOpenSelected(true);
+              } else {
+                setOpenSelected(false);
+                draft.setTrainingType(v as TrainingType);
+              }
+            }}
+            options={TYPE_OPTIONS_WITH_OPEN.map((t) => ({ value: t.value, label: t.label }))}
           />
 
           <Input label="Start time" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
@@ -128,9 +142,13 @@ export function TemplateModal({
             min={1}
             value={draft.capacity}
             onChange={(e) => draft.setCapacity(Number(e.target.value))}
-            hint={TYPE_PLAYERS[draft.trainingType]}
+            hint={
+              openSelected
+                ? 'First player chooses the type — this is the physical seat ceiling'
+                : typePlayersFor(draft.trainingType)
+            }
           />
-          {draft.requiresGenderLevel ? (
+          {!openSelected && draft.requiresGenderLevel ? (
             <Select
               label="Gender group"
               value={draft.gender}
@@ -141,7 +159,7 @@ export function TemplateModal({
             <div />
           )}
 
-          {draft.requiresGenderLevel ? (
+          {!openSelected && draft.requiresGenderLevel ? (
             <Select
               label="Level"
               value={draft.level}

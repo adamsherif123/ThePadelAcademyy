@@ -12,7 +12,7 @@ import {
   DURATION_OPTIONS,
   GENDER_OPTIONS,
   LEVEL_OPTIONS,
-  ONE_OFF_TYPE_OPTIONS,
+  TYPE_OPTIONS_WITH_OPEN,
   useSessionDraft,
 } from './sessionForm';
 import styles from './sessionForm.module.css';
@@ -143,7 +143,7 @@ export function OneOffModal({
                 draft.setTrainingType(v as TrainingType);
               }
             }}
-            options={ONE_OFF_TYPE_OPTIONS.map((t) => ({ value: t.value, label: t.label }))}
+            options={TYPE_OPTIONS_WITH_OPEN.map((t) => ({ value: t.value, label: t.label }))}
           />
 
           <Input label="Start" type="time" value={startStr} onChange={(e) => setStartStr(e.target.value)} />
@@ -205,7 +205,7 @@ export function OneOffModal({
         {closedDay && !inPast ? (
           <p className={styles.note}>
             <CalendarClock size={15} aria-hidden />
-            That’s normally a closed day — fine for a one-off, but worth a glance.
+            That’s normally a closed day — publishing this opens it on the calendar, for this date only.
           </p>
         ) : null}
       </div>

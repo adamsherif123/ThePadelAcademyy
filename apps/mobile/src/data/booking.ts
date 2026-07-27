@@ -5,6 +5,7 @@ import {
   cancellationDeadline,
   creditExpiryState,
   isCancellableWithoutForfeit,
+  isDayOpen,
 } from '@tpa/core';
 import type {
   AvailabilityTemplate,
@@ -45,36 +46,25 @@ function sameCairoDay(instant: IsoInstant, d: CairoDay): boolean {
   return c.year === d.year && c.month === d.month && c.day === d.day;
 }
 
-/**
- * The weekdays the academy operates — DERIVED from active availability templates,
- * which a signed-in (non-admin) player CAN read under RLS policy
- * `availability_templates_select_active` (S5.1). This deliberately separates two
- * states the published schedule alone can't: a CLOSED weekday (no active template —
- * the academy doesn't run that day) versus an OPEN weekday with nothing scheduled
- * yet (a template exists but no slots are published / all were cancelled). Deriving
- * "open" from slots would collapse the second into the first — a week Rania hasn't
- * generated slots for would read as a shut academy.
- */
-export function operatingWeekdays(templates: AvailabilityTemplate[]): Set<Weekday> {
-  return new Set(templates.filter((t) => t.isActive).map((t) => t.weekday));
-}
-
-export function isClosedWeekday(templates: AvailabilityTemplate[], weekday: Weekday): boolean {
-  return !operatingWeekdays(templates).has(weekday);
-}
-
 export interface DateStripDay extends CairoDay {
   key: string;
   closed: boolean;
 }
 
-/** `count` consecutive Cairo days starting today, each flagged open/closed. */
+/**
+ * `count` consecutive Cairo days starting today, each flagged open/closed via the
+ * shared `isDayOpen` rule (@tpa/core) — a day is open if its weekday is
+ * template-covered OR this specific date has a published slot (a one-off outside
+ * the recurring schedule). See @tpa/core's availability.ts for the full rationale
+ * (the same rule the admin week calendar consumes; this used to be two
+ * independently-hand-written copies).
+ */
 export function dateStrip(
   templates: AvailabilityTemplate[],
+  slots: SessionSlot[],
   now: IsoInstant,
   count: number,
 ): DateStripDay[] {
-  const open = operatingWeekdays(templates);
   const start = cairoCalendarDate(now);
   const base = Date.UTC(start.year, start.month - 1, start.day);
   return Array.from({ length: count }, (_, i) => {
@@ -86,7 +76,11 @@ export function dateStrip(
       day: d.getUTCDate(),
       weekday,
     };
-    return { ...day, key: `${day.year}-${day.month}-${day.day}`, closed: !open.has(weekday) };
+    return {
+      ...day,
+      key: `${day.year}-${day.month}-${day.day}`,
+      closed: !isDayOpen(templates, slots, weekday, day),
+    };
   });
 }
 

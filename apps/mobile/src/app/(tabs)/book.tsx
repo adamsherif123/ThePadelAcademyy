@@ -112,7 +112,7 @@ export default function BookScreen() {
   const bookings = bookingsQ.data ?? [];
   const coaches = coachesQ.data ?? [];
 
-  const days = dateStrip(templatesQ.data ?? [], now, DAYS);
+  const days = dateStrip(templatesQ.data ?? [], allSlots, now, DAYS);
   const firstOpen = days.find((d) => !d.closed) ?? days[0]!;
   const selectedDay = days.find((d) => d.key === dayKey) ?? firstOpen;
 

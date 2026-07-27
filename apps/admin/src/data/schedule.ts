@@ -4,6 +4,7 @@ import {
   cairoMidnight,
   cairoOffsetMs,
   cairoWallTimeToInstant,
+  isDayOpen,
   parseInstant,
   type CairoDate,
 } from '@tpa/core';
@@ -28,9 +29,11 @@ export function cairoWallMinutes(instant: IsoInstant): number {
 }
 
 /**
- * Weekdays with NO active template from any coach are CLOSED — derived from
- * availability data, never hardcoded (the same rule the client app's date strip
- * uses). Add a Thursday template and Thursday opens with no code change.
+ * Weekdays with NO active template from any coach are template-uncovered —
+ * derived from availability data, never hardcoded. This is the WEEKDAY-only
+ * signal (used for the "normally closed" heads-up note when placing a one-off);
+ * whether a specific DATE is actually open on the calendar is `isDayOpen`
+ * (@tpa/core), which also counts a published one-off on that exact date.
  */
 export function closedWeekdays(templates: AvailabilityTemplate[]): Set<Weekday> {
   const open = new Set<Weekday>();
@@ -48,20 +51,30 @@ export interface DayColumn {
   isClosed: boolean;
 }
 
-/** The 7 Sun–Sat columns of the week `weekOffset` weeks from now's Cairo week. */
-export function weekColumns(templates: AvailabilityTemplate[], now: IsoInstant, weekOffset: number): DayColumn[] {
+/**
+ * The 7 Sun–Sat columns of the week `weekOffset` weeks from now's Cairo week.
+ * `isClosed` is the shared `isDayOpen` rule (@tpa/core) negated — a column is
+ * closed only if its weekday is template-uncovered AND this date has no
+ * published slot of its own (a one-off outside the recurring schedule).
+ */
+export function weekColumns(
+  templates: AvailabilityTemplate[],
+  slots: SessionSlot[],
+  now: IsoInstant,
+  weekOffset: number,
+): DayColumn[] {
   const c = cairoCalendarDate(now);
   const sunday = addCairoDays({ year: c.year, month: c.month, day: c.day }, -c.weekday + weekOffset * 7);
-  const closed = closedWeekdays(templates);
   return Array.from({ length: 7 }, (_, i) => {
     const date = addCairoDays(sunday, i);
+    const weekday = i as Weekday;
     const isToday = date.year === c.year && date.month === c.month && date.day === c.day && weekOffset === 0;
     return {
-      weekday: i as Weekday,
+      weekday,
       date,
       dayStart: cairoMidnight(date),
       isToday,
-      isClosed: closed.has(i as Weekday),
+      isClosed: !isDayOpen(templates, slots, weekday, date),
     };
   });
 }

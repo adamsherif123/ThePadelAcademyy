@@ -15,13 +15,18 @@ import { parseLocalTime } from './time';
  * The fields an admin supplies for an availability template. The id, validation,
  * and gender/level normalization are added by `buildAvailabilityTemplate` — a
  * draft is never trusted to already satisfy the DB's invariants.
+ *
+ * `trainingType` is nullable — "Open — first player chooses" for a RECURRING
+ * rule (mirrors OneOffDraft): every slot it generates starts untyped and is
+ * independently fixed by ITS OWN first booking, exactly like a one-off open
+ * block.
  */
 export interface TemplateDraft {
   coachId: CoachId;
   weekday: Weekday;
   startTime: LocalTime;
   endTime: LocalTime;
-  trainingType: TrainingType;
+  trainingType: TrainingType | null;
   capacity: number;
   gender: Gender | null;
   level: Level | null;
@@ -50,12 +55,13 @@ const minutesOf = (t: LocalTime): number => {
 
 /**
  * Validate + NORMALIZE a template draft into a row that cannot violate the
- * gender/level CHECK constraint: group ⇒ both set, non-group ⇒ both null. The
- * normalization (forcing gender/level to null for non-group) happens HERE, not in
- * the UI, so a stale selection left over from switching session type can never
- * reach the store/DB. Also enforces end-after-start and capacity ≥ 1. Both create
- * and edit go through this one constructor; templates never cross midnight, so a
- * plain end > start check is correct (one-off sessions handle wrap separately).
+ * gender/level CHECK constraint: group ⇒ both set, non-group (including
+ * untyped/open) ⇒ both null. The normalization (forcing gender/level to null
+ * for non-group or untyped) happens HERE, not in the UI, so a stale selection
+ * left over from switching session type can never reach the store/DB. Also
+ * enforces end-after-start and capacity ≥ 1. Both create and edit go through
+ * this one constructor; templates never cross midnight, so a plain end > start
+ * check is correct (one-off sessions handle wrap separately).
  */
 export function buildAvailabilityTemplate(
   id: AvailabilityTemplateId,
@@ -66,7 +72,7 @@ export function buildAvailabilityTemplate(
   }
   if (draft.capacity < 1) return { ok: false, reason: 'capacity_below_one' };
 
-  const needsGenderLevel = templateRequiresGenderLevel(draft.trainingType);
+  const needsGenderLevel = draft.trainingType !== null && templateRequiresGenderLevel(draft.trainingType);
   if (needsGenderLevel && (draft.gender === null || draft.level === null)) {
     return { ok: false, reason: 'group_requires_gender_level' };
   }

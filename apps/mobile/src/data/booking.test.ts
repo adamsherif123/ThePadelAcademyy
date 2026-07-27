@@ -1,4 +1,4 @@
-import { cairoCalendarDate } from '@tpa/core';
+import { cairoCalendarDate, templateCoveredWeekdays } from '@tpa/core';
 import type {
   AvailabilityTemplate,
   Booking,
@@ -15,7 +15,6 @@ import { describe, expect, it } from 'vitest';
 import {
   bookedSlotIds,
   dateStrip,
-  operatingWeekdays,
   pastSessions,
   slotAvailability,
   slotsForType,
@@ -245,9 +244,9 @@ describe('upcoming / past split', () => {
   });
 });
 
-describe('operatingWeekdays / dateStrip (from active templates)', () => {
+describe('templateCoveredWeekdays / dateStrip (@tpa/core isDayOpen)', () => {
   it('open = weekdays with an active template; inactive or missing template = closed', () => {
-    const open = operatingWeekdays([template(1, true), template(3, false)]);
+    const open = templateCoveredWeekdays([template(1, true), template(3, false)]);
     expect(open.has(1 as Weekday)).toBe(true); // Monday: active template
     expect(open.has(3 as Weekday)).toBe(false); // Wednesday: template exists but INACTIVE
     expect(open.has(2 as Weekday)).toBe(false); // Tuesday: no template at all
@@ -256,7 +255,7 @@ describe('operatingWeekdays / dateStrip (from active templates)', () => {
   it('a weekday with an active template but ZERO slots is OPEN (nothing available), not CLOSED', () => {
     // Only Monday(1) has an active template. Crucially we pass NO slots anywhere —
     // the regression this guards is "no slots ⇒ every day closed".
-    const days = dateStrip([template(1, true)], NOW, 14);
+    const days = dateStrip([template(1, true)], [], NOW, 14);
     const mondays = days.filter((d) => d.weekday === 1);
     const tuesdays = days.filter((d) => d.weekday === 2);
     expect(mondays.length).toBeGreaterThan(0);
@@ -270,6 +269,36 @@ describe('operatingWeekdays / dateStrip (from active templates)', () => {
     // On that open Monday the slot list is simply empty — "open, nothing available",
     // which the Book screen renders as an empty state, NOT a closed day.
     expect(slotsForType([], 'trial', player, [], NOW, mondays[0]!)).toEqual([]);
+  });
+
+  it('a published one-off slot opens ONLY its own date on an otherwise template-uncovered weekday', () => {
+    // No templates at all — every weekday is template-uncovered.
+    const tuesdays = dateStrip([], [], NOW, 14).filter((d) => d.weekday === 2);
+    expect(tuesdays.length).toBeGreaterThanOrEqual(2);
+    const [firstTuesday, secondTuesday] = tuesdays;
+
+    const oneOff = openSlot({
+      id: 'sl_oneoff' as SessionSlot['id'],
+      startsAt: `${firstTuesday!.year}-${String(firstTuesday!.month).padStart(2, '0')}-${String(firstTuesday!.day).padStart(2, '0')}T12:00:00.000Z` as IsoInstant,
+      endsAt: `${firstTuesday!.year}-${String(firstTuesday!.month).padStart(2, '0')}-${String(firstTuesday!.day).padStart(2, '0')}T13:00:00.000Z` as IsoInstant,
+    });
+    const days = dateStrip([], [oneOff], NOW, 14);
+    const openedTuesday = days.find((d) => d.key === firstTuesday!.key)!;
+    const laterTuesday = days.find((d) => d.key === secondTuesday!.key)!;
+    expect(openedTuesday.closed).toBe(false); // that specific date is opened by the one-off
+    expect(laterTuesday.closed).toBe(true); // the following Tuesday is untouched
+  });
+
+  it('a cancelled-only one-off does NOT open its day', () => {
+    const tuesday = dateStrip([], [], NOW, 14).find((d) => d.weekday === 2)!;
+    const cancelledOneOff = openSlot({
+      id: 'sl_cancelled_oneoff' as SessionSlot['id'],
+      status: 'cancelled',
+      startsAt: `${tuesday.year}-${String(tuesday.month).padStart(2, '0')}-${String(tuesday.day).padStart(2, '0')}T12:00:00.000Z` as IsoInstant,
+      endsAt: `${tuesday.year}-${String(tuesday.month).padStart(2, '0')}-${String(tuesday.day).padStart(2, '0')}T13:00:00.000Z` as IsoInstant,
+    });
+    const days = dateStrip([], [cancelledOneOff], NOW, 14);
+    expect(days.find((d) => d.key === tuesday.key)!.closed).toBe(true);
   });
 });
 
