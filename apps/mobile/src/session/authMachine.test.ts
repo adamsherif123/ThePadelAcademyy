@@ -15,7 +15,14 @@ import { deriveStatus, nextRoute, type SessionStatus } from './authMachine';
  * pinned here — admin → not_a_player (never needs_profile), player → the normal states.
  */
 const player = { id: 'pl_1', phone: null, name: 'A', gender: 'men', level: 'beginner', createdAt: '2026-01-01T00:00:00.000Z' } as unknown as Player;
-const base = { sessionRestored: true, hasSession: true, gateLoading: false, isAdmin: false, player: null };
+const base = {
+  sessionRestored: true,
+  hasSession: true,
+  gateLoading: false,
+  gateUnreachable: false,
+  isAdmin: false,
+  player: null,
+};
 
 describe('deriveStatus', () => {
   it('is loading until the session is restored', () => {
@@ -43,6 +50,40 @@ describe('deriveStatus', () => {
     // a ready player — isAdmin is checked before the player branch.
     expect(deriveStatus({ ...base, isAdmin: true, player })).toBe('not_a_player');
   });
+
+  // ── the cold-start-offline bug: a real session, gate unreachable ────────────
+  // The old code read "no player DATA yet" (network failure) the same as "no
+  // player ROW" and returned needs_profile — landing a signed-in user on
+  // profile-setup, whose only way out is a genuine sign-out. This pins the fix:
+  // a session that can't be verified right now is its OWN state, never
+  // needs_profile, never signed_out.
+  describe('offline — a session exists but the gate cannot reach the server', () => {
+    it('is offline, not needs_profile, when a fresh session has no player data yet because of a network failure', () => {
+      expect(deriveStatus({ ...base, gateUnreachable: true, player: null })).toBe('offline');
+    });
+    it('is offline even if the player row WOULD have resolved — unreachable wins over "no data yet"', () => {
+      // The gate can't know player is really there; treating gateUnreachable as
+      // "no player" would be exactly the bug (it can't, because player is only
+      // ever populated from a query that already failed — but pin the priority
+      // explicitly: unreachable is checked before the player/isAdmin facts).
+      expect(deriveStatus({ ...base, gateUnreachable: true, player, isAdmin: false })).toBe('offline');
+    });
+    it('offline is NOT signed_out — the persisted session is kept, not discarded', () => {
+      expect(deriveStatus({ ...base, gateUnreachable: true })).not.toBe('signed_out');
+    });
+    it('a genuinely revoked token (no session, online) is signed_out — hasSession wins over any stray gateUnreachable', () => {
+      // Structurally impossible (the gate queries are `enabled: hasSession`), but
+      // pin the precedence: an absent session is signed_out regardless.
+      expect(deriveStatus({ ...base, hasSession: false, gateUnreachable: true })).toBe('signed_out');
+    });
+    it('connectivity restored resolves normally without any special-casing — offline was never a stored fact', () => {
+      // "Verify the session then" isn't a transition deriveStatus performs itself —
+      // it's just that the NEXT call, once the gate succeeds, sees gateUnreachable:
+      // false and the ordinary facts. No user action, no separate recovery path.
+      expect(deriveStatus({ ...base, gateUnreachable: false, player })).toBe('ready');
+      expect(deriveStatus({ ...base, gateUnreachable: false, player: null })).toBe('needs_profile');
+    });
+  });
 });
 
 describe('nextRoute — redirects', () => {
@@ -66,6 +107,16 @@ describe('nextRoute — redirects', () => {
   it('never redirects while loading', () => {
     expect(nextRoute('loading', '(auth)', 'sign-in')).toBeNull();
     expect(nextRoute('loading', '(tabs)', 'index')).toBeNull();
+  });
+
+  it('offline never routes to an auth screen — there is a session, nothing to sign in to', () => {
+    // Already in the app shell: stay exactly where they are (the cached screen).
+    expect(nextRoute('offline', '(tabs)', 'index')).toBeNull();
+    expect(nextRoute('offline', undefined, undefined)).toBeNull();
+    // Stranded on an auth screen from before the session existed: the app shell,
+    // never sign-in and never profile-setup (that WAS the bug).
+    expect(nextRoute('offline', '(auth)', 'sign-in')).toBe('/(tabs)');
+    expect(nextRoute('offline', '(auth)', 'profile-setup')).toBe('/(tabs)');
   });
 });
 

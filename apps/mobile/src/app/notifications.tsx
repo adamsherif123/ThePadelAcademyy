@@ -19,6 +19,7 @@ const ICON: Record<NotificationType, IoniconName> = {
   session_rescheduled: 'time-outline',
   credits_granted: 'wallet-outline',
   credit_request_rejected: 'alert-circle-outline',
+  admin_booked: 'person-add-outline',
 };
 
 /**

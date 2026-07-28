@@ -344,6 +344,12 @@ check "total trial credits minted = K×1 (never two per player)"                
 # What must NEVER happen: training_type='individual' with booked_count=0 (a
 # stuck typed-but-empty slot — the revert silently failed to fire), or
 # booked_count drifting from the live booking count.
+#
+# Capacity outcome differs by ordering since the open-slot-capacity fix
+# (20260809000028): a REVERTED slot restores the admin's original 3 (from
+# pre_booking_capacity, untouched here); a WON(duo) slot narrows fresh from
+# the just-restored 3 to least(3, tpa.canonical_capacity('duo')) = 2 — it is
+# NOT "untouched at 3" the way a pre-fix codebase would have left it.
 echo "Scenario H — revert (self-cancel) racing a NEW differently-typed booking (K=20):"
 H_K=20
 HSETUP=""
@@ -373,19 +379,31 @@ H_STUCK=$(sql "select count(*) from public.session_slots where id like 'slr_h%' 
 H_DRIFT=$(sql "select count(*) from public.session_slots s where id like 'slr_h%' and booked_count <> (select count(*) from public.bookings b where b.slot_id=s.id and b.status='booked')")
 H_WON=$(sql "select count(*) from public.session_slots where id like 'slr_h%' and training_type='duo'")
 H_REVERTED=$(sql "select count(*) from public.session_slots where id like 'slr_h%' and training_type is null")
-H_CAP_BAD=$(sql "select count(*) from public.session_slots where id like 'slr_h%' and capacity <> 3")
+H_REVERTED_CAP_BAD=$(sql "select count(*) from public.session_slots where id like 'slr_h%' and training_type is null and capacity <> 3")
+H_WON_CAP_BAD=$(sql "select count(*) from public.session_slots where id like 'slr_h%' and training_type='duo' and capacity <> 2")
 H_DEADLOCK=$(grep -rl "deadlock detected" "$TMP"/h_*.txt 2>/dev/null | wc -l | tr -d ' ')
 check "X's booking always ends cancelled (uncontested single-owner cancel)" "$H_XLIVE" "0"
 check "no stuck typed-but-empty slot (revert always fires when it should)" "$H_STUCK" "0"
 check "booked_count never drifts from live booking count"                  "$H_DRIFT" "0"
 check "every trial resolved to won(duo) or reverted(untyped) — no 3rd state" "$((H_WON+H_REVERTED))" "$H_K"
-check "capacity always ends at 3 (won: untouched; reverted: restored)"     "$H_CAP_BAD" "0"
+check "reverted slots restore capacity to the admin's original 3"          "$H_REVERTED_CAP_BAD" "0"
+check "won(duo) slots narrow capacity to duo's canonical 2 (least(3,2))"    "$H_WON_CAP_BAD" "0"
 check "zero deadlocks"                                                     "$H_DEADLOCK" "0"
 echo "  info — $H_WON/$H_K: Y won (duo set); $H_REVERTED/$H_K: Y lost, slot reverted untyped"
 
 # ── Scenario I: DIFFERENT chosen types racing the SAME untyped slot (Task 0
 # rule 3 — exactly one type wins; the other type gets a clean type_mismatch,
 # no oversell within the winning type) ───────────────────────────────────────
+#
+# The admin's slot starts at capacity 4. Since the open-slot-capacity fix
+# (20260809000028), the winning type's capacity narrows to
+# least(4, tpa.canonical_capacity(winning_type)) — group's canonical (4)
+# exactly matches this admin default, so a group win still seats all 4; duo's
+# canonical (2) is SMALLER, so a duo win seats only 2 of its 4 racers — the
+# other 2 correctly get 'slot_full' (a duo session really does fill at 2),
+# NOT 'type_mismatch' (they ARE the winning type, just arrived after it
+# filled). The expected winner count is therefore computed AFTER the race,
+# once we know which type actually won — it is no longer a fixed 4.
 echo "Scenario I — different types (group vs duo) racing one untyped, capacity-4 slot:"
 ISETUP="insert into public.coaches (id,name,bio,is_active) values ('cor_i','C','b',true);"
 ISETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status) values ('slr_i','cor_i',now()+interval '1 day',now()+interval '1 day 1 hour',null,4,0,'published');"
@@ -407,12 +425,16 @@ done
 wait
 I_WINS=$(grep -lFx WIN "$TMP"/i_*.txt 2>/dev/null | wc -l | tr -d ' ')
 I_MISMATCH=$(grep -lFx type_mismatch "$TMP"/i_*.txt 2>/dev/null | wc -l | tr -d ' ')
+I_SLOTFULL=$(grep -lFx slot_full "$TMP"/i_*.txt 2>/dev/null | wc -l | tr -d ' ')
 I_TYPE=$(sql "select training_type from public.session_slots where id='slr_i'")
 I_COUNT=$(sql "select booked_count from public.session_slots where id='slr_i'")
+I_CANON=$(sql "select tpa.canonical_capacity('$I_TYPE')")
+I_EXPECTED=$(( I_CANON < 4 ? I_CANON : 4 ))
 I_TYPES_BOOKED=$(sql "select count(distinct cb.training_type) from public.bookings b join public.credit_batches cb on cb.id=b.credit_batch_id where b.slot_id='slr_i' and b.status='booked'")
-check "exactly one type wins all 4 seats (no oversell within the winner)" "$I_WINS" "4"
+check "the winning type ($I_TYPE) seats exactly least(4, its canonical capacity), no oversell" "$I_WINS" "$I_EXPECTED"
 check "the other type's 4 racers all get a clean type_mismatch"          "$I_MISMATCH" "4"
-check "booked_count = 4"                                                  "$I_COUNT" "4"
+check "any excess same-type racers beyond canonical get slot_full, not type_mismatch" "$I_SLOTFULL" "$((4 - I_EXPECTED))"
+check "booked_count matches the winning type's actual seated count"       "$I_COUNT" "$I_EXPECTED"
 check "slot ends typed (either group or duo, never null)"                 "$([ -n "$I_TYPE" ] && echo yes || echo no)" "yes"
 check "every winning booking spent a credit of the SAME (winning) type"   "$I_TYPES_BOOKED" "1"
 

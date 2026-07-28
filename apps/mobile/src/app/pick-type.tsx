@@ -1,4 +1,4 @@
-import { bookableTypesFor, formatInstantDate, formatInstantTime } from '@tpa/core';
+import { CANONICAL_CAPACITY, bookableTypesFor, formatInstantDate, formatInstantTime } from '@tpa/core';
 import { space } from '@tpa/theme';
 import type { SlotId, TrainingType } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -22,10 +22,19 @@ import {
   TypeCard,
 } from '../ui';
 
-/** "You + 3 others · pending until it fills" / "confirms the moment you book" (individual, or any cap-1 block). */
-function pickerSubtitle(trainingType: TrainingType, slotCapacity: number): string {
-  if (trainingType === 'individual' || slotCapacity <= 1) return 'Confirms the moment you book';
-  const others = slotCapacity - 1;
+/**
+ * "You + 3 others · pending until it fills" / "confirms the moment you book".
+ * This is PRE-booking on a still-OPEN block, so the capacity MUST come from
+ * CANONICAL_CAPACITY (what booking this type will make the slot become), never
+ * `slot.capacity` — an open slot's stored capacity is still the admin's
+ * original default (e.g. 4) regardless of which type a player is about to
+ * pick, and book_slot itself is about to overwrite it to this same canonical
+ * number the instant the booking lands.
+ */
+function pickerSubtitle(trainingType: TrainingType): string {
+  const capacity = CANONICAL_CAPACITY[trainingType];
+  if (capacity <= 1) return 'Confirms the moment you book';
+  const others = capacity - 1;
   return `You + ${others} other${others === 1 ? '' : 's'} · pending until it fills`;
 }
 
@@ -129,7 +138,7 @@ export default function PickTypeScreen() {
               <TypeCard
                 key={o.trainingType}
                 trainingType={o.trainingType}
-                subtitle={pickerSubtitle(o.trainingType, slot.capacity)}
+                subtitle={pickerSubtitle(o.trainingType)}
                 credits={o.creditsAvailable}
                 selected={chosen === o.trainingType}
                 onPress={() => setSelected(o.trainingType)}

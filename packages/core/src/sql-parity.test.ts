@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { CANCELLATION_WINDOW_HOURS, CREDIT_EXPIRY_DAYS, SIGNUP_TRIAL_CREDITS } from './constants';
+import { CANCELLATION_WINDOW_HOURS, CANONICAL_CAPACITY, CREDIT_EXPIRY_DAYS, SIGNUP_TRIAL_CREDITS } from './constants';
 
 /**
  * The anti-drift guard for the constants that live in BOTH @tpa/core and the SQL
@@ -31,6 +31,15 @@ function tpaInt(fnName: string): string | null {
   return allMigrationSql.match(re)?.[1] ?? null;
 }
 
+/** The `when 'x' then N` branches of a single-arg `tpa.<name>(text)` CASE function. */
+function tpaCaseMap(fnName: string): Record<string, number> {
+  const fnRe = new RegExp(`function\\s+tpa\\.${fnName}\\s*\\([^)]*\\)[\\s\\S]*?\\$\\$([\\s\\S]*?)\\$\\$`, 'i');
+  const body = allMigrationSql.match(fnRe)?.[1] ?? '';
+  const out: Record<string, number> = {};
+  for (const m of body.matchAll(/when\s+'(\w+)'\s+then\s+(\d+)/gi)) out[m[1]!] = Number(m[2]);
+  return out;
+}
+
 describe('SQL ⇄ core constant parity (no silent drift)', () => {
   it('tpa.cancellation_window() mirrors CANCELLATION_WINDOW_HOURS', () => {
     expect(tpaInterval('cancellation_window')).toBe(`${CANCELLATION_WINDOW_HOURS} hours`);
@@ -42,6 +51,10 @@ describe('SQL ⇄ core constant parity (no silent drift)', () => {
 
   it('tpa.signup_trial_credits() mirrors SIGNUP_TRIAL_CREDITS', () => {
     expect(tpaInt('signup_trial_credits')).toBe(String(SIGNUP_TRIAL_CREDITS));
+  });
+
+  it('tpa.canonical_capacity(text) mirrors CANONICAL_CAPACITY for every training type', () => {
+    expect(tpaCaseMap('canonical_capacity')).toEqual(CANONICAL_CAPACITY);
   });
 });
 

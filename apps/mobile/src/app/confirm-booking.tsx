@@ -1,5 +1,6 @@
 import {
   CANCELLATION_WINDOW_HOURS,
+  CANONICAL_CAPACITY,
   formatInstantDate,
   formatInstantTime,
   isSessionConfirmed,
@@ -113,8 +114,20 @@ export default function ConfirmBookingScreen() {
   const resolvedType = verdict.ok ? verdict.trainingType : (slot.trainingType ?? chosenType);
   const meta = resolvedType ? TRAINING_META[resolvedType] : TRAINING_META.trial;
   const isGroup = slot.gender !== null && slot.level !== null;
-  const confirmed = isSessionConfirmed(slot);
-  const toFill = spotsUntilConfirmed(slot);
+  // A still-OPEN slot's stored capacity is the admin's pre-booking default
+  // (e.g. 4) — not what book_slot will actually commit once this booking
+  // fixes the type (least(admin capacity, canonical) — the open-slot-
+  // capacity fix). Preview THAT narrowing only for a genuinely open slot; an
+  // ALREADY-typed slot's capacity (admin-preset OR booking-set) is already
+  // the real number and must be read as-is — an admin-preset group of 6
+  // stays 6, never clamped down to group's canonical 4.
+  const previewCapacity =
+    slot.trainingType === null && resolvedType
+      ? Math.min(slot.capacity, CANONICAL_CAPACITY[resolvedType])
+      : slot.capacity;
+  const previewSlot = { ...slot, capacity: previewCapacity };
+  const confirmed = isSessionConfirmed(previewSlot);
+  const toFill = spotsUntilConfirmed(previewSlot);
   const submitting = bookMutation.isPending;
   const canConfirm = verdict.ok && batch !== undefined && !alreadyBooked && !submitting;
   const leftAfter = typeBalance - 1;
@@ -223,9 +236,11 @@ export default function ConfirmBookingScreen() {
           of a notification (the app can't send one). toFill === 1 means this
           booking fills the last seat and confirms it on the spot. A cap-1 session
           (individual/trial) confirms on the first booking, so confirmation
-          messaging is noise there — suppress it (gate on capacity > 1). While
-          pending, toFill is always >= 1, so no branch can render "0 to fill". */}
-      {slot.capacity <= 1 ? null : confirmed ? (
+          messaging is noise there — suppress it (gate on the PREVIEW capacity,
+          which reflects the resolved type on a still-open slot, not the
+          slot's stale admin default). While pending, toFill is always >= 1,
+          so no branch can render "0 to fill". */}
+      {previewCapacity <= 1 ? null : confirmed ? (
         <InfoCard
           variant="success"
           icon="checkmark-circle-outline"

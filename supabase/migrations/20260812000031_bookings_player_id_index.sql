@@ -1,0 +1,20 @@
+-- ============================================================================
+-- bookings(player_id) — the missing index (readiness-audit finding).
+--
+-- The original table had a plain unique(player_id, slot_id) constraint, which
+-- doubled as a usable index for a bare `player_id = X` lookup (Postgres can
+-- use a multi-column index's leading column alone). 20260718000005_s7a_
+-- booking_rpcs.sql dropped that constraint in favour of a PARTIAL unique
+-- index scoped to `where status <> 'cancelled'` (bookings_one_active_per_
+-- player_slot) — correct for the once-per-live-booking invariant it enforces,
+-- but a partial index cannot safely serve a query with no status predicate.
+-- Every "my bookings" read goes through bookings_select_own_or_admin's RLS
+-- filter (`player_id = current_player_id() or is_admin()`), which has done a
+-- sequential scan on every call since that drop — this table only grows.
+--
+-- Plain btree, additive, no other index/constraint touched. A bare CREATE
+-- INDEX on the current (small) table size takes a brief write lock; not using
+-- CONCURRENTLY here matches every other index in this repo, none of which use
+-- it, and the table's current size makes the lock negligible.
+-- ============================================================================
+create index bookings_player_id_idx on public.bookings (player_id);

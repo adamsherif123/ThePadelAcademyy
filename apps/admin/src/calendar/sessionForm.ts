@@ -1,4 +1,4 @@
-import { templateRequiresGenderLevel } from '@tpa/core';
+import { CANONICAL_CAPACITY, templateRequiresGenderLevel } from '@tpa/core';
 import type { CoachId, Gender, Level, TrainingType, Weekday } from '@tpa/types';
 import { useState } from 'react';
 
@@ -57,14 +57,6 @@ export const DURATION_OPTIONS: readonly { value: number; label: string }[] = [
   { value: 180, label: '3 hr' },
 ];
 
-/** The capacity a type leads with — group fills a court (4), a duo is 2, the rest 1. */
-export const DEFAULT_CAPACITY: Record<TrainingType, number> = {
-  group: 4,
-  duo: 2,
-  individual: 1,
-  trial: 1,
-};
-
 export interface SessionDraftInit {
   coachId: CoachId;
   trainingType: TrainingType;
@@ -77,7 +69,7 @@ export interface SessionDraft {
   coachId: CoachId;
   setCoachId: (id: CoachId) => void;
   trainingType: TrainingType;
-  /** Changing the type LEADS the capacity to that type's default (still overridable). */
+  /** Changing the type LEADS the capacity to that type's canonical seat count (still overridable). */
   setTrainingType: (t: TrainingType) => void;
   capacity: number;
   setCapacity: (n: number) => void;
@@ -108,7 +100,7 @@ export function useSessionDraft(init: SessionDraftInit): SessionDraft {
 
   const setTrainingType = (t: TrainingType) => {
     setType(t);
-    setCapacity(DEFAULT_CAPACITY[t]);
+    setCapacity(CANONICAL_CAPACITY[t]);
   };
 
   return {

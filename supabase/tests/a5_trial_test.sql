@@ -8,7 +8,7 @@
 -- Run with:  supabase test db
 -- ============================================================================
 begin;
-select plan(18);
+select plan(21);
 
 -- ── seed as postgres ─────────────────────────────────────────────────────────
 insert into auth.users (id, email) values
@@ -17,7 +17,8 @@ insert into auth.users (id, email) values
   ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'b@players.eg'),
   ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'c@players.eg'),
   ('dddddddd-dddd-dddd-dddd-dddddddddddd', 'd@players.eg'),
-  ('99999999-9999-9999-9999-999999999999', 'g@players.eg');   -- G: complete_signup (no player yet)
+  ('99999999-9999-9999-9999-999999999999', 'g@players.eg'),   -- G: complete_signup, trained_before=true (no player yet)
+  ('88888888-8888-8888-8888-888888888888', 'h@players.eg');   -- H: complete_signup, trained_before=false (no player yet)
 
 insert into public.admins (id, auth_user_id, display_name, created_at) values
   ('adm_1', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'Adm', now());
@@ -69,6 +70,18 @@ select is((select trained_before from public.players where auth_user_id = '99999
 select is((select count(*)::int from public.credit_batches c join public.players p on p.id=c.player_id
            where p.auth_user_id = '99999999-9999-9999-9999-999999999999'),
   0, 'A5: no credits minted at signup');
+-- THE regression this migration fixes: trained_before was stored but never
+-- consulted by trial_eligible() — a player who never bought/requested a
+-- trial (trial_used() = false) was still offered it purely because nothing
+-- read this column. G is still authenticated from complete_signup above.
+select is(public.trial_eligible(), false,
+  'G (trained_before=true, never bought a trial) is NOT trial-eligible — the regression this migration fixes');
+
+-- H: the FALSE-branch control — trained_before=false must remain eligible,
+-- proving the fix didn't overcorrect into blocking everyone.
+select set_config('request.jwt.claims', '{"sub":"88888888-8888-8888-8888-888888888888","role":"authenticated"}', true);
+select is(public.complete_signup('Hana','ladies','beginner',null,false)->>'ok', 'true', 'complete_signup(H, trained_before=false) → ok');
+select is(public.trial_eligible(), true, 'H (trained_before=false, never used) IS trial-eligible — genuinely-new players are unaffected');
 
 -- ── the trial buy flow, as player A ─────────────────────────────────────────
 select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","role":"authenticated"}', true);

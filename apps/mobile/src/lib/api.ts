@@ -61,6 +61,22 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Was this failure the network, not the server? postgrest-js never throws for a
+ * transport failure (no connectivity, DNS, or our own request timeout via
+ * AbortSignal) — it resolves `error` with `code: ''`, because `code` is reserved
+ * for a genuine PostgREST/Postgres error the server actually returned (RLS
+ * rejection, constraint violation, JWT-invalid, ...), which always carries a real
+ * code. This is the ONE place that distinguishes "couldn't reach the server" from
+ * "the server answered no" — every caller that could otherwise misread a fetch
+ * failure as an auth/business fact (SessionProvider's player/admin gate, the
+ * sign-in screen's email_has_account, complete_signup) checks this instead of
+ * treating any thrown ApiError as the same kind of failure.
+ */
+export function isNetworkError(e: unknown): boolean {
+  return e instanceof ApiError && (e.cause as { code?: string } | null | undefined)?.code === '';
+}
+
 // ── reads ────────────────────────────────────────────────────────────────────
 // Each throws ApiError on transport failure so React Query can retry/surface it.
 

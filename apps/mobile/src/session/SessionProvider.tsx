@@ -18,6 +18,7 @@ import {
   deleteMyPushToken,
   fetchCurrentPlayer,
   fetchIsAdmin,
+  isNetworkError,
 } from '../lib/api';
 import { getLastPushToken, setLastPushToken } from '../notifications/tokenStore';
 import { queryClient, queryKeys } from '../lib/queryClient';
@@ -33,10 +34,11 @@ export type { SessionStatus } from './authMachine';
  * RLS. The states are made explicit as `status`, because "verified but no profile yet" and
  * "verified but an ADMIN" are real places a user can land — routes, not errors:
  *
- *   signed_out    — no session          → (auth)/sign-in
- *   not_a_player  — an ADMIN credential  → (auth)/not-a-player (refused — bug #2)
- *   needs_profile — session, no player   → (auth)/profile-setup, run complete_signup
- *   ready         — session + player     → (tabs)
+ *   signed_out    — no session               → (auth)/sign-in
+ *   offline       — session, gate unreachable → (tabs), cached data + offline banner
+ *   not_a_player  — an ADMIN credential       → (auth)/not-a-player (refused — bug #2)
+ *   needs_profile — session, no player        → (auth)/profile-setup, run complete_signup
+ *   ready         — session + player          → (tabs)
  *
  * `is_admin()` is queried alongside the player so an admin who signs into the players'
  * app is refused instead of bounced to profile-setup (the bug the A1 separation made
@@ -113,11 +115,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const adminQuery = useQuery({ queryKey: ['isAdmin'], queryFn: fetchIsAdmin, enabled: hasSession });
   const player = hasSession ? (playerQuery.data ?? null) : null;
   const isAdmin = hasSession ? Boolean(adminQuery.data) : false;
+  // The gate couldn't reach the server — either Query itself paused the fetch
+  // because the device is offline (isPaused, TanStack Query's own onlineManager,
+  // wired to real connectivity in lib/queryClient.ts), or a fetch was actually
+  // attempted and failed at the transport level (isNetworkError). Both must read
+  // as "unverifiable right now", never as "no player row" — that conflation was
+  // the cold-start-offline bug (a network failure landed on profile-setup).
+  const gateUnreachable =
+    playerQuery.isPaused ||
+    adminQuery.isPaused ||
+    isNetworkError(playerQuery.error) ||
+    isNetworkError(adminQuery.error);
 
   const status: SessionStatus = deriveStatus({
     sessionRestored: session !== undefined,
     hasSession,
     gateLoading: playerQuery.isLoading || adminQuery.isLoading,
+    gateUnreachable,
     isAdmin,
     player,
   });
@@ -185,8 +199,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         await queryClient.invalidateQueries({ queryKey: queryKeys.player });
         return { ok: true };
       } catch (e) {
-        // e.g. the deleted-auth-user 23502 (a valid JWT whose auth.users row is gone).
-        // The screen shows a friendly error + the sign-out escape rather than a crash.
+        // A network failure here is NOT "we couldn't create your profile" — that copy
+        // reads as a server-side rejection and would push someone offline to retry
+        // pointlessly instead of reconnecting first. e.g. the deleted-auth-user 23502
+        // (a valid JWT whose auth.users row is gone) is the genuine-failure case the
+        // fallback message still covers.
+        if (isNetworkError(e)) {
+          return { ok: false, error: 'No connection. Check your internet and try again.' };
+        }
         return { ok: false, error: asMessage(e, 'We couldn’t create your profile. Please try again.') };
       }
     },

@@ -56,6 +56,28 @@ export const CANCELLATION_WINDOW_HOURS = 3;
 export const CAIRO_TZ = 'Africa/Cairo';
 
 /**
+ * The seat ceiling a session type implies. This is the ONE canonical
+ * type→capacity mapping — the admin's create-form default (an open slot's
+ * capacity is otherwise whatever the admin typed) AND the number book_slot /
+ * admin_book_player force capacity to the moment a booking fixes a
+ * previously-OPEN slot's type (mirroring the individual-forces-1 rule to every
+ * type, not just individual). An admin who pre-sets a type at creation keeps
+ * their own explicit capacity — this map only fires for a booking-driven
+ * type-set, never overwriting a deliberate admin number.
+ *
+ * MIRRORED IN SQL as `tpa.canonical_capacity(text)` in
+ * supabase/migrations/20260809000028_open_slot_capacity_fix.sql. Changing a
+ * number here means changing that function too; sql-parity.test.ts reads both
+ * and fails if they drift.
+ */
+export const CANONICAL_CAPACITY: Record<TrainingType, number> = {
+  trial: 1,
+  individual: 1,
+  duo: 2,
+  group: 4,
+};
+
+/**
  * Runtime arrays derived from the type unions. The `satisfies` clause rejects a
  * value that isn't a member of the union; the `Covers` assertion below rejects a
  * union member that's MISSING from the array. Together they make it impossible
