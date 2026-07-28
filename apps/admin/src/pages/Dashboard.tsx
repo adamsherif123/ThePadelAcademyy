@@ -186,7 +186,7 @@ export function Dashboard() {
   return (
     <div>
       <PageHeader
-        eyebrow="Good morning, Rania"
+        eyebrow="Good morning"
         title="Dashboard"
         subtitle="The state of The Padel Academy — revenue, players, sessions, and what needs your attention today."
       />
