@@ -21,15 +21,18 @@ import { parseInstant, toInstant } from './time';
  */
 
 /**
- * A group slot carries a required gender + level; other formats — including an
- * OPEN (untyped) slot, which is neither `null !== 'group'` nor any other format
+ * A group slot carries a required level; other formats — including an OPEN
+ * (untyped) slot, which is neither `null !== 'group'` nor any other format
  * until its first booking fixes it — never do. `slot.trainingType === 'group'` is
  * already null-safe (`null === 'group'` is simply `false`), so an open slot
- * correctly narrows to `false` here with no special-casing.
+ * correctly narrows to `false` here with no special-casing. Gender is NOT
+ * required even for group (the gender-display-only migration) — a group slot
+ * may legitimately have `gender: null` (mixed, no restriction), so the
+ * narrowed type below reflects that (`gender: Gender | null`, not `Gender`).
  */
 export function isGroupSlot(
   slot: SessionSlot,
-): slot is SessionSlot & { trainingType: 'group'; gender: Gender; level: Level } {
+): slot is SessionSlot & { trainingType: 'group'; gender: Gender | null; level: Level } {
   return slot.trainingType === 'group';
 }
 
@@ -102,8 +105,11 @@ export function cancellationDeadline(slot: SessionSlot): IsoInstant {
 /**
  * `level_mismatch` is GONE (the booking rework, rule 4): level is display-only —
  * an intermediate player sees "Beginner" on a group slot and self-selects out,
- * but no code, client or server, blocks the join. `gender_mismatch` is the one
- * hard block that survives from the old ladies/men separation.
+ * but no code, client or server, blocks the join. `gender_mismatch` is ALSO
+ * GONE now (the gender-display-only migration extends rule 4 to gender): a
+ * men player sees "Ladies'" on a group slot and self-selects out same as
+ * level, but no code blocks the join either. Both fields are still recorded
+ * on the slot and shown — neither gates anymore.
  *
  * `type_mismatch` is NEW: on an OPEN slot, two players can race to fix its type
  * (see `bookableTypesFor`); the loser's client may still think a since-resolved
@@ -116,7 +122,6 @@ export type BookBlockReason =
   | 'slot_cancelled'
   | 'slot_in_past'
   | 'slot_full'
-  | 'gender_mismatch'
   | 'type_mismatch'
   | 'no_usable_credit';
 
@@ -153,10 +158,8 @@ export function canBookSlot(
     return { ok: false, reason: 'slot_in_past' };
   }
   if (slotRemainingCapacity(slot) <= 0) return { ok: false, reason: 'slot_full' };
-  if (slot.gender !== null && slot.gender !== player.gender) {
-    return { ok: false, reason: 'gender_mismatch' };
-  }
-  // level is display-only (rule 4) — never blocks, checked nowhere in this function.
+  // gender and level are both display-only (rule 4, extended to gender) —
+  // neither blocks, neither is checked anywhere in this function.
 
   if (slot.trainingType !== null && slot.trainingType !== chosenType) {
     return { ok: false, reason: 'type_mismatch' };
@@ -190,10 +193,9 @@ export interface BookableType {
  * discipline requires here: one place resolves a chosen type against a slot.
  *
  * A TYPED slot has exactly one candidate (its own type) and so yields at most
- * one entry. An OPEN slot tries all four `TrainingType`s — gender is checked
- * inside canBookSlot regardless, but is always null on a genuinely open slot
- * (the group_shape invariant), so it never filters anything out at this stage;
- * it only ever starts mattering once someone's booking has fixed the type.
+ * one entry. An OPEN slot tries all four `TrainingType`s — gender is no longer
+ * checked inside canBookSlot at all (display-only, like level), so it never
+ * filters anything out here or anywhere downstream.
  */
 export function bookableTypesFor(
   slot: SessionSlot,

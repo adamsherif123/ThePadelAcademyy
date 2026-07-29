@@ -460,16 +460,18 @@ check "booked_count = 1 (no oversell)"          "$(sql "select booked_count from
 check "training_type set to 'duo' by the winner" "$(sql "select training_type from public.session_slots where id='slr_j'")" "duo"
 
 # ── Scenario K: MIXED-GENDER racers, SAME type ('group'), racing one untyped
-# capacity-4 slot — the gender TOCTOU fix. Before the fix, the guarded WHERE
-# re-checked only type + capacity, never gender: the peek-time gender gate
-# reads the unlocked pre-image (still null for everyone racing an untyped
-# slot), so a men racer and a ladies racer could BOTH pass their own peek and
-# then both seat, gated only by capacity — mixing genders in what becomes a
-# single-gender 'group' slot. The fix adds gender to the guarded WHERE too
-# (mirroring the type clause exactly): whichever gender's racer commits first
-# fixes slr_k's gender; the OTHER gender's racers re-evaluate against the
-# now-committed gender and lose cleanly.
-echo "Scenario K — mixed-gender racers, SAME type (group), one untyped capacity-4 slot (gender TOCTOU fix):"
+# capacity-4 slot — REPURPOSED for the gender-display-only migration
+# (20260813000032). This scenario used to prove the gender TOCTOU fix (the
+# guarded WHERE re-checking gender against the committed row, so only one
+# gender could ever win the group and the other got a clean gender_mismatch —
+# see git history for that version). Gender no longer gates booking at all —
+# by design, this is the guarantee being REMOVED — so the scenario is now the
+# positive mirror: ALL 8 racers across both genders should win, filling the
+# capacity-4 slot as a genuinely mixed-gender group, with zero gender_mismatch
+# ever returned. The capacity guard right next to the (now-deleted) gender
+# clause must still hold exactly: 8 racers on a capacity-4 slot must still
+# seat exactly 4, no oversell, regardless of gender mix.
+echo "Scenario K — mixed-gender racers, SAME type (group), one untyped capacity-4 slot (gender no longer blocks):"
 KSETUP="insert into public.coaches (id,name,bio,is_active) values ('cor_k','C','b',true);"
 KSETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status) values ('slr_k','cor_k',now()+interval '1 day',now()+interval '1 day 1 hour',null,4,0,'published');"
 for k in $(seq 1 4); do
@@ -490,14 +492,22 @@ done
 wait
 K_WINS=$(grep -lFx WIN "$TMP"/k_*.txt 2>/dev/null | wc -l | tr -d ' ')
 K_GENDER_MISMATCH=$(grep -lFx gender_mismatch "$TMP"/k_*.txt 2>/dev/null | wc -l | tr -d ' ')
+K_SLOTFULL=$(grep -lFx slot_full "$TMP"/k_*.txt 2>/dev/null | wc -l | tr -d ' ')
 K_GENDER=$(sql "select gender from public.session_slots where id='slr_k'")
 K_COUNT=$(sql "select booked_count from public.session_slots where id='slr_k'")
 K_MIXED=$(sql "select count(distinct p.gender) from public.bookings b join public.players p on p.id=b.player_id where b.slot_id='slr_k' and b.status='booked'")
-check "exactly one gender cohort wins all 4 seats (no oversell within the winner)" "$K_WINS" "4"
-check "the other gender's 4 racers all get a clean gender_mismatch"              "$K_GENDER_MISMATCH" "4"
+check "exactly 4 of the 8 racers win (capacity 4, no oversell — the guard beside the deleted gender clause)" "$K_WINS" "4"
+check "zero racers ever get gender_mismatch — the reason no longer exists"       "$K_GENDER_MISMATCH" "0"
+check "the other 4 racers lose cleanly on capacity (slot_full), not gender"      "$K_SLOTFULL" "4"
 check "booked_count = 4"                                                         "$K_COUNT" "4"
-check "slot ends with a recorded gender (either ladies or men, never null)"      "$([ -n "$K_GENDER" ] && echo yes || echo no)" "yes"
-check "every seated booking is the SAME gender — no mixed-gender group (the TOCTOU this fixes)" "$K_MIXED" "1"
+check "slot still ends with a recorded gender (from whichever racer committed first — display-only, not dropped)" "$([ -n "$K_GENDER" ] && echo yes || echo no)" "yes"
+# NOT asserted as a fixed count: which 4 of the 8 actually win is real OS/network
+# scheduling, not something the code controls — a single run could legitimately
+# seat 4-of-1-gender by chance. The deterministic proof that mixing is POSSIBLE
+# (not guaranteed every run) is gender_display_only_test.sql's single-session
+# case, where two specific, known genders are made to win in sequence. This
+# line just reports what actually happened this run.
+echo "  info — $K_MIXED distinct gender(s) among the 4 seated this run (both 1 and 2 are legitimate outcomes — capacity, not gender, decides who wins)"
 
 # ── Scenario L: delete_account racing cancel_booking on the SAME booking, on a
 # slot with a SECOND live booker (the delete_account residual fix). Before the

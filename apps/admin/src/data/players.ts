@@ -75,15 +75,17 @@ export const purchasesForPlayer = (purchases: Purchase[], playerId: PlayerId): P
     .sort((a, b) => ms(b.createdAt) - ms(a.createdAt));
 
 /**
- * Active bookings this player holds on GROUP slots whose gender/level wouldn't
- * match a proposed profile — surfaced when the owner edits gender/level, so the
+ * Active bookings this player holds on GROUP slots whose LEVEL wouldn't match
+ * a proposed profile — surfaced when the owner edits their level, so the
  * change is made with eyes open. The bookings themselves are never touched.
+ * Gender is NOT checked here (the gender-display-only migration): gender no
+ * longer restricts anything, so a differing gender is not a "mismatch" in any
+ * sense that matters — only level's shape still ties to group-ness.
  */
 export function mismatchedActiveBookings(
   bookings: Booking[],
   slots: SessionSlot[],
   playerId: PlayerId,
-  gender: Gender,
   level: Level,
 ): number {
   const slotById = new Map(slots.map((s) => [s.id, s]));
@@ -91,7 +93,7 @@ export function mismatchedActiveBookings(
     if (b.playerId !== playerId || b.status !== 'booked') return false;
     const slot = slotById.get(b.slotId);
     if (!slot || slot.trainingType !== 'group') return false;
-    return (slot.gender !== null && slot.gender !== gender) || (slot.level !== null && slot.level !== level);
+    return slot.level !== null && slot.level !== level;
   }).length;
 }
 

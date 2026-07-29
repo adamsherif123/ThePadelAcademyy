@@ -4,10 +4,10 @@
 --
 -- Proves: a successful admin booking mints exactly ONE admin_booked
 -- notification, addressed to the BOOKED PLAYER (never the admin, who has no
--- player row to notify anyway — A1); every rejection path (gender block, no
--- credit, slot full, unknown player/slot, a repeat already_booked call) emits
--- nothing; and re-calling with the same params is safe — the second call
--- rejects as already_booked and does NOT mint a second notification.
+-- player row to notify anyway — A1); every rejection path (no credit, slot
+-- full, unknown player/slot, a repeat already_booked call) emits nothing; and
+-- re-calling with the same params is safe — the second call rejects as
+-- already_booked and does NOT mint a second notification.
 --
 -- Run with:  supabase test db  (alongside rpc_admin_test.sql, which proves the
 -- booking/credit behaviour itself is unchanged — this file only proves the emit)
@@ -32,9 +32,10 @@ insert into public.coaches (id, name, bio, is_active) values
   ('co_abn1','C','b',true), ('co_abn2','C','b',true), ('co_abn3','C','b',true);
 
 -- sl_abn_win: open slot, admin will book pl_abn_win as duo → the success case.
--- sl_abn_gender: 'ladies' group slot, admin books pl_abn_win (men) WITHOUT
--- override → gender_mismatch (short-circuits before the credit check, so this
--- fires regardless of what pl_abn_win holds).
+-- sl_abn_gender: 'ladies' group slot — gender no longer blocks (this
+-- migration), so admin books pl_abn_win (men) WITHOUT override and reaches
+-- the credit check; pl_abn_win holds only a duo credit, no group credit, so
+-- this rejects on no_usable_credit, not gender.
 -- sl_abn_full: capacity-1 DUO slot already at capacity — duo so pl_abn_win's
 -- one credit batch (duo) is the type that would otherwise apply, isolating
 -- the assertion to the capacity hard-block rather than no_usable_credit.
@@ -72,12 +73,13 @@ select is(
 );
 
 -- ════════════════════════════════════════════════════════════════════════════
--- 2) Rejections emit NOTHING — gender block, no credit, slot full, and a repeat
---    call on the now-booked slot (already_booked).
+-- 2) Rejections emit NOTHING — no credit (gender no longer blocks — this
+--    migration), slot full, and a repeat call on the now-booked slot
+--    (already_booked).
 -- ════════════════════════════════════════════════════════════════════════════
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"ffffffff-1111-1111-1111-ffffffffffff","role":"authenticated"}', true);
-select is(public.admin_book_player('sl_abn_gender','pl_abn_win',false)->>'reason', 'gender_mismatch', 'gender-mismatched admin booking is rejected');
+select is(public.admin_book_player('sl_abn_gender','pl_abn_win',false)->>'reason', 'no_usable_credit', 'gender no longer blocks — pl_abn_win reaches the credit check and is rejected for holding no group credit');
 select is(public.admin_book_player('sl_abn_full','pl_abn_win',true)->>'reason', 'slot_full', 'a full slot is rejected even with override');
 select is(public.admin_book_player('sl_abn_win','pl_abn_nocredit',false,'duo')->>'reason', 'no_usable_credit', 'a credit-less player is rejected');
 reset role;

@@ -5,8 +5,10 @@
 -- model: type-set-on-first-booking, immutability after, credit-of-the-CHOSEN-
 -- type enforcement, individual auto-confirm at type-set time, the revert rule
 -- (booking-set reverts to untyped when it empties; admin-set NEVER reverts),
--- admin pre-typed flow unchanged, level recorded but display-only (rule 4),
--- and gender still a hard block (rule 4's preserved half). The real-parallelism
+-- admin pre-typed flow unchanged, and level recorded but display-only (rule 4).
+-- Gender is ALSO recorded but display-only now (the gender-display-only
+-- migration, 20260813000032, extends rule 4 to gender) — see the "gender no
+-- longer blocks" assertion below, which used to prove the opposite. The real-parallelism
 -- race guarantees (type-set atomicity, different-type racers, revert racing a
 -- new booking) are NOT provable in one session — see concurrency.sh Scenarios
 -- H/I/J; this file's "ordering b" test proves that specific code branch
@@ -17,7 +19,7 @@
 -- Run with:  supabase test db  (alongside rpc_test.sql / rpc_admin_test.sql)
 -- ============================================================================
 begin;
-select plan(79);
+select plan(81);
 
 -- ── seed as postgres (RLS bypassed; constraints still apply) ─────────────────
 insert into auth.users (id) values
@@ -108,9 +110,13 @@ select is(public.book_slot('sl_ots1','group')->>'ok', 'true', 'B books the SAME 
 select is((select booked_count from public.session_slots where id='sl_ots1'), 2, 'sl_ots1 booked_count 1 → 2 (B joined)');
 select is((select level from public.session_slots where id='sl_ots1'), 'intermediate', 'the recorded level is UNCHANGED by B''s join — only the FIRST booker sets it');
 
--- Gender STILL blocks (rule 4's preserved half).
+-- Gender no longer blocks (rule 4, extended to gender — 20260813000032). C
+-- (men) joins the ladies-recorded sl_ots1 successfully; C holds a usable
+-- group credit (cb_ots_c_grp), so nothing else stops this booking either.
 select set_config('request.jwt.claims', '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}', true);
-select is(public.book_slot('sl_ots1','group')->>'reason', 'gender_mismatch', 'a men player is blocked by the recorded gender (ladies, from the first booker) — gender is NOT display-only');
+select is(public.book_slot('sl_ots1','group')->>'ok', 'true', 'a men player joins the ladies-recorded slot → ok (gender is display-only now)');
+select is((select booked_count from public.session_slots where id='sl_ots1'), 3, 'sl_ots1 booked_count 2 → 3 (C joined, mixed gender on one slot)');
+select is((select gender from public.session_slots where id='sl_ots1'), 'ladies', 'the recorded gender is UNCHANGED by C''s join — only the FIRST booker sets it (mirrors level)');
 
 -- credit-of-the-CHOSEN-type enforced server-side, regardless of what a picker offers.
 select set_config('request.jwt.claims', '{"sub":"44444444-4444-4444-4444-444444444444","role":"authenticated"}', true);
@@ -195,13 +201,18 @@ select is(public.admin_book_player('sl_ots9','pl_ots_i',false)->>'ok', 'true',
 select is((select booked_count from public.session_slots where id='sl_ots9'), 2, 'sl_ots9 booked_count 0 → 2 (G + I)');
 
 -- ════════════════════════════════════════════════════════════════════════════
--- 6) FIX 2 — session_slots_group_shape CHECK: the four (gender,level) nullness
---    shapes under training_type IS NULL. Branch 2's old bare
---    `training_type = 'group'` equality evaluates to NULL (not FALSE) when
---    training_type IS NULL — three-valued logic let an untyped row with BOTH
---    gender and level set slip through (FALSE OR NULL OR FALSE = NULL =
---    "satisfied"). Fixed to `training_type is not null and training_type =
---    'group' and ...`, a hard FALSE for every untyped row.
+-- 6) FIX 2 — session_slots_group_shape CHECK: the untyped-row shapes. Originally
+--    proved the three-valued-logic fix (a bare `training_type = 'group'`
+--    equality evaluates to NULL, not FALSE, when training_type IS NULL, so an
+--    untyped row with BOTH gender and level set could vacuously pass). The
+--    gender-display-only migration (20260813000032) then dropped gender from
+--    the CHECK entirely — gender no longer has ANY bearing on this constraint,
+--    for any type. sl_ots_chk2 (gender SET, level NULL, untyped) therefore
+--    flips from rejected to LEGAL here; chk3/chk4 are unchanged (level SET on
+--    an untyped row is illegal regardless of gender — that part of the shape
+--    never depended on gender to begin with). The full shape matrix for the
+--    NEW check (including the new group + gender-null and non-group +
+--    gender-set legal shapes) is in gender_display_only_test.sql.
 -- ════════════════════════════════════════════════════════════════════════════
 -- Raw fixture INSERTs from here need superuser privilege (RLS grants only
 -- allow authenticated writes through the SECURITY DEFINER RPCs, not directly
@@ -215,20 +226,23 @@ select lives_ok(
        values ('sl_ots_chk1', 'co_ots_chk', now()+interval '1 day', now()+interval '1 day 1 hour', null, 4, 0, null, null, 'published') $$,
   'untyped + gender NULL + level NULL → legal (the only valid untyped shape)');
 
-select throws_ok(
+-- A distinct time from chk1 (not +1 day) — same coach, so it must not overlap
+-- chk1's slot or session_slots_coach_no_overlap (S5.1) fires instead of the
+-- CHECK this test actually means to exercise.
+select lives_ok(
   $$ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_type, capacity, booked_count, gender, level, status)
-       values ('sl_ots_chk2', 'co_ots_chk', now()+interval '1 day', now()+interval '1 day 1 hour', null, 4, 0, 'ladies', null, 'published') $$,
-  '23514', null, 'untyped + gender SET + level NULL → rejected');
+       values ('sl_ots_chk2', 'co_ots_chk', now()+interval '2 day', now()+interval '2 day 1 hour', null, 4, 0, 'ladies', null, 'published') $$,
+  'untyped + gender SET + level NULL → legal now — gender is unconstrained by the CHECK (20260813000032)');
 
 select throws_ok(
   $$ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_type, capacity, booked_count, gender, level, status)
        values ('sl_ots_chk3', 'co_ots_chk', now()+interval '1 day', now()+interval '1 day 1 hour', null, 4, 0, null, 'beginner', 'published') $$,
-  '23514', null, 'untyped + gender NULL + level SET → rejected');
+  '23514', null, 'untyped + gender NULL + level SET → still rejected — level''s shape is unaffected by the gender change');
 
 select throws_ok(
   $$ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_type, capacity, booked_count, gender, level, status)
        values ('sl_ots_chk4', 'co_ots_chk', now()+interval '1 day', now()+interval '1 day 1 hour', null, 4, 0, 'ladies', 'beginner', 'published') $$,
-  '23514', null, 'untyped + gender SET + level SET → rejected — THE exploit shape the old branch 2 vacuously passed');
+  '23514', null, 'untyped + gender SET + level SET → still rejected — level SET on an untyped row is illegal regardless of gender');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- 7) FIX 3 — delete_account shares the revert: a lone booking-set booker

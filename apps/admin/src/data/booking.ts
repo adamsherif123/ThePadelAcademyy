@@ -20,23 +20,29 @@ import { TOUCHED } from '../lib/queryClient';
 import { runRpc } from './queries';
 
 /**
- * The admin's booking seams. classifyAdminBooking is the PURE override-policy
- * preview over @tpa/core's canBookSlot (used by the add-player picker); the two
- * writes are the atomic RPCs (admin_book_player / remove_booking), which re-run the
- * same rule server-side. The RPC is the enforcement; if the preview and it disagree,
- * the RPC's reason wins.
+ * The admin's booking seams. classifyAdminBooking is the PURE preview over
+ * @tpa/core's canBookSlot (used by the add-player picker); the two writes are
+ * the atomic RPCs (admin_book_player / remove_booking), which re-run the same
+ * rule server-side. The RPC is the enforcement; if the preview and it
+ * disagree, the RPC's reason wins.
+ *
+ * There is no more override-able hard block: level_mismatch was removed first
+ * (rule 4 — display-only, never blocking), and gender_mismatch is gone too
+ * now (the gender-display-only migration extends rule 4 to gender) — every
+ * `canBookSlot` rejection left is a genuine hard block (capacity, credit,
+ * status/timing, type), none of which admin_book_player's `p_override` was
+ * ever meant to waive (it only ever waived gender). The `kind: 'override'`
+ * verdict and its "Book anyway" UI are gone with it — see SlotModal.tsx.
  *
  * `chosenType` mirrors the player app's picker: the slot's own type if it's
  * already fixed, or the admin's pick for an OPEN block (rule 2 applies to a
  * WhatsApp-reported booking exactly as it does to a self-service one — the
- * admin can only pick a type the PLAYER holds a usable credit for; override
- * waives gender only, never the credit check).
+ * admin can only pick a type the PLAYER holds a usable credit for).
  */
 
-// --- Add-player classification: the admin OVERRIDE POLICY over canBookSlot (pure) ---
+// --- Add-player classification: a thin preview over canBookSlot (pure) ---
 export type AdminBookVerdict =
   | { kind: 'ok'; creditBatchId: CreditBatch['id']; trainingType: TrainingType }
-  | { kind: 'override'; reason: 'gender_mismatch'; creditBatchId: CreditBatch['id']; trainingType: TrainingType }
   | { kind: 'blocked'; reason: BookBlockReason | 'already_booked' };
 
 export function classifyAdminBooking(
@@ -50,15 +56,6 @@ export function classifyAdminBooking(
   if (alreadyBooked) return { kind: 'blocked', reason: 'already_booked' };
   const raw = canBookSlot(slot, player, batches, now, chosenType);
   if (raw.ok) return { kind: 'ok', creditBatchId: raw.creditBatchId, trainingType: raw.trainingType };
-  // level_mismatch is gone (rule 4: display-only, never blocking — no override
-  // needed for it). gender_mismatch is the one override-able hard block left.
-  if (raw.reason === 'gender_mismatch') {
-    const override = canBookSlot(slot, { ...player, gender: slot.gender ?? player.gender }, batches, now, chosenType);
-    if (override.ok) {
-      return { kind: 'override', reason: 'gender_mismatch', creditBatchId: override.creditBatchId, trainingType: override.trainingType };
-    }
-    return { kind: 'blocked', reason: override.reason };
-  }
   return { kind: 'blocked', reason: raw.reason };
 }
 
@@ -68,9 +65,11 @@ export function isActivelyBooked(bookings: Booking[], slotId: SlotId, playerId: 
 }
 
 /**
- * Admin books a player into a slot (a WhatsApp booking recorded here) via the atomic
- * admin_book_player RPC. `override` waives a gender mismatch ONLY — every other
- * rule still runs server-side, so a hard block hiding behind a mismatch still wins.
+ * Admin books a player into a slot (a WhatsApp booking recorded here) via the
+ * atomic admin_book_player RPC. `override` is threaded straight to the RPC's
+ * `p_override` parameter, which the RPC still accepts (unchanged signature)
+ * but which no longer has anything to waive (gender/level never block) — this
+ * app never passes `true` for it anymore (see classifyAdminBooking / SlotModal).
  * `trainingType` is the admin's pick for an OPEN slot; null for an already-typed one.
  */
 export function addPlayerToSlot(

@@ -1,11 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { formatSessionTimeRange } from '@tpa/core';
 import { color, radius, space } from '@tpa/theme';
-import type { Coach, Gender, Level, SessionSlot } from '@tpa/types';
+import type { Coach, Level, SessionSlot } from '@tpa/types';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Avatar } from './Avatar';
-import { CapacityDots } from './CapacityDots';
+import { CapacityMeter } from './CapacityMeter';
 import { Text } from './Text';
 import { GENDER_LABEL, LEVEL_LABEL } from './trainingMeta';
 
@@ -46,7 +46,11 @@ export function SlotCard({
 }) {
   const bookable = state === 'bookable';
   const isOpen = slot.trainingType === null;
-  const isGroup = slot.gender !== null && slot.level !== null;
+  // Group ⟺ level set — level's shape is still tied to group-ness (unchanged
+  // by the gender-display-only migration). Gender is NOT a reliable group
+  // signal anymore: a mixed-gender group slot has gender null, so checking
+  // both (the old pattern) would misclassify it as non-group.
+  const isGroup = slot.level !== null;
 
   const body = (
     <View style={[styles.card, isOpen && styles.open, !bookable && !isOpen && styles.dimmed]}>
@@ -57,7 +61,11 @@ export function SlotCard({
             {formatSessionTimeRange(slot.startsAt, slot.endsAt)}
           </Text>
           <Text variant="caption" tone="secondary">
-            {`${coach ? `Coach ${coach.name.split(' ')[0]}` : 'Coach'} · ${slot.bookedCount}/${slot.capacity} booked`}
+            {isOpen
+              ? coach
+                ? `Coach ${coach.name.split(' ')[0]}`
+                : 'Coach'
+              : `${coach ? `Coach ${coach.name.split(' ')[0]}` : 'Coach'} · ${slot.bookedCount}/${slot.capacity} booked`}
           </Text>
         </View>
         <StatusPill state={state} note={note} isOpen={isOpen} />
@@ -66,7 +74,11 @@ export function SlotCard({
       <View style={styles.bottom}>
         {isGroup ? (
           <Text variant="micro" tone="muted">
-            {`${GENDER_LABEL[slot.gender as Gender]} · ${LEVEL_LABEL[slot.level as Level]}`}
+            {/* Gender may be null on a group slot now (mixed — no restriction);
+                shown only when actually set, never fabricated. */}
+            {slot.gender !== null
+              ? `${GENDER_LABEL[slot.gender]} · ${LEVEL_LABEL[slot.level as Level]}`
+              : LEVEL_LABEL[slot.level as Level]}
           </Text>
         ) : isOpen ? (
           <Text variant="micro" tone="accent">
@@ -75,7 +87,15 @@ export function SlotCard({
         ) : (
           <View />
         )}
-        <CapacityDots booked={slot.bookedCount} capacity={slot.capacity} muted={!bookable && !isOpen} />
+        {/* An open block's eventual capacity isn't decided yet (least(admin
+            capacity, canonical) fires only once a booking fixes the type — see
+            CANONICAL_CAPACITY) — a meter or "N/M booked" here would show a
+            ceiling that's likely to change the moment someone books. No number
+            is more honest than a wrong one; the "Open — you choose" text above
+            already says everything true that can be said before that. */}
+        {isOpen ? null : (
+          <CapacityMeter booked={slot.bookedCount} capacity={slot.capacity} muted={!bookable} />
+        )}
       </View>
 
       {bookable && creditNote ? (

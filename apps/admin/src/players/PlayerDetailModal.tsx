@@ -284,7 +284,7 @@ function EditView({
   const [gender, setGender] = useState<Gender>(player.gender);
   const [level, setLevel] = useState<Level>(player.level);
 
-  const mismatch = mismatchedActiveBookings(bookings, slots, player.id, gender, level);
+  const mismatch = mismatchedActiveBookings(bookings, slots, player.id, level);
   const profileChanged = gender !== player.gender || level !== player.level;
 
   return (
@@ -334,7 +334,7 @@ function EditView({
           <p className={styles.note}>
             <AlertTriangle size={15} aria-hidden />
             This player holds {mismatch} active booking{mismatch === 1 ? '' : 's'} on group sessions that
-            won’t match the new gender/level. Those bookings stay exactly as they are — the change only
+            won’t match the new level. Those bookings stay exactly as they are — the change only
             affects which sessions they can book from here on.
           </p>
         ) : null}

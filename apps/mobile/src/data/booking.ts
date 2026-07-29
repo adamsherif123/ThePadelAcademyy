@@ -1,11 +1,14 @@
 import {
   bookableTypesFor,
   cairoCalendarDate,
+  cairoWeekStart,
   canBookSlot,
   cancellationDeadline,
   creditExpiryState,
   isCancellableWithoutForfeit,
   isDayOpen,
+  slotRemainingCapacity,
+  TRAINING_TYPES,
 } from '@tpa/core';
 import type {
   AvailabilityTemplate,
@@ -49,6 +52,43 @@ function sameCairoDay(instant: IsoInstant, d: CairoDay): boolean {
 export interface DateStripDay extends CairoDay {
   key: string;
   closed: boolean;
+  /**
+   * Total remaining bookable seats across this day's published, not-yet-started
+   * sessions — 0 when closed. This is raw remaining capacity (@tpa/core's
+   * `slotRemainingCapacity`), summed once per slot regardless of type — not
+   * personalized to credit balance ("browsing is free": a player with zero
+   * credits still sees the same day-level room-to-book as anyone else, exactly
+   * like the feed below never hides a session for affordability) and not
+   * double-counted per type the way the old per-tab filter counted an open
+   * block once per affordable tab. Gender is never excluded either (the
+   * gender-display-only migration: gender no longer gates who can join, so it
+   * has no bearing on this count — a mixed or any-gender-recorded slot's seats
+   * count the same as any other). The true per-session verdict is what
+   * `sessionsForDay` computes for the feed itself; this chip is deliberately a
+   * coarser "is there room" teaser, not a promise, so it doesn't need to
+   * re-derive that full verdict.
+   */
+  spots: number;
+}
+
+/** Would `slot` even be a candidate to count as "available" to `player` right now,
+ * ignoring credit balance entirely? Mirrors canBookSlot's structural checks
+ * (published, not started, has room — gender/level are both display-only now
+ * and never gate) without the credit check, since "credits never hide a
+ * session" applies to these coarse counts too, not just the booking feed. Reuses
+ * `slotRemainingCapacity` (@tpa/core) rather than re-deriving it. */
+function isJoinableIgnoringCredit(slot: SessionSlot, now: IsoInstant): boolean {
+  if (slot.status !== 'published') return false;
+  if (new Date(slot.startsAt).getTime() <= new Date(now).getTime()) return false;
+  if (slotRemainingCapacity(slot) <= 0) return false;
+  return true;
+}
+
+function daySpots(slots: SessionSlot[], now: IsoInstant, day: CairoDay): number {
+  return slots
+    .filter((s) => sameCairoDay(s.startsAt, day))
+    .filter((s) => isJoinableIgnoringCredit(s, now))
+    .reduce((sum, s) => sum + slotRemainingCapacity(s), 0);
 }
 
 /**
@@ -57,7 +97,9 @@ export interface DateStripDay extends CairoDay {
  * template-covered OR this specific date has a published slot (a one-off outside
  * the recurring schedule). See @tpa/core's availability.ts for the full rationale
  * (the same rule the admin week calendar consumes; this used to be two
- * independently-hand-written copies).
+ * independently-hand-written copies). No `player` parameter — gender was the
+ * only per-player filter this ever needed, and it's gone (gender-display-only
+ * migration): every player sees the same day-level spot counts now.
  */
 export function dateStrip(
   templates: AvailabilityTemplate[],
@@ -76,44 +118,14 @@ export function dateStrip(
       day: d.getUTCDate(),
       weekday,
     };
+    const closed = !isDayOpen(templates, slots, weekday, day);
     return {
       ...day,
       key: `${day.year}-${day.month}-${day.day}`,
-      closed: !isDayOpen(templates, slots, weekday, day),
+      closed,
+      spots: closed ? 0 : daySpots(slots, now, day),
     };
   });
-}
-
-/**
- * Published slots BOOKABLE AS `trainingType` on `day`, sorted by start — either
- * already typed `trainingType`, or OPEN (untyped) and affordable as
- * `trainingType` per bookableTypesFor (so an open block appears under every
- * tab the player could actually create it as, not just one). A typed group
- * slot is gated to the player's GENDER (the one hard block, rule 4); level is
- * display-only and never excludes a session from this list — an intermediate
- * player still sees a beginner slot and self-selects out, they just aren't
- * hidden from it. An open block carries no gender/level yet (group_shape), so
- * it's never gender-filtered here — anyone can attempt it, exactly per Task 2.
- */
-export function slotsForType(
-  slots: SessionSlot[],
-  trainingType: TrainingType,
-  player: Player,
-  batches: CreditBatch[],
-  now: IsoInstant,
-  day: CairoDay,
-): SessionSlot[] {
-  return slots
-    .filter((s) => s.status === 'published')
-    .filter((s) => sameCairoDay(s.startsAt, day))
-    .filter((s) => {
-      if (s.trainingType === trainingType) return trainingType !== 'group' || s.gender === player.gender;
-      if (s.trainingType === null) {
-        return bookableTypesFor(s, player, batches, now).some((bt) => bt.trainingType === trainingType);
-      }
-      return false;
-    })
-    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
 }
 
 /**
@@ -178,14 +190,15 @@ export function bookingPreview(
  * Why a slot can or can't be booked AS `chosenType`, for the current player,
  * right now. Wraps canBookSlot and adds UI-only distinctions core doesn't
  * make: `booked`, `credits_expired` vs `no_credit`, and `type_taken` (a race —
- * see below). `level_mismatch` is GONE (rule 4: level never blocks; the
- * browse list still SHOWS the level, it just doesn't hide or grey the card).
+ * see below). `level_mismatch` is GONE (rule 4: level never blocks) and so is
+ * `gender_mismatch` (the gender-display-only migration extends rule 4 to
+ * gender) — the browse list still SHOWS both, it just doesn't hide or grey
+ * the card for either.
  */
 export type SlotAvailability =
   | { kind: 'bookable'; creditBatchId: CreditBatchId; trainingType: TrainingType }
   | { kind: 'booked' }
   | { kind: 'full' }
-  | { kind: 'gender_mismatch' }
   | { kind: 'type_taken' }
   | { kind: 'no_credit' }
   | { kind: 'credits_expired' }
@@ -208,19 +221,14 @@ export function slotAvailability(
   switch (res.reason) {
     case 'slot_full':
       return { kind: 'full' };
-    case 'gender_mismatch':
-      return { kind: 'gender_mismatch' };
     case 'slot_in_past':
       return { kind: 'past' };
     case 'slot_cancelled':
       return { kind: 'cancelled' };
-    // A race: this slot was open (or typed differently) when the list was
-    // built, and someone else's booking has since fixed a different type —
-    // slotsForType only ever put it in THIS tab because it looked affordable,
-    // so reaching type_mismatch here means the world moved. The next
-    // query-cache refresh drops it from this tab (or shows it, correctly, in
-    // whichever tab actually won) — see Task 4's UNBOOKABLE_MESSAGE for the
-    // matching confirm-screen copy.
+    // A race: this slot resolved to a different type than `chosenType` between
+    // whatever snapshot produced this call and now — someone else's booking
+    // fixed it. The next query-cache refresh corrects the verdict; see Task 4's
+    // UNBOOKABLE_MESSAGE for the matching confirm-screen copy.
     case 'type_mismatch':
       return { kind: 'type_taken' };
     case 'no_usable_credit': {
@@ -230,6 +238,189 @@ export function slotAvailability(
       return { kind: lapsed ? 'credits_expired' : 'no_credit' };
     }
   }
+}
+
+/**
+ * `slotAvailability`'s counterpart for a still-OPEN block, where there is no
+ * single `chosenType` to check. Status/timing/capacity are chosenType-independent
+ * for an open (untyped) slot — canBookSlot's own ordering runs those checks
+ * before it ever looks at type, and gender is no longer checked anywhere at
+ * all (display-only) — so probing with an arbitrary type ('trial') surfaces
+ * exactly the same verdict any other probe type would. type_mismatch is
+ * structurally unreachable here (open blocks carry no type to mismatch
+ * against), so if the probe fails for any OTHER reason it's a genuine credit
+ * gap — resolved the same way slotAvailability does, by trying every type via
+ * `bookableTypesFor` (the one function that tries all four).
+ */
+function openBlockAvailability(
+  slot: SessionSlot,
+  player: Player,
+  batches: CreditBatch[],
+  bookings: Booking[],
+  now: IsoInstant,
+): SlotAvailability {
+  if (bookedSlotIds(bookings).has(slot.id)) return { kind: 'booked' };
+
+  const structural = canBookSlot(slot, player, batches, now, 'trial');
+  if (!structural.ok && structural.reason !== 'no_usable_credit') {
+    switch (structural.reason) {
+      case 'slot_full':
+        return { kind: 'full' };
+      case 'slot_in_past':
+        return { kind: 'past' };
+      default:
+        return { kind: 'cancelled' };
+    }
+  }
+
+  const offered = bookableTypesFor(slot, player, batches, now);
+  if (offered.length > 0) {
+    const top = offered[0]!;
+    return { kind: 'bookable', creditBatchId: top.creditBatchId, trainingType: top.trainingType };
+  }
+  const lapsed = TRAINING_TYPES.some((t) =>
+    batches.some(
+      (b) => b.trainingType === t && b.quantityRemaining > 0 && creditExpiryState(b.expiresAt, now) === 'expired',
+    ),
+  );
+  return { kind: lapsed ? 'credits_expired' : 'no_credit' };
+}
+
+/** One session on the discovery feed: the slot (typed or still open) paired with
+ * its availability verdict for `player` right now. */
+export interface DaySession {
+  slot: SessionSlot;
+  availability: SlotAvailability;
+}
+
+/**
+ * Every published session on a given Cairo `day` — typed or open — exactly
+ * once, chronological. Replaces the old per-type `slotsForType` for the browse
+ * feed (Task 1): an open block used to appear once per affordable tab; here it
+ * appears once, with a single verdict. A typed slot's verdict comes from the
+ * existing `slotAvailability` (gender and level are BOTH display-only now, per
+ * rule 4 extended to gender — neither gates); an open block's comes from
+ * `openBlockAvailability` above. Neither re-derives a booking rule — both are thin wrappers over
+ * `canBookSlot` / `bookableTypesFor`. Credits never hide a row: an unaffordable
+ * session still comes back here with a `no_credit` / `credits_expired` verdict,
+ * never filtered out — the caller renders it dimmed, exactly as the old
+ * `slotDisplay` already did for `no_credit`.
+ */
+export function sessionsForDay(
+  slots: SessionSlot[],
+  player: Player,
+  batches: CreditBatch[],
+  bookings: Booking[],
+  now: IsoInstant,
+  day: CairoDay,
+): DaySession[] {
+  return slots
+    .filter((s) => s.status === 'published')
+    .filter((s) => sameCairoDay(s.startsAt, day))
+    .map((slot) => ({
+      slot,
+      availability:
+        slot.trainingType === null
+          ? openBlockAvailability(slot, player, batches, bookings, now)
+          : slotAvailability(slot, player, batches, bookings, now, slot.trainingType),
+    }))
+    .sort((a, b) => new Date(a.slot.startsAt).getTime() - new Date(b.slot.startsAt).getTime());
+}
+
+export interface WeekAvailabilitySummary {
+  sessionsThisWeek: number;
+  sessionsToday: number;
+  /** The very next joinable-in-principle session, across ALL future slots (not
+   * just this week) — a quiet week shouldn't hide a session that's genuinely
+   * next Monday. Null when nothing at all is upcoming. */
+  nextSessionAt: IsoInstant | null;
+}
+
+/**
+ * A coarse "is there stuff on" summary for the top of Book: how many
+ * joinable-in-principle sessions fall in the REST of this Cairo week
+ * (`cairoWeekStart(now)` .. +7 days — the one shared week boundary, per
+ * @tpa/core), how many of those are today, and when the very next one starts.
+ * Deliberately NOT gated by credit balance (same "browsing is free" reasoning
+ * as `dateStrip`'s spots count). No `player` parameter — gender was the only
+ * per-player exclusion this ever needed, and it's gone (gender-display-only
+ * migration): a mixed or any-gender-recorded slot counts the same for every
+ * player now.
+ */
+export function weekAvailabilitySummary(
+  slots: SessionSlot[],
+  now: IsoInstant,
+): WeekAvailabilitySummary {
+  const weekStartMs = new Date(cairoWeekStart(now)).getTime();
+  const weekEndMs = weekStartMs + 7 * 86_400_000;
+  const today = cairoCalendarDate(now);
+
+  const upcoming = slots
+    .filter((s) => isJoinableIgnoringCredit(s, now))
+    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+
+  const thisWeek = upcoming.filter((s) => {
+    const startMs = new Date(s.startsAt).getTime();
+    return startMs >= weekStartMs && startMs < weekEndMs;
+  });
+
+  return {
+    sessionsThisWeek: thisWeek.length,
+    sessionsToday: upcoming.filter((s) => sameCairoDay(s.startsAt, today)).length,
+    nextSessionAt: upcoming[0]?.startsAt ?? null,
+  };
+}
+
+/** 0 when `slot`'s level matches `player`'s own (only meaningful for group
+ * sessions — every other type carries no level), 1 otherwise. A ranking
+ * tie-breaker only; never excludes (level is display-only, rule 4). */
+function levelMatchScore(slot: SessionSlot, player: Player): 0 | 1 {
+  return slot.level !== null && slot.level === player.level ? 0 : 1;
+}
+
+/**
+ * The single best session to feature for `player` among a day's sessions — the
+ * "Best Match" card (Task D). Explicit, deterministic weighting, highest
+ * priority first:
+ *
+ *   1. Fill proximity — fewest remaining spots first. The app already leans on
+ *      "will this session actually run" as the central anxiety to resolve
+ *      (confirm-booking's pending-vs-confirmed banner, the session_confirmed
+ *      push) — recommending the session closest to filling, not just any
+ *      bookable one, matches that existing product language: it's the session
+ *      likeliest to genuinely happen soon, not just the one that fits best on
+ *      paper.
+ *   2. Level match — group sessions only (the one type level is attached to);
+ *      a no-op tie for every other type.
+ *   3. Soonest start time.
+ *   4. Deterministic tie-break: startsAt then id (mirrors the SQL tie-break
+ *      convention used elsewhere in this codebase).
+ *
+ * Only ever ranks sessions this same function has confirmed are `bookable`
+ * (via `sessionsForDay`'s own verdict, credits included) — never surfaces one
+ * the player can't actually book. Returns null when nothing is bookable that
+ * day; the caller omits the card entirely rather than showing an empty one.
+ */
+export function bestMatch(day: readonly DaySession[], player: Player): DaySession | null {
+  const bookable = day.filter((d) => d.availability.kind === 'bookable');
+  if (bookable.length === 0) return null;
+  return [...bookable].sort((a, b) => compareBestMatch(a, b, player))[0]!;
+}
+
+function compareBestMatch(a: DaySession, b: DaySession, player: Player): number {
+  const remainA = slotRemainingCapacity(a.slot);
+  const remainB = slotRemainingCapacity(b.slot);
+  if (remainA !== remainB) return remainA - remainB;
+
+  const levelA = levelMatchScore(a.slot, player);
+  const levelB = levelMatchScore(b.slot, player);
+  if (levelA !== levelB) return levelA - levelB;
+
+  const startA = new Date(a.slot.startsAt).getTime();
+  const startB = new Date(b.slot.startsAt).getTime();
+  if (startA !== startB) return startA - startB;
+
+  return a.slot.id < b.slot.id ? -1 : a.slot.id > b.slot.id ? 1 : 0;
 }
 
 /** A booking paired with its slot and coach, for the Sessions lists. */

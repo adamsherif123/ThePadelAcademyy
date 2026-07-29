@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { formatInstantDate, formatInstantTime, isSessionConfirmed } from '@tpa/core';
 import { color, radius, space } from '@tpa/theme';
-import type { BookingStatus, Coach, Gender, IsoInstant, Level, SessionSlot } from '@tpa/types';
+import type { BookingStatus, Coach, IsoInstant, Level, SessionSlot } from '@tpa/types';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { ACADEMY } from './AcademyCard';
@@ -55,10 +55,13 @@ export function BookingCard(props: BookingCardProps) {
   // it) — trainingMetaFor's null-fallback here is defense-in-depth, not an
   // expected path.
   const meta = trainingMetaFor(slot.trainingType);
-  const isGroup = slot.gender !== null && slot.level !== null;
+  // Group ⟺ level set — level's shape is still tied to group-ness (unchanged
+  // by the gender-display-only migration); gender is no longer a reliable
+  // group signal (a mixed-gender group slot has gender null).
+  const isGroup = slot.level !== null;
   const coachLine = coach ? `with ${coach.name}` : 'Academy coach';
   const groupTags = isGroup
-    ? ` · ${GENDER_LABEL[slot.gender as Gender]} · ${LEVEL_LABEL[slot.level as Level]}`
+    ? ` · ${slot.gender !== null ? `${GENDER_LABEL[slot.gender]} · ` : ''}${LEVEL_LABEL[slot.level as Level]}`
     : '';
 
   return (

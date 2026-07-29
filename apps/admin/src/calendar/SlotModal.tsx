@@ -75,10 +75,12 @@ const BLOCK_TEXT: Record<string, string> = {
 
 /**
  * Seam reason → admin-facing copy. Always has a fallback (network / unknown).
- * level_mismatch is GONE (rule 4: display-only, never blocking). type_mismatch/
- * type_required/invalid_type are new — an OPEN slot needs a chosen type; the
- * admin UI always resolves one before calling admin_book_player, so
- * type_required/invalid_type should be unreachable here (a bug if seen).
+ * level_mismatch and gender_mismatch are BOTH gone (rule 4: display-only,
+ * never blocking — gender joined level in the gender-display-only migration).
+ * type_mismatch/type_required/invalid_type are new — an OPEN slot needs a
+ * chosen type; the admin UI always resolves one before calling
+ * admin_book_player, so type_required/invalid_type should be unreachable here
+ * (a bug if seen).
  */
 const REASON_COPY: Record<string, string> = {
   not_admin: "You don't have permission.",
@@ -91,7 +93,6 @@ const REASON_COPY: Record<string, string> = {
   slot_full: 'This session is full.',
   already_booked: 'That player is already booked on this session.',
   no_usable_credit: 'That player has no usable credit for this session.',
-  gender_mismatch: "That player is outside this session's gender filter.",
   type_mismatch: 'Someone just started a different session type here — refresh and try again.',
   type_required: 'Choose a session type first.',
   invalid_type: 'That session type isn’t valid — please try again.',
@@ -173,7 +174,10 @@ export function SlotModal({
   // to pick; the Select doesn't render).
   const [addType, setAddType] = useState<TrainingType | null>(slot.trainingType);
 
-  const isGroup = slot.gender !== null && slot.level !== null;
+  // Group ⟺ level set — level's shape is still tied to group-ness (unchanged
+  // by the gender-display-only migration); gender is no longer a reliable
+  // group signal (a mixed-gender group slot has gender null).
+  const isGroup = slot.level !== null;
   const activeRoster = activeBookingsForSlot(bookings, slot.id);
   const occupied = activeRoster.length;
   const emptySeats = Math.max(0, slot.capacity - occupied);
@@ -252,10 +256,13 @@ export function SlotModal({
   };
 
   // ---- ADD view: a searchable roster of bookable players ----
-  const book = async (playerId: Player['id'], override: boolean) => {
+  // `override` is always false now — there's no more gender/level mismatch
+  // for it to waive (see classifyAdminBooking); the RPC still accepts the
+  // parameter (unchanged signature) but this app never needs to pass true.
+  const book = async (playerId: Player['id']) => {
     if (addType === null) return; // guarded by the disabled Select below too
     setActionError(null);
-    const res = await addPlayerToSlot(slot.id, playerId, override, slot.trainingType === null ? addType : null);
+    const res = await addPlayerToSlot(slot.id, playerId, false, slot.trainingType === null ? addType : null);
     if (!res.ok) setActionError(copyFor(res.reason));
   };
   function AddTrailing({ player }: { player: Player }) {
@@ -284,19 +291,8 @@ export function SlotModal({
           {credit} credit{credit === 1 ? '' : 's'}
         </span>
         {verdict.kind === 'ok' ? (
-          <Button size="sm" onClick={() => void book(player.id, false)}>
+          <Button size="sm" onClick={() => void book(player.id)}>
             Book
-          </Button>
-        ) : verdict.kind === 'override' ? (
-          <Button
-            size="sm"
-            variant="secondary"
-            className={styles.overrideBtn}
-            title={`${GENDER_LABEL[player.gender]} — outside this slot's filter`}
-            onClick={() => void book(player.id, true)}
-          >
-            <AlertTriangle size={13} aria-hidden />
-            Book anyway
           </Button>
         ) : (
           <span className={styles.blocked}>
@@ -564,7 +560,9 @@ export function SlotModal({
             ) : null}
             {isGroup ? (
               <>
-                <Badge tone="neutral">{GENDER_LABEL[slot.gender!]}</Badge>
+                {/* Gender may be null now (a mixed group — no restriction);
+                    shown only when actually set, never fabricated. */}
+                {slot.gender !== null ? <Badge tone="neutral">{GENDER_LABEL[slot.gender]}</Badge> : null}
                 <Badge tone="neutral">{LEVEL_LABEL[slot.level!]}</Badge>
               </>
             ) : null}

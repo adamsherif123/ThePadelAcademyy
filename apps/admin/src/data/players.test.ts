@@ -1,6 +1,6 @@
 import { isBatchUsable } from '@tpa/core';
 import { MOCK_NOW, mockBookings, mockCreditBatches, mockPlayers, mockPurchases, mockSlots } from '@tpa/mocks';
-import type { CreditBatch, Gender, IsoInstant, Player } from '@tpa/types';
+import type { CreditBatch, IsoInstant, Level, Player } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -91,16 +91,16 @@ describe('matchesPlayerQuery (the single shared predicate)', () => {
 });
 
 describe('mismatchedActiveBookings', () => {
-  it('flags active group bookings whose gender/level would clash with a proposed profile', () => {
-    const genderedGroup = new Map(
-      mockSlots.filter((s) => s.trainingType === 'group' && s.gender !== null).map((s) => [s.id, s]),
+  it('flags active group bookings whose LEVEL would clash with a proposed profile (gender no longer checked — gender-display-only migration)', () => {
+    const leveledGroup = new Map(
+      mockSlots.filter((s) => s.trainingType === 'group' && s.level !== null).map((s) => [s.id, s]),
     );
-    const booking = mockBookings.find((b) => b.status === 'booked' && genderedGroup.has(b.slotId));
-    if (!booking) throw new Error('no active booking on a gendered group slot');
-    const slot = genderedGroup.get(booking.slotId)!;
-    const opposite: Gender = slot.gender === 'men' ? 'ladies' : 'men';
+    const booking = mockBookings.find((b) => b.status === 'booked' && leveledGroup.has(b.slotId));
+    if (!booking) throw new Error('no active booking on a leveled group slot');
+    const slot = leveledGroup.get(booking.slotId)!;
+    const otherLevel: Level = slot.level === 'beginner' ? 'intermediate' : 'beginner';
     expect(
-      mismatchedActiveBookings(mockBookings, mockSlots, booking.playerId, opposite, slot.level!),
+      mismatchedActiveBookings(mockBookings, mockSlots, booking.playerId, otherLevel),
     ).toBeGreaterThan(0);
   });
 });

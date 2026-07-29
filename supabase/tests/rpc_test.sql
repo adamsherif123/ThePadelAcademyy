@@ -69,7 +69,12 @@ select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaa
 select is(public.book_slot('sl_nope')->>'reason',   'slot_missing',   'canBookSlot slot_missing  ↔ RPC slot_missing (unknown slot)');
 select is(public.book_slot('sl_cancel')->>'reason', 'slot_cancelled', 'canBookSlot slot_cancelled ↔ RPC slot_cancelled');
 select is(public.book_slot('sl_past')->>'reason',   'slot_in_past',   'canBookSlot slot_in_past   ↔ RPC slot_in_past');
-select is(public.book_slot('sl_glady')->>'reason',  'gender_mismatch','canBookSlot gender_mismatch ↔ RPC gender_mismatch (A is men, slot ladies)');
+-- Gender display-only migration: gender_mismatch is REMOVED from book_slot
+-- (rule 4, extended to gender). A (men) hits sl_glady (pre-set 'ladies') and
+-- now passes straight through to the credit check — A's only credit is
+-- 'trial', not 'group', so the real (and only remaining) blocker is the
+-- credit check, exactly the same shape as the level-removal parity note below.
+select is(public.book_slot('sl_glady')->>'reason', 'no_usable_credit', 'gender no longer blocks (rule 4, extended) — A reaches the credit check with no group credit');
 -- Booking rework: level_mismatch is REMOVED from book_slot (rule 4 — level is
 -- display-only, no code blocks a mismatched join). A's gender matches sl_gint
 -- ('men'), so the level difference no longer intercepts at all; A's only

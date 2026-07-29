@@ -7,7 +7,7 @@ import {
   spotsUntilConfirmed,
 } from '@tpa/core';
 import { color, space } from '@tpa/theme';
-import type { Gender, Level, SlotId, TrainingType } from '@tpa/types';
+import type { Level, SlotId, TrainingType } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
@@ -48,7 +48,6 @@ const UNBOOKABLE_MESSAGE: Record<BookReason, string> = {
   slot_full: 'This session just filled up. Pick another slot.',
   slot_in_past: 'This session has already started.',
   slot_cancelled: 'This session was cancelled.',
-  gender_mismatch: "This session isn't for your group.",
   type_mismatch: 'Someone just started a different session here. Go back and pick again.',
   no_usable_credit: 'You no longer have a usable credit for this session.',
   slot_missing: 'This session is no longer available.',
@@ -113,7 +112,10 @@ export default function ConfirmBookingScreen() {
   // pick — never slot.trainingType directly (still null for an open block).
   const resolvedType = verdict.ok ? verdict.trainingType : (slot.trainingType ?? chosenType);
   const meta = resolvedType ? TRAINING_META[resolvedType] : TRAINING_META.trial;
-  const isGroup = slot.gender !== null && slot.level !== null;
+  // Group ⟺ level set — level's shape is still tied to group-ness (unchanged
+  // by the gender-display-only migration); gender is no longer a reliable
+  // group signal (a mixed-gender group slot has gender null).
+  const isGroup = slot.level !== null;
   // A still-OPEN slot's stored capacity is the admin's pre-booking default
   // (e.g. 4) — not what book_slot will actually commit once this booking
   // fixes the type (least(admin capacity, canonical) — the open-slot-
@@ -224,7 +226,9 @@ export default function ConfirmBookingScreen() {
         <View style={styles.tags}>
           {isGroup ? (
             <>
-              <Badge label={GENDER_LABEL[slot.gender as Gender]} />
+              {/* Gender may be null now (a mixed group — no restriction); shown
+                  only when actually set, never fabricated. */}
+              {slot.gender !== null ? <Badge label={GENDER_LABEL[slot.gender]} /> : null}
               <Badge label={LEVEL_LABEL[slot.level as Level]} />
             </>
           ) : null}

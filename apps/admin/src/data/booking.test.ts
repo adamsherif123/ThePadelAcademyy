@@ -20,9 +20,11 @@ vi.mock('../lib/supabase', () => ({ supabase: {} }));
 import { classifyAdminBooking, isActivelyBooked } from './booking';
 
 /**
- * classifyAdminBooking (the admin override policy over @tpa/core's canBookSlot) and
- * isActivelyBooked are still pure previews. S10b moved the writes (addPlayerToSlot /
- * removeBooking) to atomic RPCs, proven server-side — so their mutation tests are gone.
+ * classifyAdminBooking (a pure preview over @tpa/core's canBookSlot — no more
+ * override policy: gender joined level as fully display-only, gender-display-
+ * only migration) and isActivelyBooked are still pure previews. S10b moved the
+ * writes (addPlayerToSlot / removeBooking) to atomic RPCs, proven server-side —
+ * so their mutation tests are gone.
  */
 
 const now = MOCK_NOW;
@@ -68,39 +70,38 @@ const groupBatch: CreditBatch = {
   note: null,
 };
 
-describe('classifyAdminBooking (override policy over canBookSlot)', () => {
+describe('classifyAdminBooking (a preview over canBookSlot)', () => {
   it('ok when the player matches and can pay, naming the resolved type', () => {
     const v = classifyAdminBooking(mkSlot(), mkPlayer(), [groupBatch], now, false, 'group');
     expect(v).toEqual({ kind: 'ok', creditBatchId: 'cb_x', trainingType: 'group' });
   });
 
-  it('OVERRIDES a gender mismatch when the player can still pay + fit', () => {
+  it('a GENDER mismatch is `ok` outright — no override path left (rule 4, extended to gender: display-only, never blocking)', () => {
     const v = classifyAdminBooking(mkSlot({ gender: 'men' }), mkPlayer({ gender: 'ladies' }), [groupBatch], now, false, 'group');
-    expect(v.kind).toBe('override');
-    expect(v.kind === 'override' && v.reason).toBe('gender_mismatch');
+    expect(v).toEqual({ kind: 'ok', creditBatchId: 'cb_x', trainingType: 'group' });
   });
 
-  it('a LEVEL mismatch is `ok` outright — never even reaches the override path (rule 4: display-only, never blocking)', () => {
+  it('a LEVEL mismatch is `ok` outright too (rule 4: display-only, never blocking)', () => {
     const v = classifyAdminBooking(mkSlot({ level: 'beginner' }), mkPlayer({ level: 'intermediate' }), [groupBatch], now, false, 'group');
     expect(v.kind).toBe('ok');
   });
 
-  it('does NOT override full', () => {
+  it('a full slot still blocks', () => {
     const v = classifyAdminBooking(mkSlot({ capacity: 4, bookedCount: 4 }), mkPlayer(), [groupBatch], now, false, 'group');
     expect(v).toEqual({ kind: 'blocked', reason: 'slot_full' });
   });
 
-  it('does NOT override already-booked', () => {
+  it('an already-booked player still blocks', () => {
     const v = classifyAdminBooking(mkSlot(), mkPlayer(), [groupBatch], now, true, 'group');
     expect(v).toEqual({ kind: 'blocked', reason: 'already_booked' });
   });
 
-  it('does NOT override no usable credit', () => {
+  it('no usable credit still blocks', () => {
     const v = classifyAdminBooking(mkSlot(), mkPlayer(), [], now, false, 'group');
     expect(v).toEqual({ kind: 'blocked', reason: 'no_usable_credit' });
   });
 
-  it('a hard block hiding behind a mismatch wins (mismatch + no credit → blocked, not override)', () => {
+  it('a gender difference plus no credit → blocked for the REAL reason (no_usable_credit) — gender was never the actual blocker', () => {
     const v = classifyAdminBooking(mkSlot({ gender: 'men' }), mkPlayer({ gender: 'ladies' }), [], now, false, 'group');
     expect(v).toEqual({ kind: 'blocked', reason: 'no_usable_credit' });
   });

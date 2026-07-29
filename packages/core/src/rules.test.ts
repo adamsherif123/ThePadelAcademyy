@@ -155,13 +155,21 @@ describe('canBookSlot — TYPED slot (regression: unchanged from before the book
     expect(canBookSlot(slot({ status: 'cancelled' }), player, [batch()], NOW, 'group')).toEqual({ ok: false, reason: 'slot_cancelled' });
     expect(canBookSlot(slot({ startsAt: '2026-07-14T11:00:00.000Z' as IsoInstant }), player, [batch()], NOW, 'group')).toEqual({ ok: false, reason: 'slot_in_past' });
     expect(canBookSlot(slot({ capacity: 4, bookedCount: 4 }), player, [batch()], NOW, 'group')).toEqual({ ok: false, reason: 'slot_full' });
-    expect(canBookSlot(slot({ gender: 'ladies' }), player, [batch()], NOW, 'group')).toEqual({ ok: false, reason: 'gender_mismatch' });
     expect(canBookSlot(slot(), player, [], NOW, 'group')).toEqual({ ok: false, reason: 'no_usable_credit' });
     expect(canBookSlot(slot({ trainingType: 'duo', gender: null, level: null }), player, [batch()], NOW, 'duo')).toEqual({ ok: false, reason: 'no_usable_credit' });
   });
 
   it('rule 4: a LEVEL mismatch never blocks — the positive proof (display-only)', () => {
     const mismatched = slot({ level: 'intermediate' }); // player is 'beginner'
+    expect(canBookSlot(mismatched, player, [batch()], NOW, 'group')).toEqual({
+      ok: true,
+      creditBatchId: 'cb_1',
+      trainingType: 'group',
+    });
+  });
+
+  it('rule 4: a GENDER mismatch never blocks either — the positive proof (display-only, extended by the gender-display-only migration)', () => {
+    const mismatched = slot({ gender: 'ladies' }); // player is 'men'
     expect(canBookSlot(mismatched, player, [batch()], NOW, 'group')).toEqual({
       ok: true,
       creditBatchId: 'cb_1',
@@ -212,7 +220,7 @@ describe('canBookSlot — OPEN (untyped) slot: the first booking picks the type 
     expect(canBookSlot(openSlot(), player, [groupCredit], NOW, 'duo')).toEqual({ ok: false, reason: 'no_usable_credit' });
   });
 
-  it('gender never blocks the FIRST booking — an open slot always has gender null until this booking sets it', () => {
+  it('gender never blocks the first booking on an open slot (trivially — it starts null) or any later one (display-only)', () => {
     const ladiesPlayer: Player = { ...player, gender: 'ladies' };
     const res = canBookSlot(openSlot(), ladiesPlayer, [batch({ playerId: ladiesPlayer.id, trainingType: 'group' })], NOW, 'group');
     expect(res).toEqual({ ok: true, creditBatchId: 'cb_1', trainingType: 'group' });

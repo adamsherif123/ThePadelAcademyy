@@ -7,7 +7,7 @@ export { BookingCard } from './BookingCard';
 export { BestValueBadge, isBestValuePackage } from './BestValueBadge';
 export { BrandMark } from './BrandMark';
 export { Button, type ButtonProps, type ButtonVariant } from './Button';
-export { CapacityDots } from './CapacityDots';
+export { CapacityMeter } from './CapacityMeter';
 export { Card, type CardVariant } from './Card';
 export { CheckList } from './CheckList';
 export { CircleIconButton } from './CircleIconButton';

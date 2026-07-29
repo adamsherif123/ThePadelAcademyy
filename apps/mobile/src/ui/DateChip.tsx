@@ -7,18 +7,24 @@ const WEEKDAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
 /**
  * A day cell in the Book date strip. Open + selected = navy fill; open =
- * white card; closed = dashed, greyed, with a CLOSED label. Closed days are not
+ * white card; closed = dashed, greyed, with a CLOSED label. An open day also
+ * states its `spots` — total remaining bookable seats across that day's
+ * sessions (see booking.ts's `dateStrip`/`daySpots`) — so the strip itself
+ * hints at where the room is before tapping a day. Closed days are not
  * pressable. RTL-safe.
  */
 export function DateChip({
   weekday,
   dayNumber,
+  spots,
   selected = false,
   closed = false,
   onPress,
 }: {
   weekday: number;
   dayNumber: number;
+  /** Ignored when `closed` — pass 0 for a closed day. */
+  spots: number;
   selected?: boolean;
   closed?: boolean;
   onPress?: () => void;
@@ -42,7 +48,11 @@ export function DateChip({
         <Text variant="micro" tone="muted">
           Closed
         </Text>
-      ) : null}
+      ) : (
+        <Text variant="micro" tone={selected ? 'inverse' : spots > 0 ? 'accent' : 'muted'}>
+          {`${spots} spot${spots === 1 ? '' : 's'}`}
+        </Text>
+      )}
     </View>
   );
 

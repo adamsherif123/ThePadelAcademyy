@@ -101,21 +101,27 @@ select is(public.record_cash_purchase('pl_a','pk_g4',0)->>'reason', 'amount_belo
 select is(public.record_cash_purchase('pl_a','pk_nope',1)->>'reason', 'package_missing', 'cash rejects an unknown package');
 select is(public.record_cash_purchase('pl_nope','pk_g4',1)->>'reason', 'player_missing', 'cash rejects an unknown player');
 
--- admin_book_player (override = gender/level ONLY; hard blocks still win)
-select is(public.admin_book_player('sl_gl','pl_a',false)->>'reason', 'gender_mismatch', 'admin_book no-override: gender mismatch blocks');
+-- admin_book_player — gender display-only migration: gender no longer blocks,
+-- with or without override (p_override has nothing gender-related left to
+-- waive — see the migration's header note). Hard blocks (capacity, credit,
+-- already-booked) still win regardless.
+select is(public.admin_book_player('sl_gl','pl_a',false)->>'ok', 'true', 'admin_book no-override: gender mismatch no longer blocks (rule 4, extended to gender)');
+select is((select booked_count from public.session_slots where id='sl_gl'), 1, 'the gender-mismatched booking took a seat');
 -- Booking rework: level_mismatch is REMOVED (rule 4 — display-only, no code
 -- blocks a mismatched join, admin path included). pl_a's gender matches sl_gi
 -- ('men') and pl_a holds a usable group credit (cb_a_grp), so with level no
--- longer checked this booking now SUCCEEDS — spending the first of the three
--- cb_a_grp units the later assertions account for.
+-- longer checked this booking succeeds too — spending the second of the three
+-- cb_a_grp units (the sl_gl booking above spent the first).
 select is(public.admin_book_player('sl_gi','pl_a',false)->>'ok', 'true', 'admin_book no-override: level mismatch no longer blocks (rule 4)');
 select is((select booked_count from public.session_slots where id='sl_gi'), 1, 'level-mismatched booking still took a seat');
-select is(public.admin_book_player('sl_gl','pl_a',true)->>'ok', 'true', 'admin_book override: gender mismatch waived → ok');
-select is(public.admin_book_player('sl_gl','pl_a',true)->>'reason', 'already_booked', 'admin_book: a second live booking → already_booked (constraint, not override)');
-select is((select booked_count from public.session_slots where id='sl_gl'), 1, 'override booking took exactly one seat');
-select is((select quantity_remaining from public.credit_batches where id='cb_a_grp'), 1, 'sl_gi (level, now allowed) + sl_gl (override) each spent one group credit (3 → 1)');
-select is(public.admin_book_player('sl_full','pl_a',true)->>'reason', 'slot_full', 'HARD BLOCK WINS: full + mismatch + override → slot_full, not ok');
-select is(public.admin_book_player('sl_nc','pl_c',true)->>'reason', 'no_usable_credit', 'HARD BLOCK WINS: no-credit + mismatch + override → no_usable_credit');
+-- A repeat call for the SAME player+slot (override or not — override has
+-- nothing left to waive) hits the one-booking-per-player-per-slot constraint,
+-- not a silent double-seat.
+select is(public.admin_book_player('sl_gl','pl_a',true)->>'reason', 'already_booked', 'admin_book: a second live booking → already_booked (constraint, not gender/override)');
+select is((select booked_count from public.session_slots where id='sl_gl'), 1, 'the repeat call did not take a second seat');
+select is((select quantity_remaining from public.credit_batches where id='cb_a_grp'), 1, 'sl_gl + sl_gi each spent one group credit (3 → 1); the repeated already_booked call spent nothing');
+select is(public.admin_book_player('sl_full','pl_a',true)->>'reason', 'slot_full', 'HARD BLOCK WINS: a full slot rejects regardless of gender/override');
+select is(public.admin_book_player('sl_nc','pl_c',true)->>'reason', 'no_usable_credit', 'HARD BLOCK WINS: no-credit still rejects regardless of gender/override');
 select is(public.admin_book_player('sl_gl','pl_nope',true)->>'reason', 'player_missing', 'admin_book rejects an unknown player');
 select is(public.admin_book_player('sl_nope','pl_a',true)->>'reason', 'slot_missing', 'admin_book rejects an unknown slot');
 

@@ -127,8 +127,9 @@ export async function removeBookingRpc(bookingId: Booking['id'], refund: boolean
 }
 
 /**
- * level_mismatch is GONE (rule 4: level is display-only, never blocking —
- * neither the hard-reject path nor the override computation reference it
+ * level_mismatch and gender_mismatch are BOTH gone (rule 4: display-only,
+ * never blocking — gender joined level in the gender-display-only migration;
+ * neither the hard-reject path nor the override computation reference either
  * anymore). type_required / invalid_type / type_mismatch are new: an OPEN
  * slot needs a chosen type (type_required if omitted, invalid_type if it
  * isn't one of the four, type_mismatch if it disagrees with an already-typed
@@ -136,7 +137,7 @@ export async function removeBookingRpc(bookingId: Booking['id'], refund: boolean
  */
 export type AdminBookReason =
   | 'not_admin' | 'slot_missing' | 'player_missing' | 'slot_cancelled' | 'slot_in_past'
-  | 'gender_mismatch' | 'no_usable_credit' | 'slot_full' | 'already_booked'
+  | 'no_usable_credit' | 'slot_full' | 'already_booked'
   | 'type_required' | 'invalid_type' | 'type_mismatch';
 export type AdminBookResult =
   | { ok: true; bookingId: string; creditBatchId: string; overridden: boolean }

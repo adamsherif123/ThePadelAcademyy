@@ -53,10 +53,14 @@ export const LEVEL_OPTIONS: readonly { value: Level; label: string }[] = LEVELS.
   label: LEVEL_LABEL[l],
 }));
 
-/** "Men's · Beginner" for a group slot; "" for non-group (no gender/level). */
+/**
+ * "Men's · Beginner" for a single-gender group slot; "Beginner" for a MIXED
+ * group slot (gender null — no restriction, the gender-display-only
+ * migration); "" for non-group (level null — no group to tag at all).
+ */
 export function groupTags(gender: Gender | null, level: Level | null): string {
-  if (gender === null || level === null) return '';
-  return `${GENDER_LABEL[gender]} · ${LEVEL_LABEL[level]}`;
+  if (level === null) return '';
+  return gender === null ? LEVEL_LABEL[level] : `${GENDER_LABEL[gender]} · ${LEVEL_LABEL[level]}`;
 }
 
 /** The players-per-session descriptor by type (for the modal summary/hint). */
