@@ -8,13 +8,11 @@ import type {
   LocalTime,
   Player,
   SessionSlot,
-  TrainingType,
   Weekday,
 } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
 import {
-  bestMatch,
   bookedSlotIds,
   dateStrip,
   pastSessions,
@@ -22,8 +20,6 @@ import {
   slotAvailability,
   upcomingSessions,
   weekAvailabilitySummary,
-  type DaySession,
-  type SlotAvailability,
 } from './booking';
 import { balanceByType } from './wallet';
 
@@ -416,80 +412,3 @@ describe('weekAvailabilitySummary', () => {
   });
 });
 
-describe('bestMatch', () => {
-  const bookableAv = (trainingType: TrainingType, creditBatchId = 'cb_bm'): SlotAvailability => ({
-    kind: 'bookable',
-    creditBatchId: creditBatchId as CreditBatch['id'],
-    trainingType,
-  });
-
-  it('ranks fewest remaining spots first — the session closest to filling', () => {
-    const nearlyFull = slot({ id: 'bm_near' as SessionSlot['id'], capacity: 4, bookedCount: 3 }); // 1 left
-    const wideOpen = slot({ id: 'bm_wide' as SessionSlot['id'], capacity: 4, bookedCount: 0 }); // 4 left
-    const day: DaySession[] = [
-      { slot: wideOpen, availability: bookableAv('group') },
-      { slot: nearlyFull, availability: bookableAv('group') },
-    ];
-    expect(bestMatch(day, player)?.slot.id).toBe('bm_near');
-  });
-
-  it('breaks a fill-proximity tie on level match — group sessions only (player is beginner)', () => {
-    const matching = slot({ id: 'bm_match' as SessionSlot['id'], level: 'beginner', capacity: 4, bookedCount: 2 });
-    const mismatched = slot({
-      id: 'bm_mismatch' as SessionSlot['id'],
-      level: 'intermediate',
-      capacity: 4,
-      bookedCount: 2,
-    });
-    const day: DaySession[] = [
-      { slot: mismatched, availability: bookableAv('group') },
-      { slot: matching, availability: bookableAv('group') },
-    ];
-    expect(bestMatch(day, player)?.slot.id).toBe('bm_match');
-  });
-
-  it('breaks a fill-proximity + level tie on soonest start time', () => {
-    const later = slot({
-      id: 'bm_later' as SessionSlot['id'],
-      capacity: 4,
-      bookedCount: 2,
-      startsAt: iso(3, 18),
-    });
-    const sooner = slot({
-      id: 'bm_sooner' as SessionSlot['id'],
-      capacity: 4,
-      bookedCount: 2,
-      startsAt: iso(3, 10),
-    });
-    const day: DaySession[] = [
-      { slot: later, availability: bookableAv('duo') },
-      { slot: sooner, availability: bookableAv('duo') },
-    ];
-    expect(bestMatch(day, player)?.slot.id).toBe('bm_sooner');
-  });
-
-  it('breaks a complete tie deterministically by id', () => {
-    const a = slot({ id: 'bm_a' as SessionSlot['id'], capacity: 4, bookedCount: 2, startsAt: iso(3, 10) });
-    const b = slot({ id: 'bm_b' as SessionSlot['id'], capacity: 4, bookedCount: 2, startsAt: iso(3, 10) });
-    const day: DaySession[] = [
-      { slot: b, availability: bookableAv('duo') },
-      { slot: a, availability: bookableAv('duo') },
-    ];
-    expect(bestMatch(day, player)?.slot.id).toBe('bm_a');
-  });
-
-  it('never surfaces a non-bookable session — skips full/no_credit for the best actually-bookable one', () => {
-    const full: DaySession = { slot: slot({ id: 'bm_full' as SessionSlot['id'] }), availability: { kind: 'full' } };
-    const noCredit: DaySession = {
-      slot: slot({ id: 'bm_nocredit' as SessionSlot['id'] }),
-      availability: { kind: 'no_credit' },
-    };
-    const bookable: DaySession = { slot: slot({ id: 'bm_ok' as SessionSlot['id'] }), availability: bookableAv('group') };
-    expect(bestMatch([full, noCredit, bookable], player)?.slot.id).toBe('bm_ok');
-  });
-
-  it('returns null when nothing that day is bookable — the caller omits the card entirely', () => {
-    const day: DaySession[] = [{ slot: slot({ id: 'bm_full2' as SessionSlot['id'] }), availability: { kind: 'full' } }];
-    expect(bestMatch(day, player)).toBeNull();
-  });
-});

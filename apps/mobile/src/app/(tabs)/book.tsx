@@ -6,7 +6,6 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import {
-  bestMatch,
   coachById,
   dateStrip,
   sessionsForDay,
@@ -43,7 +42,7 @@ const DAYS = 14;
 /**
  * Map a core-derived availability verdict to SlotCard display props. `av.trainingType`
  * on `bookable` is the RESOLVED type (the slot's own if already typed, else the type
- * `sessionsForDay`/`bestMatch` resolved an open block to) — the credit note always
+ * `sessionsForDay` resolved an open block to) — the credit note always
  * names the type this exact tap would spend, never `slot.trainingType` directly
  * (which may still be null for an open block).
  */
@@ -135,12 +134,6 @@ export default function BookScreen() {
   const dayLabel = isToday ? 'Today' : `${WEEKDAY_ABBR[selectedDay.weekday]} ${selectedDay.day}`;
 
   const daySessions = sessionsForDay(allSlots, player, batches, bookings, now, selectedDay);
-  const best = bestMatch(daySessions, player);
-  const bestDisplay = best ? slotDisplay(best.availability) : null;
-  // The Best Match card above already renders `best` — drop it from the feed
-  // below so the same SessionSlot never appears twice. `daySessions` itself
-  // (the day's true count/spots, used above for the summary line) is untouched.
-  const feedSessions = best ? daySessions.filter((d) => d.slot.id !== best.slot.id) : daySessions;
   const weekSummary = weekAvailabilitySummary(allSlots, now);
   const wallet = totalReadyToBook(batches, now);
 
@@ -177,41 +170,16 @@ export default function BookScreen() {
         {`${dayLabel} · ${daySessions.length} session${daySessions.length === 1 ? '' : 's'} · ${selectedDay.spots} spot${selectedDay.spots === 1 ? '' : 's'} available`}
       </Text>
 
-      {/* Best match — omitted entirely when nothing that day is actually bookable. */}
-      {best && bestDisplay ? (
-        <View style={styles.bestMatch}>
-          <Text variant="label" tone="accent">
-            Best match for you
-          </Text>
-          <SlotCard
-            slot={best.slot}
-            coach={coachById(coaches, best.slot.coachId)}
-            now={now}
-            state={bestDisplay.state}
-            note={bestDisplay.note}
-            creditNote={bestDisplay.creditNote}
-            onPress={() => onSlot(best.slot)}
-          />
-        </View>
-      ) : null}
-
-      {/* Chronological feed — every OTHER session that day, once, typed or open.
-          (The Best Match card above already renders its one slot; see feedSessions.) */}
+      {/* Chronological feed — every session that day, once, typed or open. */}
       {daySessions.length === 0 ? (
         <EmptyState
           icon="calendar-outline"
           title="No sessions on this day"
           message="Nothing available on this day. Try another day in the strip above."
         />
-      ) : feedSessions.length === 0 ? (
-        // The day's only session IS the Best Match card above — say so explicitly
-        // rather than leaving a silent gap that could read as a broken screen.
-        <Text variant="caption" tone="muted">
-          That's the only session on this day.
-        </Text>
       ) : (
         <View style={styles.slots}>
-          {feedSessions.map(({ slot, availability }) => {
+          {daySessions.map(({ slot, availability }) => {
             const display = slotDisplay(availability);
             return (
               <SlotCard
@@ -243,6 +211,5 @@ export default function BookScreen() {
 const styles = StyleSheet.create({
   content: { gap: space.lg },
   dateStrip: { gap: space.sm, paddingVertical: space.xs },
-  bestMatch: { gap: space.sm },
   slots: { gap: space.md },
 });

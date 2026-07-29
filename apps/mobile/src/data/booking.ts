@@ -371,58 +371,6 @@ export function weekAvailabilitySummary(
   };
 }
 
-/** 0 when `slot`'s level matches `player`'s own (only meaningful for group
- * sessions — every other type carries no level), 1 otherwise. A ranking
- * tie-breaker only; never excludes (level is display-only, rule 4). */
-function levelMatchScore(slot: SessionSlot, player: Player): 0 | 1 {
-  return slot.level !== null && slot.level === player.level ? 0 : 1;
-}
-
-/**
- * The single best session to feature for `player` among a day's sessions — the
- * "Best Match" card (Task D). Explicit, deterministic weighting, highest
- * priority first:
- *
- *   1. Fill proximity — fewest remaining spots first. The app already leans on
- *      "will this session actually run" as the central anxiety to resolve
- *      (confirm-booking's pending-vs-confirmed banner, the session_confirmed
- *      push) — recommending the session closest to filling, not just any
- *      bookable one, matches that existing product language: it's the session
- *      likeliest to genuinely happen soon, not just the one that fits best on
- *      paper.
- *   2. Level match — group sessions only (the one type level is attached to);
- *      a no-op tie for every other type.
- *   3. Soonest start time.
- *   4. Deterministic tie-break: startsAt then id (mirrors the SQL tie-break
- *      convention used elsewhere in this codebase).
- *
- * Only ever ranks sessions this same function has confirmed are `bookable`
- * (via `sessionsForDay`'s own verdict, credits included) — never surfaces one
- * the player can't actually book. Returns null when nothing is bookable that
- * day; the caller omits the card entirely rather than showing an empty one.
- */
-export function bestMatch(day: readonly DaySession[], player: Player): DaySession | null {
-  const bookable = day.filter((d) => d.availability.kind === 'bookable');
-  if (bookable.length === 0) return null;
-  return [...bookable].sort((a, b) => compareBestMatch(a, b, player))[0]!;
-}
-
-function compareBestMatch(a: DaySession, b: DaySession, player: Player): number {
-  const remainA = slotRemainingCapacity(a.slot);
-  const remainB = slotRemainingCapacity(b.slot);
-  if (remainA !== remainB) return remainA - remainB;
-
-  const levelA = levelMatchScore(a.slot, player);
-  const levelB = levelMatchScore(b.slot, player);
-  if (levelA !== levelB) return levelA - levelB;
-
-  const startA = new Date(a.slot.startsAt).getTime();
-  const startB = new Date(b.slot.startsAt).getTime();
-  if (startA !== startB) return startA - startB;
-
-  return a.slot.id < b.slot.id ? -1 : a.slot.id > b.slot.id ? 1 : 0;
-}
-
 /** A booking paired with its slot and coach, for the Sessions lists. */
 export interface SessionEntry {
   booking: Booking;
