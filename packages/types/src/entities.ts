@@ -80,6 +80,8 @@ export interface Package {
   price: Piastres;
   name: string;
   isActive: boolean;
+  /** Set only when retired (had purchase/request history at delete time) — same convention as Player.deletedAt. */
+  deletedAt?: IsoInstant | null;
 }
 
 /**

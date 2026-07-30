@@ -315,6 +315,23 @@ export async function deleteTemplateRpc(id: AvailabilityTemplate['id']): Promise
     : { ok: false, reason: d.reason as DeleteTemplateReason };
 }
 
+export type DeletePackageReason = 'not_admin' | 'package_missing' | 'trial_package_protected';
+export type DeletePackageResult =
+  | { ok: true; action: 'deleted' | 'retired' | 'already_deleted' }
+  | { ok: false; reason: DeletePackageReason };
+/**
+ * Deletes a package via the delete_package RPC: hard-deletes it if nothing has
+ * ever referenced it (no purchases, no credit requests), or retires it
+ * (deleted_at set, is_active forced false, row + history intact) if it has.
+ * The trial package can't be deleted at all — use setPackageSellable instead.
+ */
+export async function deletePackageRpc(id: PackageId): Promise<DeletePackageResult> {
+  const d = await callRpc('delete_package', { p_package_id: id });
+  return d.ok
+    ? { ok: true, action: d.action as 'deleted' | 'retired' | 'already_deleted' }
+    : { ok: false, reason: d.reason as DeletePackageReason };
+}
+
 export type RescheduleReason =
   | 'not_admin' | 'slot_missing' | 'slot_cancelled'
   | 'capacity_below_booked' | 'end_before_start' | 'in_past' | 'coach_conflict';

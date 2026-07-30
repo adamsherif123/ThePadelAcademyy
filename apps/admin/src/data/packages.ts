@@ -1,9 +1,9 @@
 import { TRAINING_TYPES } from '@tpa/core';
-import type { Package, PackageId, Piastres, TrainingType } from '@tpa/types';
+import type { CreditRequest, Package, PackageId, Piastres, Purchase, TrainingType } from '@tpa/types';
 
-import { insertPackage, updatePackage as updatePackageApi } from '../lib/api';
+import { deletePackageRpc, insertPackage, updatePackage as updatePackageApi, type DeletePackageResult } from '../lib/api';
 import { TOUCHED } from '../lib/queryClient';
-import { runWrite } from './queries';
+import { runRpc, runWrite } from './queries';
 
 /**
  * Package selectors + the package CRUD seam. Writes are is_admin-gated config (not
@@ -59,9 +59,13 @@ export interface CatalogStats {
   bestValue: { perSession: Piastres; descriptor: string } | null;
 }
 
-/** The three headline stats — all derived from the active catalog, never hardcoded. */
+/**
+ * The three headline stats — all derived from the active catalog, never hardcoded.
+ * Deleted (retired) packages are excluded entirely: they're gone from the catalog,
+ * not just unsellable, so they shouldn't count toward "total packages" either.
+ */
 export function catalogStats(packages: Package[]): CatalogStats {
-  const all = packages;
+  const all = packages.filter((p) => !p.deletedAt);
   const active = all.filter((p) => p.isActive);
   if (active.length === 0) {
     return { activeCount: 0, totalCount: all.length, lowestEntry: null, bestValue: null };
@@ -77,10 +81,10 @@ export function catalogStats(packages: Package[]): CatalogStats {
   };
 }
 
-/** Active-and-inactive packages of a type, cheapest bundle first (for the sections). */
+/** Active-and-inactive (but not deleted) packages of a type, cheapest bundle first (for the sections). */
 export function packagesForType(packages: Package[], type: TrainingType): Package[] {
   return packages
-    .filter((p) => p.trainingType === type)
+    .filter((p) => p.trainingType === type && !p.deletedAt)
     .sort((a, b) => a.sessionCount - b.sessionCount);
 }
 
@@ -144,4 +148,38 @@ export async function updatePackage(id: PackageId, draft: PackageDraft): Promise
 export async function setPackageSellable(id: PackageId, isActive: boolean): Promise<SavePackageResult> {
   const res = await runWrite(() => updatePackageApi(id, { isActive }), TOUCHED.packages);
   return res.ok ? { ok: true, pkg: res.value } : { ok: false, reason: 'network' };
+}
+
+/**
+ * Whether ANYTHING references this package — a purchase (any status) or a
+ * credit request (any status). Mirrors exactly what delete_package's own
+ * catch-fallback decides server-side (a foreign_key_violation on either
+ * table), so the confirmation dialog never promises an outcome the RPC then
+ * contradicts. Client-side only for copy — the RPC is the actual authority.
+ */
+export function packageHasHistory(
+  pkg: Package,
+  purchases: Purchase[],
+  creditRequests: CreditRequest[],
+): boolean {
+  return purchases.some((p) => p.packageId === pkg.id) || creditRequests.some((r) => r.packageId === pkg.id);
+}
+
+/**
+ * Deletes a package: hard-deletes it if nothing has ever referenced it, or
+ * retires it (row + purchase/request history intact, hidden from the
+ * catalog) if it has — decided server-side by delete_package. Touches
+ * packages only; unlike setPackageSellable this can change WHICH row exists,
+ * not just a flag on it, but the invalidation is the same single key.
+ */
+
+/**
+ * Deletes a package: hard-deletes it if nothing has ever referenced it, or
+ * retires it (row + purchase/request history intact, hidden from the
+ * catalog) if it has — decided server-side by delete_package. Touches
+ * packages only; unlike setPackageSellable this can change WHICH row exists,
+ * not just a flag on it, but the invalidation is the same single key.
+ */
+export function deletePackage(id: PackageId): Promise<DeletePackageResult | { ok: false; reason: 'network' }> {
+  return runRpc(() => deletePackageRpc(id), [TOUCHED.packages]);
 }

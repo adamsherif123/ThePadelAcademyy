@@ -57,6 +57,7 @@ export function rowToPackage(r: Row): Package {
     price: num(r.price) as Package['price'],
     name: str(r.name),
     isActive: bool(r.is_active),
+    deletedAt: nstr(r.deleted_at) as Package['deletedAt'],
   };
 }
 

@@ -92,6 +92,29 @@ racer_delete_account() { # $1=player_uuid $2=target_iso $3=outfile
     > "$3" 2>&1 &
 }
 
+# A racer that deletes a PACKAGE as the admin (for the delete_package-vs-
+# request_credits race). Wraps the single call in a subquery so the result is
+# read once, never invoked twice by the formatting itself.
+racer_delete_package() { # $1=admin_uuid $2=package_id $3=target_iso $4=outfile
+  "${PSQL[@]}" \
+    -c "select set_config('request.jwt.claims', '{\"sub\":\"$1\",\"role\":\"authenticated\"}', false)" \
+    -c "select pg_sleep(greatest(0, extract(epoch from (timestamptz '$3' - clock_timestamp()))))" \
+    -c "select case when (r->>'ok')='true' then coalesce(r->>'action','ok') else r->>'reason' end from (select public.delete_package('$2') as r) s" \
+    > "$4" 2>&1 &
+}
+
+# A racer that submits a credit REQUEST as a player (for the delete_package-vs-
+# request_credits race — request_credits inserts into credit_requests, which
+# FK-references packages, same as record_cash_purchase's purchases insert).
+racer_request_credits() { # $1=player_uuid $2=package_id $3=target_iso $4=outfile
+  "${PSQL[@]}" \
+    -c "set role authenticated" \
+    -c "select set_config('request.jwt.claims', '{\"sub\":\"$1\",\"role\":\"authenticated\"}', false)" \
+    -c "select pg_sleep(greatest(0, extract(epoch from (timestamptz '$3' - clock_timestamp()))))" \
+    -c "select case when (r->>'ok')='true' then 'true' else r->>'reason' end from (select public.request_credits('$2','instapay') as r) s" \
+    > "$4" 2>&1 &
+}
+
 # A one-off, non-raced call as a given player — used to set up pre-race state
 # (e.g. Scenario H's "X already booked" precondition) without contention.
 call_as() { # $1=uuid $2=sql
@@ -556,6 +579,66 @@ check "Y's booking is completely untouched (still booked)"                    "$
 check "X's booking always ends cancelled (exactly one racer's cancel lands)"  "$L_X_LIVE"     "0"
 check "X's credit ends refunded-once(1) or not-at-all(0), never double"       "$L_CREDIT_BAD" "0"
 check "zero deadlocks"                                                        "$L_DEADLOCK"   "0"
+
+# ── Scenario M: delete_package racing request_credits on the SAME unused
+# package (the crux of the delete_package review — pgTAP is single-session and
+# cannot exercise the actual FOR UPDATE lock window, only the decision logic
+# for each fixed ordering; this is the real proof of the ordering itself).
+# request_credits' FK-referencing insert (into credit_requests) blocks on
+# delete_package's FOR UPDATE lock via Postgres's own FOR KEY SHARE check, so
+# only two outcomes are possible per package, and BOTH must be clean (never a
+# raw Postgres error surfacing from either racer):
+#   (a) the request's insert lock-acquisition wins  → it lands, commits; then
+#       delete_package's DELETE hits the now-real FK reference, catches it,
+#       and retires (deleted_at set) — the request stays valid, referencing a
+#       real (retired) package.
+#   (b) delete_package's FOR UPDATE wins            → nothing references the
+#       package yet, so its DELETE actually succeeds and commits; the
+#       blocked request then unblocks to find the row genuinely gone, and its
+#       insert's own FK check fails — caught by the new foreign_key_violation
+#       handler, returning a clean package_missing, never a crash.
+# What must NEVER happen: a credit_request referencing a package that no
+# longer exists (impossible at the DB level, checked anyway), a package left
+# ACTIVE and untouched (delete_package silently doing nothing), or a raw
+# "ERROR" in any racer's output (an uncaught exception reaching the caller).
+echo "Scenario M — delete_package racing request_credits on the SAME unused package (K=20):"
+M_K=20
+MSETUP="insert into public.admins (id,auth_user_id,display_name,created_at) values ('adm_dadm','$(uuid 999)','Adm',now()) on conflict (auth_user_id) do nothing;"
+for k in $(seq 1 $M_K); do
+  MSETUP+="insert into public.packages (id,training_type,session_count,price,name,is_active) values ('pkr_m$k','group',4,160000,'M$k',true);"
+  MSETUP+="insert into auth.users (id) values ('$(uuid $((1000+k)))');"
+  MSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_m$k','+2010m0${k}','M','men','beginner',now(),'$(uuid $((1000+k)))');"
+done
+sql "$MSETUP" >/dev/null
+
+T=$(target 4)
+for k in $(seq 1 $M_K); do
+  racer_delete_package   "$(uuid 999)"          "pkr_m$k" "$T" "$TMP/m_del_$k.txt"
+  racer_request_credits  "$(uuid $((1000+k)))"  "pkr_m$k" "$T" "$TMP/m_req_$k.txt"
+done
+wait
+
+M_ERRORS=$(grep -rl "ERROR" "$TMP"/m_*.txt 2>/dev/null | wc -l | tr -d ' ')
+M_INCONSISTENT=$(sql "
+  select count(*) from (
+    select gs.k,
+      exists(select 1 from public.packages where id='pkr_m'||gs.k) as pkg_exists,
+      coalesce((select deleted_at is not null from public.packages where id='pkr_m'||gs.k), false) as pkg_retired,
+      exists(select 1 from public.credit_requests where package_id='pkr_m'||gs.k) as req_exists
+    from generate_series(1,$M_K) as gs(k)
+  ) t
+  where not (
+    (pkg_exists and pkg_retired and req_exists)      -- (a) request won the lock: retired, request intact
+    or (not pkg_exists and not req_exists)            -- (b) delete won the lock: hard-deleted, nothing references it
+  )
+")
+M_ORPHAN_REQ=$(sql "select count(*) from public.credit_requests cr where cr.package_id like 'pkr_m%' and not exists (select 1 from public.packages p where p.id = cr.package_id)")
+check "zero raw errors from either racer (no uncaught exception under the race)" "$M_ERRORS"      "0"
+check "every package ends in exactly one consistent state (retired+request, or hard-deleted+no request)" "$M_INCONSISTENT" "0"
+check "zero orphaned credit_requests (none ever references a gone package)"      "$M_ORPHAN_REQ"  "0"
+M_RETIRED=$(sql "select count(*) from public.packages where id like 'pkr_m%' and deleted_at is not null")
+M_DELETED=$(sql "select $M_K - count(*) from public.packages where id like 'pkr_m%'")
+echo "  info — $M_RETIRED/$M_K: request won the lock (retired); $M_DELETED/$M_K: delete won the lock (hard-deleted) — both orderings are legitimate, real OS scheduling decides which"
 
 # ── teardown ─────────────────────────────────────────────────────────────────
 cleanup_rows
