@@ -402,6 +402,44 @@ export async function cancelBookingRpc(bookingId: BookingId): Promise<CancelRpcR
   return { ok: false, reason: d.reason as CancelReason };
 }
 
+// ── edit profile (update_profile RPC) ──────────────────────────────────────────
+// The post-signup counterpart to complete_signup: updates an EXISTING player's
+// name/gender/level and adds/replaces/clears the optional phone, reusing the same
+// server-side E.164 + phone_taken validation. `no_player` is the caller-isn't-a-player
+// case (admin / retired row) — unreachable from the profile screen, modelled for the
+// exhaustive switch. {ok, reason} as data; only transport failures throw.
+export type UpdateProfileReason =
+  | 'name_required'
+  | 'invalid_gender'
+  | 'invalid_level'
+  | 'not_authenticated'
+  | 'no_player'
+  | 'is_admin'
+  | 'phone_taken'
+  | 'invalid_phone';
+
+export type UpdateProfileResult =
+  | { ok: true; playerId: string }
+  | { ok: false; reason: UpdateProfileReason };
+
+export async function updateProfileRpc(draft: {
+  name: string;
+  gender: Gender;
+  level: Level;
+  phone?: string | null;
+}): Promise<UpdateProfileResult> {
+  const d = (await callRpc('update_profile', {
+    p_name: draft.name,
+    p_gender: draft.gender,
+    p_level: draft.level,
+    // Same optional-phone contract as complete_signup: blank → null (clears it); the
+    // server normalises to +20 E.164 and rejects a duplicate/invalid number.
+    p_phone: draft.phone?.trim() ? draft.phone.trim() : null,
+  })) as Record<string, unknown>;
+  if (d.ok) return { ok: true, playerId: d.player_id as string };
+  return { ok: false, reason: d.reason as UpdateProfileReason };
+}
+
 export async function completeSignupRpc(draft: {
   name: string;
   gender: Gender;

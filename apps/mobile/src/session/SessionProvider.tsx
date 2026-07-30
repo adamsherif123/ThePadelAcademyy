@@ -19,6 +19,7 @@ import {
   fetchCurrentPlayer,
   fetchIsAdmin,
   isNetworkError,
+  updateProfileRpc,
 } from '../lib/api';
 import { getLastPushToken, setLastPushToken } from '../notifications/tokenStore';
 import { queryClient, queryKeys } from '../lib/queryClient';
@@ -70,6 +71,17 @@ interface SessionValue {
   ) => Promise<{ ok: boolean; error?: string; taken?: boolean }>;
   /** Create the player via complete_signup (A5: no credits at signup). */
   completeProfile: (draft: ProfileDraft) => Promise<{ ok: boolean; error?: string }>;
+  /**
+   * Edit an EXISTING player's name/gender/level + optional phone (update_profile RPC).
+   * `error` is the RPC reason code on a business no (e.g. 'phone_taken') or a friendly
+   * sentence on a network failure — the caller maps it to copy. Never throws.
+   */
+  updateProfile: (edit: {
+    name: string;
+    gender: Gender;
+    level: Level;
+    phone?: string | null;
+  }) => Promise<{ ok: boolean; error?: string }>;
   /** Permanently delete the account (anonymise + drop the auth identity), then sign out. */
   deleteAccount: () => Promise<{ ok: boolean; error?: string }>;
   signOut: () => Promise<void>;
@@ -213,6 +225,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [session],
   );
 
+  const updateProfile = useCallback(
+    async (edit: { name: string; gender: Gender; level: Level; phone?: string | null }) => {
+      try {
+        const res = await updateProfileRpc(edit);
+        if (!res.ok) return { ok: false, error: res.reason };
+        // Reconcile the cached player to the server row — the profile screen reads
+        // `player` from this exact query, so it reflects the edit with no manual refresh.
+        await queryClient.invalidateQueries({ queryKey: queryKeys.player });
+        return { ok: true };
+      } catch (e) {
+        // Same distinction completeProfile draws: a network failure is "couldn't reach
+        // the server", not "the server said no" — don't phrase it as a rejection.
+        if (isNetworkError(e)) {
+          return { ok: false, error: 'No connection. Check your internet and try again.' };
+        }
+        return { ok: false, error: asMessage(e, 'We couldn’t save your changes. Please try again.') };
+      }
+    },
+    [],
+  );
+
   // Drop THIS device's push token while the session is still valid (own-only RLS
   // delete), so a signed-out phone stops getting this player's pushes and a deleted
   // account stops getting any — without touching another device's token.
@@ -270,10 +303,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signInWithEmail,
       signUpWithEmail,
       completeProfile,
+      updateProfile,
       deleteAccount,
       signOut,
     }),
-    [status, now, session, player, signInWithEmail, signUpWithEmail, completeProfile, deleteAccount, signOut],
+    [
+      status,
+      now,
+      session,
+      player,
+      signInWithEmail,
+      signUpWithEmail,
+      completeProfile,
+      updateProfile,
+      deleteAccount,
+      signOut,
+    ],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

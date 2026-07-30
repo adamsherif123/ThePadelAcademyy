@@ -1,6 +1,7 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { color, fontSize, radius, space } from '@tpa/theme';
 import { useState } from 'react';
-import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
 import { fontFamilyForWeight } from '../theme/fonts';
 import { Text } from './Text';
@@ -18,10 +19,17 @@ export interface InputProps extends Omit<TextInputProps, 'style' | 'editable'> {
  * Text field with default / focused / error / disabled states. Border comes from
  * tokens (strong by default, accent when focused, danger on error). `tone='navy'`
  * adapts it for dark auth screens. RTL-safe: no physical text alignment.
+ *
+ * `secureTextEntry` fields (passwords) get a show/hide eye toggle on the trailing
+ * edge — masked by default, tap to reveal. Every password field in the app goes
+ * through this one component, so the toggle needs wiring here only.
  */
-export function Input({ label, error, disabled = false, tone = 'light', ...rest }: InputProps) {
+export function Input({ label, error, disabled = false, tone = 'light', secureTextEntry, ...rest }: InputProps) {
   const [focused, setFocused] = useState(false);
+  const [revealed, setRevealed] = useState(false);
   const isNavy = tone === 'navy';
+  const isPassword = Boolean(secureTextEntry);
+  const iconColor = isNavy ? color.text.inverse : color.text.muted;
 
   const borderColor = error
     ? color.status.danger
@@ -38,25 +46,40 @@ export function Input({ label, error, disabled = false, tone = 'light', ...rest 
           {label}
         </Text>
       ) : null}
-      <TextInput
-        {...rest}
-        editable={!disabled}
-        onFocus={(e) => {
-          setFocused(true);
-          rest.onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          setFocused(false);
-          rest.onBlur?.(e);
-        }}
-        placeholderTextColor={color.text.muted}
-        style={[
-          styles.input,
-          isNavy ? styles.inputNavy : styles.inputLight,
-          { borderColor },
-          disabled ? styles.disabled : null,
-        ]}
-      />
+      <View style={styles.inputRow}>
+        <TextInput
+          {...rest}
+          secureTextEntry={isPassword && !revealed}
+          editable={!disabled}
+          onFocus={(e) => {
+            setFocused(true);
+            rest.onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            rest.onBlur?.(e);
+          }}
+          placeholderTextColor={color.text.muted}
+          style={[
+            styles.input,
+            isNavy ? styles.inputNavy : styles.inputLight,
+            { borderColor },
+            disabled ? styles.disabled : null,
+            isPassword ? styles.inputWithIcon : null,
+          ]}
+        />
+        {isPassword ? (
+          <Pressable
+            onPress={() => setRevealed((v) => !v)}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel={revealed ? 'Hide password' : 'Show password'}
+            style={styles.eyeButton}
+          >
+            <Ionicons name={revealed ? 'eye-off-outline' : 'eye-outline'} size={20} color={iconColor} />
+          </Pressable>
+        ) : null}
+      </View>
       {error ? (
         <Text variant="caption" style={styles.error}>
           {error}
@@ -68,6 +91,7 @@ export function Input({ label, error, disabled = false, tone = 'light', ...rest 
 
 const styles = StyleSheet.create({
   wrap: { gap: space.xs },
+  inputRow: { justifyContent: 'center' },
   input: {
     minHeight: 54,
     borderWidth: 1,
@@ -77,8 +101,17 @@ const styles = StyleSheet.create({
     fontSize: fontSize.body,
     // No textAlign: RN aligns to the writing direction's start by default (RTL-safe).
   },
+  inputWithIcon: { paddingEnd: 48 },
   inputLight: { backgroundColor: color.bg.surface, color: color.text.primary },
   inputNavy: { backgroundColor: color.pillOnInverse.bg, color: color.text.inverse },
   disabled: { backgroundColor: color.bg.canvas, opacity: 0.7 },
   error: { color: color.status.danger },
+  eyeButton: {
+    position: 'absolute',
+    end: 0,
+    height: '100%',
+    paddingHorizontal: space.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

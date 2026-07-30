@@ -34,6 +34,7 @@ export function SlotCard({
   state,
   note,
   creditNote,
+  cta,
   onPress,
 }: {
   slot: SessionSlot;
@@ -42,6 +43,14 @@ export function SlotCard({
   state: SlotCardState;
   note?: string;
   creditNote?: string;
+  /**
+   * An invitation shown on a card that is NOT `bookable` but is still tappable —
+   * today, a credit-short session ("Add credits to book"). Rendered as an accent
+   * line so a dimmed, un-bookable card still reads as "tap me to fix this",
+   * matching the prompt that opens on tap (Task 1). Ignored on `bookable` cards
+   * (they show `creditNote` instead) and absent on genuinely inert cards.
+   */
+  cta?: string;
   onPress?: () => void;
 }) {
   const bookable = state === 'bookable';
@@ -102,11 +111,23 @@ export function SlotCard({
         <Text variant="caption" tone="accent" style={styles.creditNote}>
           {creditNote}
         </Text>
+      ) : !bookable && cta ? (
+        <View style={styles.ctaRow}>
+          <Text variant="caption" tone="accent">
+            {cta}
+          </Text>
+          <Ionicons name="chevron-forward" size={14} color={color.accent.default} />
+        </View>
       ) : null}
     </View>
   );
 
-  if (bookable && onPress) {
+  // Tappable whenever the screen hands us an onPress — not only when `bookable`.
+  // A credit-short card is deliberately un-bookable (dimmed, "No credits") yet
+  // still tappable so the tap can open the buy-credits prompt (Task 1); the
+  // screen withholds onPress for genuinely inert states (full/past/cancelled/
+  // just-taken), so those stay non-interactive exactly as before.
+  if (onPress) {
     return (
       <Pressable onPress={onPress} accessibilityRole="button">
         {({ pressed }) => <View style={pressed ? styles.pressed : undefined}>{body}</View>}
@@ -178,6 +199,7 @@ const styles = StyleSheet.create({
   info: { flex: 1, gap: 2 },
   bottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   creditNote: {},
+  ctaRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',

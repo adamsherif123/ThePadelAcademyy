@@ -65,7 +65,11 @@ export default function ProfileScreen() {
               </Text>
             ) : null}
           </View>
-          <CircleIconButton icon="pencil" accessibilityLabel="Edit profile" onPress={() => {}} />
+          <CircleIconButton
+            icon="pencil"
+            accessibilityLabel="Edit profile"
+            onPress={() => router.push('/edit-profile')}
+          />
         </View>
         <View style={styles.tags}>
           <Badge label={GENDER_LABEL[player.gender]} />

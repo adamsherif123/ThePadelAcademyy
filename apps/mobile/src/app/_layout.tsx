@@ -114,6 +114,8 @@ function RootNavigator() {
         <Stack.Screen name="confirm-booking" />
         <Stack.Screen name="booked-success" />
         <Stack.Screen name="cancel-booking" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="needs-credits" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="edit-profile" />
         <Stack.Screen name="coaches" />
         <Stack.Screen name="purchase-history" />
         <Stack.Screen name="notifications" />

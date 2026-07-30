@@ -46,7 +46,18 @@ const DAYS = 14;
  * names the type this exact tap would spend, never `slot.trainingType` directly
  * (which may still be null for an open block).
  */
-function slotDisplay(av: SlotAvailability): { state: SlotCardState; note?: string; creditNote?: string } {
+// `cta` is set ONLY for the credit-shortfall verdicts (no_credit /
+// credits_expired) — the two a tap can actually resolve by buying credits. It's
+// what turns those dimmed cards into an invitation (SlotCard renders it as an
+// accent "… ›" line) and it pairs with the onPress the screen wires for exactly
+// those kinds. full/past/cancelled/type_taken get no cta and no onPress, so they
+// stay inert: tapping "buy credits" wouldn't help, and we don't pretend it would.
+function slotDisplay(av: SlotAvailability): {
+  state: SlotCardState;
+  note?: string;
+  creditNote?: string;
+  cta?: string;
+} {
   switch (av.kind) {
     case 'bookable':
       return { state: 'bookable', creditNote: `Uses 1 ${TRAINING_META[av.trainingType].label} credit` };
@@ -60,14 +71,20 @@ function slotDisplay(av: SlotAvailability): { state: SlotCardState; note?: strin
     case 'type_taken':
       return { state: 'unavailable', note: 'Just taken' };
     case 'credits_expired':
-      return { state: 'unavailable', note: 'Credits expired' };
+      return { state: 'unavailable', note: 'Credits expired', cta: 'Renew credits to book' };
     case 'no_credit':
-      return { state: 'unavailable', note: 'No credits' };
+      return { state: 'unavailable', note: 'No credits', cta: 'Add credits to book' };
     case 'past':
       return { state: 'unavailable', note: 'Started' };
     case 'cancelled':
       return { state: 'unavailable', note: 'Cancelled' };
   }
+}
+
+/** The credit-shortfall verdicts — the only unbookable kinds a tap can resolve
+ *  (by buying credits), so the only ones that get a tappable prompt. */
+function isCreditShort(kind: SlotAvailability['kind']): kind is 'no_credit' | 'credits_expired' {
+  return kind === 'no_credit' || kind === 'credits_expired';
 }
 
 /** "Next session today at 6 PM" / "Next session Tue, 14 Jul at 6 PM" — the date
@@ -145,6 +162,12 @@ export default function BookScreen() {
       ? router.push({ pathname: '/pick-type', params: { slotId: slot.id } })
       : router.push({ pathname: '/confirm-booking', params: { slotId: slot.id } });
 
+  // A credit-short session is tappable now (Task 1): instead of a dead card, the
+  // tap opens a kind prompt that routes to buy-credits. `reason` tailors the copy
+  // (nothing on file vs. credits lapsed) — the prompt reads it, no re-derivation.
+  const onCreditShort = (slot: SessionSlot, reason: 'no_credit' | 'credits_expired') =>
+    router.push({ pathname: '/needs-credits', params: { slotId: slot.id, reason } });
+
   return (
     <Screen scroll tabBar contentContainerStyle={styles.content}>
       <ScreenHeader eyebrow="Book your session" title="Find your next session" />
@@ -181,6 +204,15 @@ export default function BookScreen() {
         <View style={styles.slots}>
           {daySessions.map(({ slot, availability }) => {
             const display = slotDisplay(availability);
+            // `kind` as a const local (not the property) so isCreditShort's
+            // narrowing survives into the onPress closure below.
+            const kind = availability.kind;
+            const onPress =
+              kind === 'bookable'
+                ? () => onSlot(slot)
+                : isCreditShort(kind)
+                  ? () => onCreditShort(slot, kind)
+                  : undefined;
             return (
               <SlotCard
                 key={slot.id}
@@ -190,7 +222,8 @@ export default function BookScreen() {
                 state={display.state}
                 note={display.note}
                 creditNote={display.creditNote}
-                onPress={display.state === 'bookable' ? () => onSlot(slot) : undefined}
+                cta={display.cta}
+                onPress={onPress}
               />
             );
           })}

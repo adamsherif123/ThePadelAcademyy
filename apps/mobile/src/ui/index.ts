@@ -24,6 +24,7 @@ export { NavyScreen } from './NavyScreen';
 export { PackageCard } from './PackageCard';
 export { PackageRow } from './PackageRow';
 export { PillOnNavy } from './PillOnNavy';
+export { ProfileFields } from './ProfileFields';
 export { ProgressBar } from './ProgressBar';
 export { Screen } from './Screen';
 export { ScreenHeader } from './ScreenHeader';
