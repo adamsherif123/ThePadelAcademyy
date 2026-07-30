@@ -20,6 +20,7 @@ const ICON: Record<NotificationType, IoniconName> = {
   credits_granted: 'wallet-outline',
   credit_request_rejected: 'alert-circle-outline',
   admin_booked: 'person-add-outline',
+  session_reopened: 'refresh-circle-outline',
 };
 
 /**

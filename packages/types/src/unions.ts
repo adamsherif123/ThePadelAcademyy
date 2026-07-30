@@ -44,7 +44,9 @@ export type CreditSource = 'purchase' | 'signup_grant' | 'admin_grant';
 /**
  * The server-side events that mint a notification (S12). Each is emitted inside the
  * RPC that causes it; the client never invents these. `session_confirmed` fires when
- * a session fills or the admin confirms it; the rest track cancels, removals,
+ * a session fills or the admin confirms it; `session_reopened` is its mirror — a
+ * cancellation dropping a fill-confirmed session back below capacity (a manually
+ * confirmed session never reopens this way); the rest track cancels, removals,
  * reschedules, credit grants (incl. an approved credit request), a rejected
  * credit request (A3), and an admin manually seating a player (WhatsApp bookings,
  * walk-ins) who took no action of their own.
@@ -56,7 +58,8 @@ export type NotificationType =
   | 'session_rescheduled'
   | 'credits_granted'
   | 'credit_request_rejected'
-  | 'admin_booked';
+  | 'admin_booked'
+  | 'session_reopened';
 
 /**
  * A credit request's lifecycle (A3). `pending` until an admin resolves it; `approved`
