@@ -6,7 +6,7 @@
 -- Run with:  supabase test db
 -- ============================================================================
 begin;
-select plan(28);
+select plan(30);
 
 -- ── seed as postgres ─────────────────────────────────────────────────────────
 -- A2: auth users sign up with EMAIL now (not phone). complete_signup no longer reads
@@ -16,7 +16,7 @@ insert into auth.users (id, email) values
   ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'v@players.eg'),   -- V: validation (never gets a player)
   ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'e@players.eg'),   -- E: authenticated but pre-signup
   ('ffffffff-ffff-ffff-ffff-ffffffffffff', 'admin@thepadelacademy.eg'),   -- F: an ADMIN (bug #2)
-  ('11111111-1111-1111-1111-111111111111', 'g@players.eg'),   -- G: optional-phone happy path
+  ('11111111-1111-1111-1111-111111111111', 'g@players.eg'),   -- G: phone happy path
   ('22222222-2222-2222-2222-222222222222', 'h@players.eg');   -- H: duplicate-phone rejection
 
 -- F is an admin (auth user linked to an admins row, NO player) — A1 separation.
@@ -44,13 +44,13 @@ select is(public.complete_signup('X','men','beginner')->>'reason', 'not_authenti
 
 -- ── complete_signup: happy path AS the freshly-verified user A ──────────────
 select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","role":"authenticated"}', true);
-select is(public.complete_signup('Ali Hassan','men','beginner')->>'ok', 'true', 'complete_signup(A) → ok');
-select is(public.complete_signup('Ali Hassan','men','beginner')->>'already_completed', 'true',
+select is(public.complete_signup('Ali Hassan','men','beginner','0100 111 2222')->>'ok', 'true', 'complete_signup(A) → ok');
+select is(public.complete_signup('Ali Hassan','men','beginner','0100 111 2222')->>'already_completed', 'true',
   'second complete_signup(A) → already_completed (idempotent fast path)');
 
--- the player exists with the given profile and NO phone (A2: email auth → phone is null)
+-- the player exists with the given profile and the normalised phone (phone is required now)
 select is((select gender||'/'||level||'/'||coalesce(phone, '<null>') from public.players where auth_user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
-  'men/beginner/<null>', 'player created with the given profile and NO phone (email auth)');
+  'men/beginner/+201001112222', 'player created with the given profile and the normalised phone');
 -- A2.1: the email is set from the auth user (server-side, never a client argument)
 select is((select email from public.players where auth_user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'),
   'a@players.eg', 'complete_signup stored the email from the authenticated user');
@@ -63,19 +63,21 @@ select is((select count(*)::int from public.credit_batches c join public.players
 
 -- ── complete_signup: profile validation (as V, who never gets a player) ─────
 select set_config('request.jwt.claims', '{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc","role":"authenticated"}', true);
-select is(public.complete_signup('X','martian','beginner')->>'reason', 'invalid_gender', 'rejects an invalid gender');
-select is(public.complete_signup('X','men','grandmaster')->>'reason', 'invalid_level', 'rejects an invalid level');
-select is(public.complete_signup('   ','men','beginner')->>'reason', 'name_required', 'rejects a blank name');
+select is(public.complete_signup('X','martian','beginner','0100 123 4567')->>'reason', 'invalid_gender', 'rejects an invalid gender');
+select is(public.complete_signup('X','men','grandmaster','0100 123 4567')->>'reason', 'invalid_level', 'rejects an invalid level');
+select is(public.complete_signup('   ','men','beginner','0100 123 4567')->>'reason', 'name_required', 'rejects a blank name');
+select is(public.complete_signup('X','men','beginner')->>'reason', 'phone_required', 'phone is now REQUIRED at signup — a missing phone rejects cleanly');
+select is(public.complete_signup('X','men','beginner','   ')->>'reason', 'phone_required', 'a blank phone is treated the same as a missing one');
 select is(public.complete_signup('X','men','beginner','12')->>'reason', 'invalid_phone', 'rejects a phone that is not a valid EG mobile');
 select is((select count(*)::int from public.players where auth_user_id = 'cccccccc-cccc-cccc-cccc-cccccccccccc'),
   0, 'a rejected signup creates no player');
 
--- ── optional phone: normalised to +20 E.164, and UNIQUE ─────────────────────
+-- ── phone: normalised to +20 E.164, and UNIQUE ───────────────────────────────
 select set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
 select is(public.complete_signup('Gina','ladies','beginner','0100 123 4567')->>'ok', 'true',
-  'complete_signup with an optional phone → ok');
+  'complete_signup with a phone → ok');
 select is((select phone from public.players where auth_user_id = '11111111-1111-1111-1111-111111111111'),
-  '+201001234567', 'the optional phone is normalised to +20 E.164 before storing');
+  '+201001234567', 'the phone is normalised to +20 E.164 before storing');
 -- a DIFFERENT auth user claiming the SAME real number → phone_taken (UNIQUE), no player made
 select set_config('request.jwt.claims', '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}', true);
 select is(public.complete_signup('Huda','ladies','beginner','+20 100 123 4567')->>'reason', 'phone_taken',

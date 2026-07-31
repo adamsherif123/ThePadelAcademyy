@@ -293,8 +293,9 @@ export type SignupReason =
   | 'invalid_level'
   | 'not_authenticated'
   | 'is_admin' // A1/A2: an admin identity can never become a player (defence in depth)
-  | 'phone_taken' // A2.1: the optional phone is UNIQUE — another player already has it
-  | 'invalid_phone'; // A2.1: the optional phone isn't a valid EG mobile
+  | 'phone_required' // phone is required at signup (not required later — see update_profile)
+  | 'phone_taken' // the phone is UNIQUE — another player already has it
+  | 'invalid_phone'; // the phone isn't a valid EG mobile
 
 export type SignupRpcResult =
   | { ok: true; alreadyCompleted: boolean; playerId: string }

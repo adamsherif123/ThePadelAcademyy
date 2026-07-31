@@ -1,11 +1,13 @@
-import { color, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
 import type { Gender, Level } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
+import { haptics } from '../../lib/haptics';
 import { PRIVACY_POLICY_URL } from '../../lib/legal';
 import { useSession } from '../../session/SessionProvider';
+import { useTheme } from '../../theme/ThemeProvider';
 import { Button, InfoCard, Input, ProfileFields, Screen, ScreenHeader, Text } from '../../ui';
 
 const MIN_PASSWORD = 8;
@@ -23,15 +25,37 @@ const MIN_PASSWORD = 8;
  * session and returns to email entry (see `onBack`). An admin never reaches this screen —
  * the guard routes an admin credential to the refusal screen (bug #2).
  */
-// complete_signup's optional-phone rejections → friendly copy. Everything else falls back
+// complete_signup's phone rejections → friendly copy. Everything else falls back
 // to a generic message + the sign-out escape.
 const REASON_COPY: Record<string, string> = {
-  phone_taken: 'That phone number is already registered. Try another, or leave it blank.',
-  invalid_phone: 'Enter a valid Egyptian mobile (e.g. 0100 123 4567), or leave it blank.',
+  phone_required: 'Enter your phone number to continue.',
+  phone_taken: 'That phone number is already registered. Try another.',
+  invalid_phone: 'Enter a valid Egyptian mobile (e.g. 0100 123 4567).',
 };
 
 export default function ProfileSetupScreen() {
   const router = useRouter();
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      content: { gap: space.lg },
+      field: { gap: space.sm },
+      haveAccountRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center' },
+      genderRow: { flexDirection: 'row', gap: space.md },
+      genderCard: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: space.xl,
+        borderRadius: radius.md,
+        borderWidth: 1,
+        borderColor: color.border.subtle,
+        backgroundColor: color.bg.surface,
+      },
+      selectedCard: { borderColor: color.accent.default, backgroundColor: color.bg.canvas },
+      helper: { textAlign: 'center' },
+    }),
+    [color],
+  );
   const { email: emailParam } = useLocalSearchParams<{ email?: string }>();
   const { completeProfile, signUpWithEmail, signOut, email: sessionEmail, status } = useSession();
   // An email param means the new-signup path (no session yet). Otherwise it's an orphan
@@ -53,7 +77,12 @@ export default function ProfileSetupScreen() {
   const confirmMismatch = isNewFlow && confirm.length > 0 && confirm !== password;
   const passwordOk = !isNewFlow || (password.length >= MIN_PASSWORD && confirm === password);
   const complete =
-    name.trim().length > 0 && gender !== null && level !== null && trainedBefore !== null && passwordOk;
+    name.trim().length > 0 &&
+    gender !== null &&
+    level !== null &&
+    trainedBefore !== null &&
+    phone.trim().length > 0 &&
+    passwordOk;
   const busy = submitting;
 
   const onCreate = async () => {
@@ -69,6 +98,7 @@ export default function ProfileSetupScreen() {
       if (isNewFlow && status === 'signed_out') {
         const signUpRes = await signUpWithEmail(emailParam ?? '', password);
         if (!signUpRes.ok) {
+          haptics.error();
           if (signUpRes.taken) {
             setError('That email already has an account. Go back and sign in with your password.');
           } else {
@@ -77,14 +107,15 @@ export default function ProfileSetupScreen() {
           return;
         }
       }
-      // complete_signup creates the player (A5: NO credits at signup) and stores the optional
-      // phone + the self-reported trained_before. completeProfile never throws.
+      // complete_signup creates the player (A5: NO credits at signup) and stores the
+      // now-required phone + the self-reported trained_before. completeProfile never throws.
       const res = await completeProfile({ name: name.trim(), gender, level, phone, trainedBefore });
       if (res.ok) {
         // First-timers see the trial offer; returning members go straight into the app.
         router.replace(trainedBefore === false ? '/(auth)/trial-grant' : '/(tabs)');
         return;
       }
+      haptics.error();
       setError(
         REASON_COPY[res.error ?? ''] ??
           'We couldn’t create your profile. If this keeps happening, sign out below and try again.',
@@ -156,7 +187,7 @@ export default function ProfileSetupScreen() {
       </View>
 
       <View style={styles.field}>
-        <Text variant="label">Phone (optional)</Text>
+        <Text variant="label">Phone</Text>
         <Input
           placeholder="e.g. 0100 123 4567"
           keyboardType="phone-pad"
@@ -166,7 +197,7 @@ export default function ProfileSetupScreen() {
           onChangeText={setPhone}
         />
         <Text variant="caption" tone="muted">
-          Add it so the academy can reach you about your sessions. You can leave this blank.
+          So the academy can reach you about your sessions.
         </Text>
       </View>
 
@@ -214,7 +245,7 @@ export default function ProfileSetupScreen() {
         <Text variant="caption" tone="muted" style={styles.helper}>
           {isNewFlow
             ? 'Fill in all fields and choose a password to continue'
-            : 'Fill in all three fields to continue'}
+            : 'Fill in all fields to continue'}
         </Text>
       ) : null}
 
@@ -249,21 +280,3 @@ export default function ProfileSetupScreen() {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  content: { gap: space.lg },
-  field: { gap: space.sm },
-  haveAccountRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center' },
-  genderRow: { flexDirection: 'row', gap: space.md },
-  genderCard: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: space.xl,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: color.border.subtle,
-    backgroundColor: color.bg.surface,
-  },
-  selectedCard: { borderColor: color.accent.default, backgroundColor: color.bg.canvas },
-  helper: { textAlign: 'center' },
-});

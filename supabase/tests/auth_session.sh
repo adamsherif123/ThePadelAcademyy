@@ -42,7 +42,7 @@ teardown() {
   db "delete from public.bookings; delete from public.credit_batches; delete from public.players;
       delete from public.admins where auth_user_id in (select id from auth.users where email='$EADM');
       delete from public.session_slots where id='sl_auth'; delete from public.coaches where id='co_auth';
-      delete from auth.users where email in ('$EA','$EB','$EC','$EADM','phone1@players.eg','phone2@players.eg');" >/dev/null
+      delete from auth.users where email in ('$EA','$EB','$EC','$EADM','phone1@players.eg','phone2@players.eg','nophone@players.eg');" >/dev/null
 }
 # email_has_account, called UNAUTHENTICATED with only the anon key (the sign-in screen).
 anon_has() { curl -s -X POST "$API/rest/v1/rpc/email_has_account" -H "apikey: $ANON" -H "Content-Type: application/json" -d "{\"p_email\":\"$1\"}"; }
@@ -58,13 +58,13 @@ read -r TOK_A UID_A <<<"$(signup "$EA" "$PW")"
 [ -z "$TOK_A" ] && { echo "FAIL — could not obtain a real session for A (signUp)"; exit 1; }
 echo "  A auth uid = $UID_A"
 
-# complete_signup with the REAL JWT
-R="$(rpc "$TOK_A" complete_signup '{"p_name":"Ali Hassan","p_gender":"men","p_level":"beginner"}')"
+# complete_signup with the REAL JWT — phone is required now.
+R="$(rpc "$TOK_A" complete_signup '{"p_name":"Ali Hassan","p_gender":"men","p_level":"beginner","p_phone":"0100 000 1111"}')"
 check "complete_signup(A) → ok"                 "$(echo "$R" | jqf "d['ok']")"                "True"
 check "complete_signup(A) → not already_completed" "$(echo "$R" | jqf "d['already_completed']")" "False"
 PLID_A="$(echo "$R" | jqf "d['player_id']")"
 
-check "player.phone is null (email signup — no phone)" "$(db "select coalesce(phone,'<null>') from public.players where id='$PLID_A'")" "<null>"
+check "player.phone is stored + normalised (phone is required at signup)" "$(db "select coalesce(phone,'<null>') from public.players where id='$PLID_A'")" "+201000001111"
 check "player.email is stored from the auth user (A2.1)" "$(db "select email from public.players where id='$PLID_A'")" "$EA"
 
 # A2.1 routing check, over the real anon-key path (not just a forged claim).
@@ -77,7 +77,7 @@ check "A has ZERO credits at signup (A5 — no free trial grant)" "$(rest_get "$
 
 echo "── Player B: a second real signup, for read isolation ──"
 read -r TOK_B UID_B <<<"$(signup "$EB" "$PW")"
-RB="$(rpc "$TOK_B" complete_signup '{"p_name":"Bea Nabil","p_gender":"ladies","p_level":"intermediate"}')"
+RB="$(rpc "$TOK_B" complete_signup '{"p_name":"Bea Nabil","p_gender":"ladies","p_level":"intermediate","p_phone":"0100 000 2222"}')"
 PLID_B="$(echo "$RB" | jqf "d['player_id']")"
 check "B completes signup → ok"                 "$(echo "$RB" | jqf "d['ok']")" "True"
 
@@ -110,10 +110,14 @@ check "C reads zero credit batches (no player → RLS denies)" "$(rest_get "$TOK
 check "C reads zero players (RLS denies)"        "$(rest_get "$TOK_C" "players?select=id" | jqf "len(d)")" "0"
 check "C's book_slot → not_authenticated (current_player_id NULL)" "$(rpc "$TOK_C" book_slot '{"p_slot_id":"sl_auth"}' | jqf "d['reason']")" "not_authenticated"
 
-echo "── optional phone at signup: normalised to +20 E.164, and UNIQUE ──"
+echo "── phone at signup: required, normalised to +20 E.164, and UNIQUE ──"
+read -r TOK_N _ <<<"$(signup "nophone@players.eg" "$PW")"
+check "signup with NO phone → phone_required (real plumbing, not just a forged JWT)" \
+  "$(rpc "$TOK_N" complete_signup '{"p_name":"Nope","p_gender":"men","p_level":"beginner"}' | jqf "d['reason']")" "phone_required"
+
 read -r TOK_P UID_P <<<"$(signup "phone1@players.eg" "$PW")"
 RP="$(rpc "$TOK_P" complete_signup '{"p_name":"Phoney","p_gender":"men","p_level":"beginner","p_phone":"0100 111 2222"}')"
-check "signup WITH an optional phone → ok"        "$(echo "$RP" | jqf "d['ok']")" "True"
+check "signup with a phone → ok"                  "$(echo "$RP" | jqf "d['ok']")" "True"
 check "the phone is normalised to +20 E.164"      "$(db "select phone from public.players where auth_user_id='$UID_P'")" "+201001112222"
 read -r TOK_Q UID_Q <<<"$(signup "phone2@players.eg" "$PW")"
 check "a 2nd player claiming the same number → phone_taken (clean reason)" \

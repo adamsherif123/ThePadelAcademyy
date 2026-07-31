@@ -64,7 +64,7 @@ select throws_ok(
 -- ── complete_signup: zero credits + trained_before stored (Tasks 1, 4) ──────
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"99999999-9999-9999-9999-999999999999","role":"authenticated"}', true);
-select is(public.complete_signup('Gina','ladies','beginner',null,true)->>'ok', 'true', 'complete_signup(G, trained_before=true) → ok');
+select is(public.complete_signup('Gina','ladies','beginner','0100 999 1111',true)->>'ok', 'true', 'complete_signup(G, trained_before=true) → ok');
 select is((select trained_before from public.players where auth_user_id = '99999999-9999-9999-9999-999999999999'),
   true, 'trained_before is stored on the player (self-reported)');
 select is((select count(*)::int from public.credit_batches c join public.players p on p.id=c.player_id
@@ -80,7 +80,7 @@ select is(public.trial_eligible(), false,
 -- H: the FALSE-branch control — trained_before=false must remain eligible,
 -- proving the fix didn't overcorrect into blocking everyone.
 select set_config('request.jwt.claims', '{"sub":"88888888-8888-8888-8888-888888888888","role":"authenticated"}', true);
-select is(public.complete_signup('Hana','ladies','beginner',null,false)->>'ok', 'true', 'complete_signup(H, trained_before=false) → ok');
+select is(public.complete_signup('Hana','ladies','beginner','0100 999 2222',false)->>'ok', 'true', 'complete_signup(H, trained_before=false) → ok');
 select is(public.trial_eligible(), true, 'H (trained_before=false, never used) IS trial-eligible — genuinely-new players are unaffected');
 
 -- ── the trial buy flow, as player A ─────────────────────────────────────────
