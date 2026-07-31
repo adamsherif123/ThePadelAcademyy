@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color } from '@tpa/theme';
 import { useRouter } from 'expo-router';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useNotifications } from '../data/queries';
+import { useTheme } from '../theme/ThemeProvider';
 import { Text } from '../ui';
 
 /**
@@ -13,8 +14,27 @@ import { Text } from '../ui';
  */
 export function NotificationBell() {
   const router = useRouter();
+  const { color } = useTheme();
   const q = useNotifications();
   const unread = (q.data ?? []).filter((n) => n.readAt === null).length;
+  const styles = useMemo(
+    () => StyleSheet.create({
+      badge: {
+        position: 'absolute',
+        top: -5,
+        end: -6,
+        minWidth: 17,
+        height: 17,
+        borderRadius: 9,
+        paddingHorizontal: 4,
+        backgroundColor: color.status.danger,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      badgeText: { color: color.text.inverse, fontSize: 10, lineHeight: 13 },
+    }),
+    [color],
+  );
 
   return (
     <Pressable
@@ -34,19 +54,3 @@ export function NotificationBell() {
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  badge: {
-    position: 'absolute',
-    top: -5,
-    end: -6,
-    minWidth: 17,
-    height: 17,
-    borderRadius: 9,
-    paddingHorizontal: 4,
-    backgroundColor: color.status.danger,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeText: { color: color.text.inverse, fontSize: 10, lineHeight: 13 },
-});

@@ -1,18 +1,20 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
 import type { PackageId } from '@tpa/types';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { packageById } from '../data/catalog';
 import { usePackages } from '../data/queries';
 import { requestCreditsRpc, uploadProof, type RequestCreditsReason } from '../lib/api';
+import { haptics } from '../lib/haptics';
 import { resetTo, resetToTab } from '../lib/nav';
 import { queryClient, queryKeys } from '../lib/queryClient';
 import { useSession } from '../session/SessionProvider';
+import { useTheme } from '../theme/ThemeProvider';
 import {
   Button,
   Card,
@@ -57,6 +59,45 @@ const REASON_COPY: Partial<Record<RequestCreditsReason, string>> = {
 
 export default function RequestCreditsScreen() {
   const router = useRouter();
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      content: { gap: space.lg },
+      gap: { marginTop: space.sm },
+      priceRow: { marginTop: space.md },
+      field: { gap: space.sm },
+      methodRow: { flexDirection: 'row', gap: space.md },
+      methodCard: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: space.lg,
+        borderRadius: radius.md,
+        borderWidth: 1,
+        borderColor: color.border.subtle,
+        backgroundColor: color.bg.surface,
+      },
+      selectedCard: { borderColor: color.accent.default, backgroundColor: color.bg.canvas },
+      payee: {
+        marginTop: space.md,
+        padding: space.md,
+        borderRadius: radius.md,
+        borderWidth: 1,
+        borderColor: color.border.strong,
+        backgroundColor: color.bg.canvas,
+        gap: space.xs,
+      },
+      copyRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: space.md,
+      },
+      payeeNumber: { letterSpacing: 0.5 },
+      copyHint: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
+      center: { textAlign: 'center' },
+    }),
+    [color],
+  );
   const { packageId } = useLocalSearchParams<{ packageId: string }>();
   const { player } = useSession();
   const packagesQ = usePackages();
@@ -131,6 +172,7 @@ export default function RequestCreditsScreen() {
     try {
       const res = await requestCreditsRpc(pkg.id, method, proofPath);
       if (res.ok) {
+        haptics.success();
         await queryClient.invalidateQueries({ queryKey: queryKeys.creditRequests });
         setOutcome('submitted');
         return;
@@ -139,6 +181,7 @@ export default function RequestCreditsScreen() {
         setOutcome('already_pending');
         return;
       }
+      haptics.error();
       setError(REASON_COPY[res.reason] ?? 'We couldn’t submit your request. Please try again.');
     } catch {
       // Transport failure/timeout (callRpc throws): the submit may or may not have landed.
@@ -302,39 +345,3 @@ export default function RequestCreditsScreen() {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  content: { gap: space.lg },
-  gap: { marginTop: space.sm },
-  priceRow: { marginTop: space.md },
-  field: { gap: space.sm },
-  methodRow: { flexDirection: 'row', gap: space.md },
-  methodCard: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: space.lg,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: color.border.subtle,
-    backgroundColor: color.bg.surface,
-  },
-  selectedCard: { borderColor: color.accent.default, backgroundColor: color.bg.canvas },
-  payee: {
-    marginTop: space.md,
-    padding: space.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: color.border.strong,
-    backgroundColor: color.bg.canvas,
-    gap: space.xs,
-  },
-  copyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: space.md,
-  },
-  payeeNumber: { letterSpacing: 0.5 },
-  copyHint: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
-  center: { textAlign: 'center' },
-});

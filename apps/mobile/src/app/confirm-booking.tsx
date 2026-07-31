@@ -6,15 +6,17 @@ import {
   isSessionConfirmed,
   spotsUntilConfirmed,
 } from '@tpa/core';
-import { color, space } from '@tpa/theme';
+import { space } from '@tpa/theme';
 import type { Level, SlotId, TrainingType } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { bookingPreview } from '../data/booking';
+import { haptics } from '../lib/haptics';
 import { useBatches, useBookSlot, useBookings, useCoaches, useSlots, combine } from '../data/queries';
 import { useSession } from '../session/SessionProvider';
+import { useTheme } from '../theme/ThemeProvider';
 import {
   ACADEMY,
   Avatar,
@@ -63,6 +65,7 @@ const UNEXPECTED_REASONS: readonly BookReason[] = ['type_required', 'invalid_typ
 /** 12 — Confirm booking. Read-through preview + the real credit-spend RPC. */
 export default function ConfirmBookingScreen() {
   const router = useRouter();
+  const { color } = useTheme();
   const { player, now } = useSession();
   const slotsQ = useSlots();
   const batchesQ = useBatches();
@@ -157,8 +160,10 @@ export default function ConfirmBookingScreen() {
     // disagree, the RPC wins and its reason is shown here.
     const outcome = await bookMutation.mutateAsync({ slotId: slot.id, trainingType: asType });
     if (outcome.status === 'booked') {
+      haptics.success();
       router.replace({ pathname: '/booked-success', params: { bookingId: outcome.bookingId } });
     } else if (outcome.status === 'rejected') {
+      haptics.error();
       if (UNEXPECTED_REASONS.includes(outcome.reason)) {
         captureException(new Error(`book_slot returned unreachable reason: ${outcome.reason}`), {
           slotId: slot.id,
@@ -207,7 +212,7 @@ export default function ConfirmBookingScreen() {
           <Badge label={meta.label} icon={meta.icon} />
         </View>
 
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: color.border.subtle }]} />
 
         <View style={styles.rows}>
           <IconRow chip icon="calendar-outline" label="Date" value={formatInstantDate(slot.startsAt)} />
@@ -319,7 +324,7 @@ const styles = StyleSheet.create({
   pad: { marginTop: space.lg },
   coachRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   coachInfo: { flex: 1, gap: 2 },
-  divider: { height: 1, backgroundColor: color.border.subtle, marginVertical: space.md },
+  divider: { height: 1, marginVertical: space.md },
   rows: { gap: space.md },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.md },
 });

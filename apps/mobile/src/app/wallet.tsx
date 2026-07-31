@@ -1,5 +1,5 @@
 import { CREDIT_EXPIRY_DAYS, formatInstantDate } from '@tpa/core';
-import { color, space } from '@tpa/theme';
+import { space } from '@tpa/theme';
 import type { CreditBatch, CreditRequest, Package } from '@tpa/types';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
@@ -8,6 +8,7 @@ import { packageById } from '../data/catalog';
 import { useBatches, useMyCreditRequests, usePackages, useTrialEligible } from '../data/queries';
 import { activeBatches, balanceByType, expiredBatches, totalReadyToBook } from '../data/wallet';
 import { useSession } from '../session/SessionProvider';
+import { useTheme } from '../theme/ThemeProvider';
 import {
   Badge,
   BalancePills,
@@ -150,10 +151,17 @@ function RequestStatusCard({
   pkg: Package | undefined;
   onAgain: () => void;
 }) {
+  const { color } = useTheme();
   const rejected = request.status === 'rejected';
   const what = pkg ? `${TRAINING_META[pkg.trainingType].label} ${pkg.sessionCount}-pack` : 'credit request';
   return (
-    <Card style={rejected ? styles.rejectedCard : styles.pendingCard}>
+    <Card
+      style={{
+        gap: space.sm,
+        borderLeftWidth: 3,
+        borderLeftColor: rejected ? color.status.danger : color.status.warning,
+      }}
+    >
       <View style={styles.reqHead}>
         <Badge label={rejected ? 'Declined' : 'Pending'} tone={rejected ? 'danger' : 'warning'} />
         <Text variant="caption" tone="muted">
@@ -229,8 +237,6 @@ function BatchCard({
 const styles = StyleSheet.create({
   content: { gap: space.md },
   emptyCard: { gap: space.sm, alignItems: 'flex-start' },
-  pendingCard: { gap: space.sm, borderLeftWidth: 3, borderLeftColor: color.status.warning },
-  rejectedCard: { gap: space.sm, borderLeftWidth: 3, borderLeftColor: color.status.danger },
   reqHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   reqTitle: { marginTop: 2 },
   batchHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: space.sm },

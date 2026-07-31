@@ -1,6 +1,7 @@
-import { color, space } from '@tpa/theme';
+import { space } from '@tpa/theme';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { EmptyState } from './EmptyState';
 import { Text } from './Text';
 
@@ -10,6 +11,7 @@ import { Text } from './Text';
  * A transport failure (offline, timeout, 5xx) lands here; retry re-runs the query.
  */
 export function LoadingView({ label }: { label?: string }) {
+  const { color } = useTheme();
   return (
     <View style={styles.center} accessibilityRole="progressbar">
       <ActivityIndicator color={color.accent.default} />

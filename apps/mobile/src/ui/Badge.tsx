@@ -1,19 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color, creditExpiry, radius, space, type TintPair } from '@tpa/theme';
+import { radius, space, type TintPair } from '@tpa/theme';
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 import type { IoniconName } from './trainingMeta';
 
 export type BadgeTone = 'neutral' | 'success' | 'warning' | 'danger' | 'onInverse';
-
-const TONE: Record<BadgeTone, TintPair> = {
-  neutral: { fg: color.text.secondary, bg: color.bg.canvas },
-  success: creditExpiry.ok, //           green fg/bg pair
-  warning: creditExpiry.expiring_soon, // amber fg/bg pair
-  danger: creditExpiry.expired, //        red fg/bg pair
-  onInverse: { fg: color.pillOnInverse.text, bg: color.pillOnInverse.bg },
-};
 
 /**
  * Pill/badge with an optional leading icon. Type pills (Group/Duo/… with an icon)
@@ -33,6 +26,14 @@ export function Badge({
   icon?: IoniconName;
   style?: ViewStyle;
 }) {
+  const { color, creditExpiry } = useTheme();
+  const TONE: Record<BadgeTone, TintPair> = {
+    neutral: { fg: color.text.secondary, bg: color.bg.canvas },
+    success: creditExpiry.ok, //           green fg/bg pair
+    warning: creditExpiry.expiring_soon, // amber fg/bg pair
+    danger: creditExpiry.expired, //        red fg/bg pair
+    onInverse: { fg: color.pillOnInverse.text, bg: color.pillOnInverse.bg },
+  };
   const pair = tint ?? TONE[tone];
   const border = tone === 'onInverse' ? color.pillOnInverse.border : pair.bg;
   return (

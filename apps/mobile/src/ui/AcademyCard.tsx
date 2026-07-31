@@ -1,6 +1,8 @@
-import { StyleSheet, View } from 'react-native';
-import { color, space } from '@tpa/theme';
+import { useMemo } from 'react';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { space } from '@tpa/theme';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Card } from './Card';
 import { IconRow } from './IconRow';
 
@@ -18,15 +20,25 @@ export const ACADEMY = {
 
 /** The "THE ACADEMY" card shown on Home and Profile. */
 export function AcademyCard() {
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      divider: { height: 1, backgroundColor: color.border.subtle, marginVertical: space.md },
+    }),
+    [color],
+  );
   return (
     <Card>
-      <IconRow icon="location-outline" title={ACADEMY.name} subtitle={ACADEMY.address} />
+      {/* Taps through to Maps — same pattern as the booking card's location row. */}
+      <Pressable
+        onPress={() => Linking.openURL(ACADEMY.mapsUrl)}
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${ACADEMY.name} in Maps`}
+      >
+        <IconRow icon="location-outline" title={ACADEMY.name} subtitle={ACADEMY.address} />
+      </Pressable>
       <View style={styles.divider} />
       <IconRow icon="time-outline" title={ACADEMY.hours} subtitle={ACADEMY.hoursNote} />
     </Card>
   );
 }
-
-const styles = StyleSheet.create({
-  divider: { height: 1, backgroundColor: color.border.subtle, marginVertical: space.md },
-});

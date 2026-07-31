@@ -1,6 +1,8 @@
-import { color, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 
 /**
@@ -16,6 +18,29 @@ export function SegmentedControl<T extends string>({
   value: T;
   onChange: (value: T) => void;
 }) {
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      track: {
+        flexDirection: 'row',
+        backgroundColor: color.bg.canvas,
+        borderColor: color.border.subtle,
+        borderWidth: 1,
+        borderRadius: radius.pill,
+        padding: space.xs,
+        gap: space.xs,
+      },
+      segment: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: space.sm,
+        borderRadius: radius.pill,
+      },
+      segmentSelected: { backgroundColor: color.bg.inverse },
+      label: { textTransform: 'uppercase', letterSpacing: 0.4 },
+    }),
+    [color],
+  );
   return (
     <View style={styles.track}>
       {options.map((opt) => {
@@ -42,23 +67,3 @@ export function SegmentedControl<T extends string>({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  track: {
-    flexDirection: 'row',
-    backgroundColor: color.bg.canvas,
-    borderColor: color.border.subtle,
-    borderWidth: 1,
-    borderRadius: radius.pill,
-    padding: space.xs,
-    gap: space.xs,
-  },
-  segment: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: space.sm,
-    borderRadius: radius.pill,
-  },
-  segmentSelected: { backgroundColor: color.bg.inverse },
-  label: { textTransform: 'uppercase', letterSpacing: 0.4 },
-});

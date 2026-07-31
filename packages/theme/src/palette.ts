@@ -47,3 +47,31 @@ export const WARNING_BG = '#fbeccb'; //  amber tint
 export const TEXT_MUTED = '#9aa7bd'; //  lighter neutral than --muted; site has no 3rd text level
 export const ACCENT_DISABLED = '#aebfe8'; // desaturated royal for disabled actions
 export const TINT_DUO_BG = '#e6ebf4'; // soft slate: the admin's duo (navy) tint fill — the site has no navy-tint surface
+
+// --- DARK scheme (mobile only — the admin stays light-only) ---
+// Designed as a real dark palette, not an inversion: a dark charcoal-navy canvas
+// (never pure black — reads softer, and stays a family with the brand's own
+// navy), a lighter step for surfaces so cards separate from the page, and
+// accent/status hues LIFTED in lightness (not just reused) since the light
+// palette's saturated-but-dark royal/success/danger read muddy or nearly
+// invisible against a dark background — each needs more luminance to still
+// pop, same as the reasoning already documented for translucent-white-on-navy.
+export const DARK_CANVAS = '#0a1220'; //        page background
+export const DARK_SURFACE = '#141d33'; //       card / raised surface (a step lighter than canvas)
+export const DARK_INVERSE = '#1c2b52'; //       hero/summary "inverse" surface — richer navy, distinct from ordinary surface
+export const DARK_INK = '#eef1f8'; //           primary text on dark — soft off-white, not stark #fff
+export const DARK_MUTED = '#9aa8c7'; //         secondary text on dark
+export const DARK_TEXT_MUTED = '#6d7994'; //    least-emphasis text (captions/meta) on dark
+export const DARK_LABEL = '#9db4ff'; //         eyebrow labels on dark — periwinkle family, lifted for legibility
+export const DARK_ROYAL = '#5b93ff'; //         primary accent on dark — lightened; the light ROYAL reads muddy on dark navy
+export const DARK_ROYAL_2 = '#3f6fe0'; //       pressed accent on dark — deeper than DARK_ROYAL, still clearly brighter than base ROYAL
+export const DARK_ACCENT_DISABLED = '#3c4a70'; // dim/desaturated accent for disabled actions on dark
+export const DARK_ICE = '#1a2c52'; //           soft tinted chip/badge fill on dark — ICE's role, inverted
+export const DARK_BORDER_SUBTLE = '#232f4d'; // hairline dividers on dark
+export const DARK_BORDER_INPUT = '#3a4568'; //  stronger borders (inputs/controls) on dark
+export const DARK_SUCCESS_FG = '#3ddc84'; //    brighter green — the light SUCCESS_FG would nearly vanish on dark
+export const DARK_SUCCESS_BG = '#123023'; //    success pill/badge fill on dark
+export const DARK_WARNING_FG = '#f0b74a'; //    brighter amber on dark
+export const DARK_WARNING_BG = '#3a2c11'; //    warning pill/badge fill on dark
+export const DARK_DANGER_FG = '#ff6b6b'; //     brighter coral-red — the light DANGER_FG would nearly vanish on dark
+export const DARK_DANGER_BG = '#3a1414'; //     danger pill/badge fill on dark

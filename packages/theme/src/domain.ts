@@ -19,12 +19,25 @@ export interface TintPair {
  * — training type is shown as a labelled pill with an icon, never a hue (two color
  * dimensions on one card read as noise, and individual's amber collided with
  * expiring_soon).
+ *
+ * Kept as the plain `creditExpiry` export (byte-identical, light-only) for the
+ * admin's token codegen; `creditExpirySchemes` below is what the mobile theme
+ * provider resolves against.
  */
 export const creditExpiry = {
   ok: { fg: p.SUCCESS_FG, bg: p.SUCCESS_BG },
   expiring_soon: { fg: p.WARNING_FG, bg: p.WARNING_BG },
   expired: { fg: p.DANGER_FG, bg: p.DANGER_BG },
 } as const satisfies Record<CreditExpiryState, TintPair>;
+
+/** Dark-scheme credit-expiry pairs — the same lifted fg/bg reasoning as color.ts's darkColor. */
+const darkCreditExpiry = {
+  ok: { fg: p.DARK_SUCCESS_FG, bg: p.DARK_SUCCESS_BG },
+  expiring_soon: { fg: p.DARK_WARNING_FG, bg: p.DARK_WARNING_BG },
+  expired: { fg: p.DARK_DANGER_FG, bg: p.DARK_DANGER_BG },
+} as const satisfies Record<CreditExpiryState, TintPair>;
+
+export const creditExpirySchemes = { light: creditExpiry, dark: darkCreditExpiry } as const;
 
 /**
  * Training-type colour coding — a fg accent + soft bg fill per type, keyed by

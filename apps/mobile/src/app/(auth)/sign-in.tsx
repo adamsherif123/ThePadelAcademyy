@@ -1,10 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color, space } from '@tpa/theme';
+import { space } from '@tpa/theme';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { emailHasAccount } from '../../lib/api';
+import { useTheme } from '../../theme/ThemeProvider';
 import { ACADEMY, BrandMark, Button, Input, NavyScreen, PillOnNavy, Text } from '../../ui';
 
 /** Loose email shape check — the server is the real authority; this just catches typos. */
@@ -22,6 +23,7 @@ const looksLikeEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
  */
 export default function SignInScreen() {
   const router = useRouter();
+  const { color } = useTheme();
   const [email, setEmail] = useState('');
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);

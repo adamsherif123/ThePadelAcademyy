@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
+import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 import type { IoniconName } from './trainingMeta';
 
@@ -30,6 +32,26 @@ export function IconRow({
   chip?: boolean;
   tone?: 'light' | 'navy';
 }) {
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      row: { flexDirection: 'row', gap: space.sm, alignItems: 'flex-start' },
+      rowCentered: { flexDirection: 'row', gap: space.sm, alignItems: 'center' },
+      bareIcon: { marginTop: 2 },
+      chip: {
+        width: 32,
+        height: 32,
+        borderRadius: radius.sm,
+        backgroundColor: color.bg.canvas,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      chipNavy: { backgroundColor: color.pillOnInverse.bg },
+      col: { flex: 1, gap: 2 },
+      value: { flex: 1, textAlign: 'right' },
+    }),
+    [color],
+  );
   const isNavy = tone === 'navy';
   const iconColor = isNavy ? color.text.inverse : color.accent.default;
 
@@ -74,20 +96,3 @@ export function IconRow({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: space.sm, alignItems: 'flex-start' },
-  rowCentered: { flexDirection: 'row', gap: space.sm, alignItems: 'center' },
-  bareIcon: { marginTop: 2 },
-  chip: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.sm,
-    backgroundColor: color.bg.canvas,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chipNavy: { backgroundColor: color.pillOnInverse.bg },
-  col: { flex: 1, gap: 2 },
-  value: { flex: 1, textAlign: 'right' },
-});

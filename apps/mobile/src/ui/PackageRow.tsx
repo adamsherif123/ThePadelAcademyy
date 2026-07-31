@@ -1,8 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
 import type { Package, Piastres } from '@tpa/types';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { BestValueBadge, isBestValuePackage } from './BestValueBadge';
 import { Money } from './Money';
 import { Text } from './Text';
@@ -19,6 +21,37 @@ import { Text } from './Text';
  * The per-session unit price is derived here (pure math); everything else a token.
  */
 export function PackageRow({ pkg, onPress }: { pkg: Package; onPress?: () => void }) {
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      row: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.sm,
+        backgroundColor: color.bg.surface,
+        borderColor: color.border.subtle,
+        borderWidth: 1,
+        borderRadius: radius.lg,
+        padding: space.md,
+      },
+      pressed: { opacity: 0.7 },
+      tile: {
+        width: 56,
+        minHeight: 56,
+        paddingVertical: space.xs,
+        borderRadius: radius.md,
+        backgroundColor: color.bg.canvas,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 2,
+      },
+      tileLabel: { alignSelf: 'stretch', textAlign: 'center' },
+      info: { flexShrink: 1, flexGrow: 1, minWidth: 0, gap: 2 },
+      perSession: { flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap' },
+      badge: { flexShrink: 1 },
+    }),
+    [color],
+  );
   const isSingle = pkg.sessionCount === 1;
   const perSession = Math.round(pkg.price / pkg.sessionCount) as Piastres;
 
@@ -62,31 +95,3 @@ export function PackageRow({ pkg, onPress }: { pkg: Package; onPress?: () => voi
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-    backgroundColor: color.bg.surface,
-    borderColor: color.border.subtle,
-    borderWidth: 1,
-    borderRadius: radius.lg,
-    padding: space.md,
-  },
-  pressed: { opacity: 0.7 },
-  tile: {
-    width: 56,
-    minHeight: 56,
-    paddingVertical: space.xs,
-    borderRadius: radius.md,
-    backgroundColor: color.bg.canvas,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-  },
-  tileLabel: { alignSelf: 'stretch', textAlign: 'center' },
-  info: { flexShrink: 1, flexGrow: 1, minWidth: 0, gap: 2 },
-  perSession: { flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap' },
-  badge: { flexShrink: 1 },
-});

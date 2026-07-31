@@ -1,8 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
 import type { TrainingType } from '@tpa/types';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 import { TRAINING_META } from './trainingMeta';
 
@@ -26,6 +28,24 @@ export function TypeCard({
   selected?: boolean;
   onPress?: () => void;
 }) {
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      base: {
+        flex: 1,
+        minHeight: 128,
+        borderRadius: radius.lg,
+        borderWidth: 1,
+        padding: space.lg,
+        justifyContent: 'space-between',
+        gap: space.sm,
+      },
+      unselected: { backgroundColor: color.bg.surface, borderColor: color.border.subtle },
+      selected: { backgroundColor: color.bg.canvas, borderColor: color.accent.default },
+      text: { gap: 2 },
+    }),
+    [color],
+  );
   const meta = TRAINING_META[trainingType];
   const hasCredits = credits > 0;
 
@@ -55,18 +75,3 @@ export function TypeCard({
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  base: {
-    flex: 1,
-    minHeight: 128,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    padding: space.lg,
-    justifyContent: 'space-between',
-    gap: space.sm,
-  },
-  unselected: { backgroundColor: color.bg.surface, borderColor: color.border.subtle },
-  selected: { backgroundColor: color.bg.canvas, borderColor: color.accent.default },
-  text: { gap: 2 },
-});

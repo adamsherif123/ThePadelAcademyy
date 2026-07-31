@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
+import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Button } from './Button';
 import { Text } from './Text';
 import type { IoniconName } from './trainingMeta';
@@ -21,6 +23,25 @@ export function EmptyState({
   message: string;
   cta?: { label: string; onPress: () => void };
 }) {
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      container: { alignItems: 'center', gap: space.md, paddingVertical: space.xxxl, paddingHorizontal: space.xl },
+      circle: {
+        width: 72,
+        height: 72,
+        borderRadius: radius.pill,
+        backgroundColor: color.bg.canvas,
+        borderColor: color.border.subtle,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      centered: { textAlign: 'center' },
+      cta: { marginTop: space.sm, alignSelf: 'stretch' },
+    }),
+    [color],
+  );
   return (
     <View style={styles.container}>
       <View style={styles.circle}>
@@ -40,19 +61,3 @@ export function EmptyState({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { alignItems: 'center', gap: space.md, paddingVertical: space.xxxl, paddingHorizontal: space.xl },
-  circle: {
-    width: 72,
-    height: 72,
-    borderRadius: radius.pill,
-    backgroundColor: color.bg.canvas,
-    borderColor: color.border.subtle,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  centered: { textAlign: 'center' },
-  cta: { marginTop: space.sm, alignSelf: 'stretch' },
-});

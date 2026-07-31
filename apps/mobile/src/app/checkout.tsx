@@ -1,5 +1,5 @@
 import { formatPiastres } from '@tpa/core';
-import { color, space } from '@tpa/theme';
+import { space } from '@tpa/theme';
 import type { PackageId, Piastres } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -7,8 +7,10 @@ import { StyleSheet, View } from 'react-native';
 
 import { packageById, perSessionPiastres } from '../data/catalog';
 import { usePackages } from '../data/queries';
+import { haptics } from '../lib/haptics';
 import { payForPackage } from '../data/payments';
 import { useSession } from '../session/SessionProvider';
+import { useTheme } from '../theme/ThemeProvider';
 import {
   Badge,
   Button,
@@ -32,6 +34,7 @@ import {
  */
 export default function CheckoutScreen() {
   const router = useRouter();
+  const { color } = useTheme();
   const { player } = useSession();
   const packagesQ = usePackages();
   const [paying, setPaying] = useState(false);
@@ -74,6 +77,7 @@ export default function CheckoutScreen() {
         params: { purchaseId: res.purchaseId, outcome: res.outcome },
       });
     } else {
+      haptics.error();
       setPaying(false);
       setError(res.error);
     }
@@ -103,12 +107,12 @@ export default function CheckoutScreen() {
           {pkg.name}
         </Text>
 
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: color.border.subtle }]} />
 
         <Row label="Sessions" value={<Text variant="body" weight="bold">{String(pkg.sessionCount)}</Text>} />
         <Row label="Per session" value={<Money amount={perSession} variant="body" />} />
 
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: color.border.subtle }]} />
 
         <View style={styles.totalRow}>
           <Text variant="label">Total</Text>
@@ -142,5 +146,5 @@ const styles = StyleSheet.create({
   name: { marginTop: space.sm },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: space.xs },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  divider: { height: 1, backgroundColor: color.border.subtle, marginVertical: space.md },
+  divider: { height: 1, marginVertical: space.md },
 });

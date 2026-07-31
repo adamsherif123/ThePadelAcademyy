@@ -1,14 +1,15 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { formatRelativeTime } from '@tpa/core';
-import { color, space } from '@tpa/theme';
+import { space } from '@tpa/theme';
 import type { Notification, NotificationType } from '@tpa/types';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useNotifications, useMarkAllNotificationsRead } from '../data/queries';
 import { notificationHref } from '../notifications/deepLink';
 import { useSession } from '../session/SessionProvider';
+import { useTheme } from '../theme/ThemeProvider';
 import { Card, EmptyState, ErrorView, LoadingView, Screen, ScreenHeader, Text } from '../ui';
 import type { IoniconName } from '../ui/trainingMeta';
 
@@ -96,6 +97,27 @@ function NotificationRow({
   relative: string;
   onPress: () => void;
 }) {
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      row: { flexDirection: 'row', gap: space.md, alignItems: 'flex-start' },
+      iconWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: color.bg.canvas,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      iconWrapUnread: { backgroundColor: color.accent.soft },
+      body: { flex: 1, gap: 2 },
+      titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+      title: { flex: 1 },
+      dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: color.accent.default, marginStart: space.sm },
+      time: { marginTop: space.xs },
+    }),
+    [color],
+  );
   return (
     <Pressable onPress={onPress} accessibilityRole="button">
       <Card>
@@ -129,19 +151,4 @@ function NotificationRow({
 
 const styles = StyleSheet.create({
   content: { gap: space.md },
-  row: { flexDirection: 'row', gap: space.md, alignItems: 'flex-start' },
-  iconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: color.bg.canvas,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconWrapUnread: { backgroundColor: color.accent.soft },
-  body: { flex: 1, gap: 2 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { flex: 1 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: color.accent.default, marginStart: space.sm },
-  time: { marginTop: space.xs },
 });

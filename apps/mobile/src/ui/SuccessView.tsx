@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color, creditExpiry, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Button } from './Button';
 import { Text } from './Text';
 import type { IoniconName } from './trainingMeta';
@@ -32,6 +33,7 @@ export function SuccessView({
   primary: { label: string; onPress: () => void };
   secondary?: { label: string; onPress: () => void };
 }) {
+  const { color, creditExpiry } = useTheme();
   const circle = tone === 'success' ? creditExpiry.ok : { fg: color.accent.default, bg: color.bg.canvas };
 
   return (

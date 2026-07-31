@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 import type { IoniconName } from './trainingMeta';
 
@@ -21,6 +23,32 @@ export function LinkRow({
   subtitle?: string;
   onPress?: () => void;
 }) {
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      row: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.md,
+        backgroundColor: color.bg.surface,
+        borderColor: color.border.subtle,
+        borderWidth: 1,
+        borderRadius: radius.lg,
+        padding: space.lg,
+      },
+      pressed: { opacity: 0.7 },
+      iconChip: {
+        width: 40,
+        height: 40,
+        borderRadius: radius.md,
+        backgroundColor: color.bg.canvas,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      text: { flex: 1, gap: 2 },
+    }),
+    [color],
+  );
   return (
     <Pressable
       onPress={onPress}
@@ -44,26 +72,3 @@ export function LinkRow({
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.md,
-    backgroundColor: color.bg.surface,
-    borderColor: color.border.subtle,
-    borderWidth: 1,
-    borderRadius: radius.lg,
-    padding: space.lg,
-  },
-  pressed: { opacity: 0.7 },
-  iconChip: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
-    backgroundColor: color.bg.canvas,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  text: { flex: 1, gap: 2 },
-});

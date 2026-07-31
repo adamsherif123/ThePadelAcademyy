@@ -1,7 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
 import { ActivityIndicator, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Text, type TextTone, type TextVariant } from './Text';
 import type { IoniconName } from './trainingMeta';
 
@@ -33,34 +34,6 @@ interface VariantColors {
   labelDisabled: TextTone;
   labelColor: string;
 }
-
-const VARIANT: Record<ButtonVariant, VariantColors> = {
-  primary: {
-    bg: color.accent.default,
-    bgPressed: color.accent.pressed,
-    bgDisabled: color.accent.disabled,
-    label: 'inverse',
-    labelDisabled: 'inverse',
-    labelColor: color.text.inverse,
-  },
-  secondary: {
-    bg: color.bg.surface,
-    bgPressed: color.bg.canvas,
-    bgDisabled: color.bg.surface,
-    border: color.border.strong,
-    label: 'primary',
-    labelDisabled: 'muted',
-    labelColor: color.text.primary,
-  },
-  ghost: {
-    bg: 'transparent',
-    bgPressed: color.bg.canvas,
-    bgDisabled: 'transparent',
-    label: 'accent',
-    labelDisabled: 'muted',
-    labelColor: color.accent.default,
-  },
-};
 
 export interface ButtonProps {
   label: string;
@@ -100,6 +73,34 @@ export function Button({
   destructive = false,
   style,
 }: ButtonProps) {
+  const { color } = useTheme();
+  const VARIANT: Record<ButtonVariant, VariantColors> = {
+    primary: {
+      bg: color.accent.default,
+      bgPressed: color.accent.pressed,
+      bgDisabled: color.accent.disabled,
+      label: 'inverse',
+      labelDisabled: 'inverse',
+      labelColor: color.text.inverse,
+    },
+    secondary: {
+      bg: color.bg.surface,
+      bgPressed: color.bg.canvas,
+      bgDisabled: color.bg.surface,
+      border: color.border.strong,
+      label: 'primary',
+      labelDisabled: 'muted',
+      labelColor: color.text.primary,
+    },
+    ghost: {
+      bg: 'transparent',
+      bgPressed: color.bg.canvas,
+      bgDisabled: 'transparent',
+      label: 'accent',
+      labelDisabled: 'muted',
+      labelColor: color.accent.default,
+    },
+  };
   const v = VARIANT[variant];
   const sz = SIZE[size];
   const isInert = disabled || loading;

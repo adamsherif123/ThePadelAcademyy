@@ -1,13 +1,17 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { formatSessionTimeRange } from '@tpa/core';
-import { color, radius, space } from '@tpa/theme';
+import { formatInstantTime } from '@tpa/core';
+import { radius, space } from '@tpa/theme';
 import type { Coach, Level, SessionSlot } from '@tpa/types';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useMemo } from 'react';
+import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Avatar } from './Avatar';
 import { CapacityMeter } from './CapacityMeter';
 import { Text } from './Text';
 import { GENDER_LABEL, LEVEL_LABEL } from './trainingMeta';
+
+type ActiveColor = ReturnType<typeof useTheme>['color'];
 
 // `booked` renders a static "Booked" pill; there's deliberately no action here —
 // managing/cancelling a booking lives only in the Sessions tab (by design).
@@ -53,6 +57,41 @@ export function SlotCard({
   cta?: string;
   onPress?: () => void;
 }) {
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      card: {
+        backgroundColor: color.bg.surface,
+        borderColor: color.border.subtle,
+        borderWidth: 1,
+        borderRadius: radius.lg,
+        padding: space.lg,
+        gap: space.md,
+      },
+      dimmed: { opacity: 0.6 },
+      // An open block is an invitation, not a class yet — a dashed accent border
+      // (instead of the solid neutral one every typed session gets) says "nothing
+      // is decided here" at a glance, without adding a badge to every card.
+      open: { borderStyle: 'dashed', borderColor: color.accent.default, borderWidth: 1.5 },
+      pressed: { opacity: 0.85 },
+      top: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+      info: { flex: 1, gap: 2 },
+      bottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+      creditNote: {},
+      ctaRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
+      pill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.xs,
+        borderRadius: radius.pill,
+        paddingVertical: space.xs,
+        paddingHorizontal: space.sm,
+      },
+      pillOutline: { borderWidth: 1, borderColor: color.border.strong, backgroundColor: color.bg.surface },
+      pillOpen: { borderWidth: 1, borderColor: color.accent.default, backgroundColor: color.bg.surface },
+    }),
+    [color],
+  );
   const bookable = state === 'bookable';
   const isOpen = slot.trainingType === null;
   // Group ⟺ level set — level's shape is still tied to group-ness (unchanged
@@ -67,7 +106,7 @@ export function SlotCard({
         <Avatar name={coach?.name ?? 'Coach'} imageUrl={coach?.photoUrl} size={44} />
         <View style={styles.info}>
           <Text variant="body" weight="bold">
-            {formatSessionTimeRange(slot.startsAt, slot.endsAt)}
+            {`${formatInstantTime(slot.startsAt)} – ${formatInstantTime(slot.endsAt)}`}
           </Text>
           <Text variant="caption" tone="secondary">
             {isOpen
@@ -77,7 +116,7 @@ export function SlotCard({
               : `${coach ? `Coach ${coach.name.split(' ')[0]}` : 'Coach'} · ${slot.bookedCount}/${slot.capacity} booked`}
           </Text>
         </View>
-        <StatusPill state={state} note={note} isOpen={isOpen} />
+        <StatusPill state={state} note={note} isOpen={isOpen} color={color} styles={styles} />
       </View>
 
       <View style={styles.bottom}>
@@ -137,7 +176,19 @@ export function SlotCard({
   return body;
 }
 
-function StatusPill({ state, note, isOpen }: { state: SlotCardState; note?: string; isOpen?: boolean }) {
+function StatusPill({
+  state,
+  note,
+  isOpen,
+  color,
+  styles,
+}: {
+  state: SlotCardState;
+  note?: string;
+  isOpen?: boolean;
+  color: ActiveColor;
+  styles: { pill: ViewStyle; pillOutline: ViewStyle; pillOpen: ViewStyle };
+}) {
   if (state === 'bookable' && isOpen) {
     return (
       <View style={[styles.pill, styles.pillOpen]}>
@@ -179,35 +230,3 @@ function StatusPill({ state, note, isOpen }: { state: SlotCardState; note?: stri
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: color.bg.surface,
-    borderColor: color.border.subtle,
-    borderWidth: 1,
-    borderRadius: radius.lg,
-    padding: space.lg,
-    gap: space.md,
-  },
-  dimmed: { opacity: 0.6 },
-  // An open block is an invitation, not a class yet — a dashed accent border
-  // (instead of the solid neutral one every typed session gets) says "nothing
-  // is decided here" at a glance, without adding a badge to every card.
-  open: { borderStyle: 'dashed', borderColor: color.accent.default, borderWidth: 1.5 },
-  pressed: { opacity: 0.85 },
-  top: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  info: { flex: 1, gap: 2 },
-  bottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  creditNote: {},
-  ctaRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.xs,
-    borderRadius: radius.pill,
-    paddingVertical: space.xs,
-    paddingHorizontal: space.sm,
-  },
-  pillOutline: { borderWidth: 1, borderColor: color.border.strong, backgroundColor: color.bg.surface },
-  pillOpen: { borderWidth: 1, borderColor: color.accent.default, backgroundColor: color.bg.surface },
-});

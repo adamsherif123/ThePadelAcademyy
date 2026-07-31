@@ -1,8 +1,8 @@
 import { formatExpiry, formatInstantDate, formatInstantTime } from '@tpa/core';
-import { color, space } from '@tpa/theme';
+import { space } from '@tpa/theme';
 import type { CreditBatchId } from '@tpa/types';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { activePackages } from '../../data/catalog';
@@ -19,6 +19,7 @@ import { nextSession } from '../../data/schedule';
 import { soonestExpiringBatch, totalReadyToBook } from '../../data/wallet';
 import { NotificationBell } from '../../notifications/NotificationBell';
 import { useSession } from '../../session/SessionProvider';
+import { useTheme } from '../../theme/ThemeProvider';
 import {
   ACADEMY,
   AcademyCard,
@@ -41,6 +42,21 @@ import {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      headerTrailing: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+      content: { gap: space.lg },
+      emptyCredits: { gap: space.sm, alignItems: 'flex-start' },
+      section: { gap: space.sm },
+      sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+      nextRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+      nextInfo: { flex: 1, gap: 2 },
+      divider: { height: 1, backgroundColor: color.border.subtle, marginVertical: space.md },
+      packageScroll: { gap: space.md, paddingVertical: space.xs },
+    }),
+    [color],
+  );
   const { player, now } = useSession();
   const batches = useBatches();
   const bookings = useBookings();
@@ -183,15 +199,3 @@ export default function HomeScreen() {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  headerTrailing: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  content: { gap: space.lg },
-  emptyCredits: { gap: space.sm, alignItems: 'flex-start' },
-  section: { gap: space.sm },
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  nextRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  nextInfo: { flex: 1, gap: 2 },
-  divider: { height: 1, backgroundColor: color.border.subtle, marginVertical: space.md },
-  packageScroll: { gap: space.md, paddingVertical: space.xs },
-});

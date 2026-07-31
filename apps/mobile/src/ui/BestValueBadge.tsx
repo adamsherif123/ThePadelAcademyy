@@ -1,6 +1,6 @@
-import { color } from '@tpa/theme';
 import type { Package } from '@tpa/types';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Badge } from './Badge';
 
 /** The single "best value" rule: 8-session bundles. Used by both package cards. */
@@ -10,5 +10,6 @@ export function isBestValuePackage(pkg: Package): boolean {
 
 /** The single BEST VALUE badge treatment (royal pill) shared by PackageCard/Row. */
 export function BestValueBadge() {
+  const { color } = useTheme();
   return <Badge label="Best value" tint={{ fg: color.text.inverse, bg: color.accent.default }} />;
 }

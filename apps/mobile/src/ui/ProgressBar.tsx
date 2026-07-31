@@ -1,5 +1,8 @@
-import { color, radius } from '@tpa/theme';
+import { radius } from '@tpa/theme';
+import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
+
+import { useTheme } from '../theme/ThemeProvider';
 
 /**
  * Royal fill on a light track (wallet batch progress). `tone='muted'` renders the
@@ -13,6 +16,20 @@ export function ProgressBar({
   value: number;
   tone?: 'accent' | 'muted';
 }) {
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      track: {
+        flexDirection: 'row',
+        height: 8,
+        borderRadius: radius.pill,
+        backgroundColor: color.border.subtle,
+        overflow: 'hidden',
+      },
+      fill: { flex: 1, borderRadius: radius.pill },
+    }),
+    [color],
+  );
   const clamped = Math.max(0, Math.min(1, value));
   const fillColor = tone === 'muted' ? color.text.muted : color.accent.default;
   return (
@@ -24,14 +41,3 @@ export function ProgressBar({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  track: {
-    flexDirection: 'row',
-    height: 8,
-    borderRadius: radius.pill,
-    backgroundColor: color.border.subtle,
-    overflow: 'hidden',
-  },
-  fill: { flex: 1, borderRadius: radius.pill },
-});

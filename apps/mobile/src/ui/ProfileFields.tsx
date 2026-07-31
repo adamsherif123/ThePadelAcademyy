@@ -1,8 +1,10 @@
 import { GENDERS, LEVELS } from '@tpa/core';
-import { color, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
 import type { Gender, Level } from '@tpa/types';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Input } from './Input';
 import { Text } from './Text';
 import { GENDER_LABEL } from './trainingMeta';
@@ -41,6 +43,51 @@ export function ProfileFields({
   level: Level | null;
   onLevelChange: (level: Level) => void;
 }) {
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      field: { gap: space.sm },
+      genderRow: { flexDirection: 'row', gap: space.md },
+      genderCard: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: space.xl,
+        borderRadius: radius.md,
+        borderWidth: 1,
+        borderColor: color.border.subtle,
+        backgroundColor: color.bg.surface,
+      },
+      levelCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.md,
+        padding: space.lg,
+        borderRadius: radius.md,
+        borderWidth: 1,
+        borderColor: color.border.subtle,
+        backgroundColor: color.bg.surface,
+      },
+      levelText: { flex: 1, gap: 2 },
+      selectedCard: { borderColor: color.accent.default, backgroundColor: color.bg.canvas },
+      radio: {
+        width: 22,
+        height: 22,
+        borderRadius: radius.pill,
+        borderWidth: 2,
+        borderColor: color.border.strong,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      radioSelected: { borderColor: color.accent.default },
+      radioDot: {
+        width: 10,
+        height: 10,
+        borderRadius: radius.pill,
+        backgroundColor: color.accent.default,
+      },
+    }),
+    [color],
+  );
   return (
     <>
       <View style={styles.field}>
@@ -100,45 +147,3 @@ export function ProfileFields({
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  field: { gap: space.sm },
-  genderRow: { flexDirection: 'row', gap: space.md },
-  genderCard: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: space.xl,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: color.border.subtle,
-    backgroundColor: color.bg.surface,
-  },
-  levelCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.md,
-    padding: space.lg,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: color.border.subtle,
-    backgroundColor: color.bg.surface,
-  },
-  levelText: { flex: 1, gap: 2 },
-  selectedCard: { borderColor: color.accent.default, backgroundColor: color.bg.canvas },
-  radio: {
-    width: 22,
-    height: 22,
-    borderRadius: radius.pill,
-    borderWidth: 2,
-    borderColor: color.border.strong,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioSelected: { borderColor: color.accent.default },
-  radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: radius.pill,
-    backgroundColor: color.accent.default,
-  },
-});

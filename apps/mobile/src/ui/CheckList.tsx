@@ -1,7 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color, space } from '@tpa/theme';
+import { space } from '@tpa/theme';
 import { StyleSheet, View } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 
 /**
@@ -9,6 +10,7 @@ import { Text } from './Text';
  * icon via row + gap.
  */
 export function CheckList({ items }: { items: string[] }) {
+  const { color } = useTheme();
   return (
     <View style={styles.list}>
       {items.map((item) => (

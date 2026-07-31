@@ -1,8 +1,9 @@
-import { color, fontSize, letterSpacing, lineHeight, type FontWeightToken } from '@tpa/theme';
+import { fontSize, letterSpacing, lineHeight, type FontWeightToken } from '@tpa/theme';
 // eslint-disable-next-line no-restricted-imports -- THE one sanctioned react-native Text import: this is the shared wrapper every other file must use instead.
 import { Text as RNText, type TextProps as RNTextProps } from 'react-native';
 
 import { fontFamilyForWeight } from '../theme/fonts';
+import { useTheme } from '../theme/ThemeProvider';
 
 /**
  * The shared <Text>. Every piece of text in the app renders through this — raw
@@ -22,15 +23,6 @@ export type TextVariant =
   | 'micro';
 
 export type TextTone = 'primary' | 'secondary' | 'muted' | 'inverse' | 'label' | 'accent';
-
-const toneColor: Record<TextTone, string> = {
-  primary: color.text.primary,
-  secondary: color.text.secondary,
-  muted: color.text.muted,
-  inverse: color.text.inverse,
-  label: color.text.label,
-  accent: color.accent.default,
-};
 
 interface VariantSpec {
   size: number;
@@ -62,6 +54,15 @@ export interface TextProps extends RNTextProps {
 }
 
 export function Text({ variant = 'body', tone, weight, style, ...rest }: TextProps) {
+  const { color } = useTheme();
+  const toneColor: Record<TextTone, string> = {
+    primary: color.text.primary,
+    secondary: color.text.secondary,
+    muted: color.text.muted,
+    inverse: color.text.inverse,
+    label: color.text.label,
+    accent: color.accent.default,
+  };
   const spec = VARIANTS[variant];
   return (
     <RNText

@@ -1,6 +1,8 @@
-import { color, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 
 const WEEKDAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
@@ -29,6 +31,23 @@ export function DateChip({
   closed?: boolean;
   onPress?: () => void;
 }) {
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      base: {
+        width: 64,
+        borderRadius: radius.md,
+        borderWidth: 1,
+        paddingVertical: space.md,
+        alignItems: 'center',
+        gap: 2,
+      },
+      open: { backgroundColor: color.bg.surface, borderColor: color.border.subtle },
+      selected: { backgroundColor: color.bg.inverse, borderColor: color.bg.inverse },
+      closed: { backgroundColor: color.bg.canvas, borderColor: color.border.subtle, borderStyle: 'dashed' },
+    }),
+    [color],
+  );
   const abbr = WEEKDAY_ABBR[weekday] ?? '';
 
   const content = (
@@ -63,17 +82,3 @@ export function DateChip({
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  base: {
-    width: 64,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    paddingVertical: space.md,
-    alignItems: 'center',
-    gap: 2,
-  },
-  open: { backgroundColor: color.bg.surface, borderColor: color.border.subtle },
-  selected: { backgroundColor: color.bg.inverse, borderColor: color.bg.inverse },
-  closed: { backgroundColor: color.bg.canvas, borderColor: color.border.subtle, borderStyle: 'dashed' },
-});

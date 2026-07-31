@@ -1,8 +1,9 @@
-import { color, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { shadow } from '../theme/shadow';
+import { useTheme } from '../theme/ThemeProvider';
 
 export type CardVariant = 'surface' | 'inverse';
 
@@ -24,6 +25,7 @@ export function Card({
   onPress?: () => void;
   style?: ViewStyle;
 }) {
+  const { color } = useTheme();
   const isInverse = variant === 'inverse';
   const composed = [
     styles.base,

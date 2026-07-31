@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 import type { IoniconName } from './trainingMeta';
 
@@ -25,6 +27,27 @@ export function PillOnNavy({
   onPress?: () => void;
   style?: ViewStyle;
 }) {
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      base: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.xs,
+        alignSelf: 'flex-start',
+        backgroundColor: color.pillOnInverse.bg,
+        borderColor: color.pillOnInverse.border,
+        borderWidth: 1,
+        borderRadius: radius.pill,
+        paddingVertical: space.xs,
+        paddingHorizontal: space.md,
+      },
+      dimmed: { opacity: 0.45 },
+      pressed: { opacity: 0.7 },
+      label: { letterSpacing: 0.4 },
+    }),
+    [color],
+  );
   const fg = color.pillOnInverse.text;
   const content = (
     <>
@@ -49,21 +72,3 @@ export function PillOnNavy({
   }
   return <View style={[styles.base, dimmed && styles.dimmed, style]}>{content}</View>;
 }
-
-const styles = StyleSheet.create({
-  base: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.xs,
-    alignSelf: 'flex-start',
-    backgroundColor: color.pillOnInverse.bg,
-    borderColor: color.pillOnInverse.border,
-    borderWidth: 1,
-    borderRadius: radius.pill,
-    paddingVertical: space.xs,
-    paddingHorizontal: space.md,
-  },
-  dimmed: { opacity: 0.45 },
-  pressed: { opacity: 0.7 },
-  label: { letterSpacing: 0.4 },
-});

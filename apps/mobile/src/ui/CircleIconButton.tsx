@@ -1,7 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color, radius } from '@tpa/theme';
+import { radius } from '@tpa/theme';
 import { Pressable, StyleSheet } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import type { IoniconName } from './trainingMeta';
 
 /**
@@ -19,6 +20,7 @@ export function CircleIconButton({
   tone?: 'light' | 'navy';
   accessibilityLabel?: string;
 }) {
+  const { color } = useTheme();
   const isNavy = tone === 'navy';
   return (
     <Pressable

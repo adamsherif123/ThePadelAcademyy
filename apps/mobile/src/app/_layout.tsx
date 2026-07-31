@@ -8,6 +8,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,7 +19,14 @@ import { NotificationsBridge } from '../notifications/NotificationsBridge';
 import { nextRoute } from '../session/authMachine';
 import { SessionProvider, useSession } from '../session/SessionProvider';
 import { interFonts } from '../theme/fonts';
+import { ThemeProvider, useTheme } from '../theme/ThemeProvider';
 import { Button, InfoCard, Screen, Text } from '../ui';
+
+/** Status bar icons flip with the resolved scheme — dark icons on light, light icons on dark. */
+function ThemedStatusBar() {
+  const { scheme } = useTheme();
+  return <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />;
+}
 
 SplashScreen.preventAutoHideAsync();
 
@@ -141,11 +149,14 @@ export default function RootLayout() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <SessionProvider>
-        <RootNavigator />
-      </SessionProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <ThemedStatusBar />
+      <QueryClientProvider client={queryClient}>
+        <SessionProvider>
+          <RootNavigator />
+        </SessionProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

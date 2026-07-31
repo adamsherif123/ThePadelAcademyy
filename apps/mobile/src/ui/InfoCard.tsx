@@ -1,7 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color, creditExpiry, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
 import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Text, type TextVariant } from './Text';
 import type { IoniconName } from './trainingMeta';
 
@@ -14,21 +15,6 @@ interface VariantStyle {
   fg: string;
   icon: IoniconName;
 }
-
-const VARIANT: Record<InfoCardVariant, VariantStyle> = {
-  // Informational, deep navy.
-  navy: { bg: color.bg.inverse, border: color.border.onInverse, fg: color.text.inverse, icon: 'information-circle-outline' },
-  // Expiry warnings (amber creditExpiry tokens).
-  amber: { bg: creditExpiry.expiring_soon.bg, border: creditExpiry.expiring_soon.bg, fg: creditExpiry.expiring_soon.fg, icon: 'time-outline' },
-  // "This will use 1 credit" callout — white with a royal border.
-  royal: { bg: color.bg.surface, border: color.accent.default, fg: color.accent.default, icon: 'ticket-outline' },
-  // Subtle neutral note (profile-setup explainer).
-  neutral: { bg: color.bg.surface, border: color.border.subtle, fg: color.text.secondary, icon: 'information-circle-outline' },
-  // Green "free cancellation" strip (ok creditExpiry tokens).
-  success: { bg: creditExpiry.ok.bg, border: creditExpiry.ok.bg, fg: creditExpiry.ok.fg, icon: 'checkmark-circle-outline' },
-  // Red forfeit warning (expired creditExpiry tokens).
-  danger: { bg: creditExpiry.expired.bg, border: creditExpiry.expired.bg, fg: creditExpiry.expired.fg, icon: 'alert-circle-outline' },
-};
 
 interface SizeSpec {
   padV: number;
@@ -76,6 +62,21 @@ export function InfoCard({
   onDismiss?: () => void;
   style?: ViewStyle;
 }) {
+  const { color, creditExpiry } = useTheme();
+  const VARIANT: Record<InfoCardVariant, VariantStyle> = {
+    // Informational, deep navy.
+    navy: { bg: color.bg.inverse, border: color.border.onInverse, fg: color.text.inverse, icon: 'information-circle-outline' },
+    // Expiry warnings (amber creditExpiry tokens).
+    amber: { bg: creditExpiry.expiring_soon.bg, border: creditExpiry.expiring_soon.bg, fg: creditExpiry.expiring_soon.fg, icon: 'time-outline' },
+    // "This will use 1 credit" callout — white with a royal border.
+    royal: { bg: color.bg.surface, border: color.accent.default, fg: color.accent.default, icon: 'ticket-outline' },
+    // Subtle neutral note (profile-setup explainer).
+    neutral: { bg: color.bg.surface, border: color.border.subtle, fg: color.text.secondary, icon: 'information-circle-outline' },
+    // Green "free cancellation" strip (ok creditExpiry tokens).
+    success: { bg: creditExpiry.ok.bg, border: creditExpiry.ok.bg, fg: creditExpiry.ok.fg, icon: 'checkmark-circle-outline' },
+    // Red forfeit warning (expired creditExpiry tokens).
+    danger: { bg: creditExpiry.expired.bg, border: creditExpiry.expired.bg, fg: creditExpiry.expired.fg, icon: 'alert-circle-outline' },
+  };
   const v = VARIANT[variant];
   const s = SIZE[size];
   return (

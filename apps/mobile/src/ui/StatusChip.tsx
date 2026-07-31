@@ -1,8 +1,9 @@
 import { creditExpiryState, formatExpiry } from '@tpa/core';
-import { creditExpiry, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
 import type { IsoInstant } from '@tpa/types';
 import { StyleSheet, View } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 
 /** Capitalize the first letter of core's (lowercase) expiry copy for display. */
@@ -16,6 +17,7 @@ function capitalize(s: string): string {
  * from @tpa/core's formatExpiry — never hand-written. RTL-safe.
  */
 export function StatusChip({ expiresAt, now }: { expiresAt: IsoInstant; now: IsoInstant }) {
+  const { creditExpiry } = useTheme();
   const state = creditExpiryState(expiresAt, now);
   const c = creditExpiry[state];
   return (

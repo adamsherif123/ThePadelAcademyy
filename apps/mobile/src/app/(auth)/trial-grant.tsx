@@ -1,10 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { formatPiastres } from '@tpa/core';
-import { color, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
 import { useRouter } from 'expo-router';
+import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { usePackages, useTrialEligible } from '../../data/queries';
+import { useTheme } from '../../theme/ThemeProvider';
 import { Button, LoadingView, NavyScreen, PillOnNavy, Text } from '../../ui';
 
 /**
@@ -23,6 +25,26 @@ import { Button, LoadingView, NavyScreen, PillOnNavy, Text } from '../../ui';
  */
 export default function TrialOfferScreen() {
   const router = useRouter();
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      content: { flex: 1, justifyContent: 'space-between' },
+      center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: space.md },
+      centered: { textAlign: 'center' },
+      actions: { gap: space.sm },
+      giftCircle: {
+        width: 84,
+        height: 84,
+        borderRadius: radius.pill,
+        backgroundColor: color.accent.default,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: space.md,
+      },
+      pills: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, justifyContent: 'center', marginTop: space.md },
+    }),
+    [color],
+  );
   const packagesQ = usePackages();
   const trialEligibleQ = useTrialEligible();
   const eligible = Boolean(trialEligibleQ.data);
@@ -83,20 +105,3 @@ export default function TrialOfferScreen() {
     </NavyScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  content: { flex: 1, justifyContent: 'space-between' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: space.md },
-  centered: { textAlign: 'center' },
-  actions: { gap: space.sm },
-  giftCircle: {
-    width: 84,
-    height: 84,
-    borderRadius: radius.pill,
-    backgroundColor: color.accent.default,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: space.md,
-  },
-  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, justifyContent: 'center', marginTop: space.md },
-});

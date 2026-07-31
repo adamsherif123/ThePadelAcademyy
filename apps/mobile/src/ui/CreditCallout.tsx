@@ -1,7 +1,9 @@
-import { color, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
 import type { IsoInstant } from '@tpa/types';
+import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { StatusChip } from './StatusChip';
 import { Text } from './Text';
 
@@ -24,6 +26,27 @@ export function CreditCallout({
   expiresAt: IsoInstant;
   now: IsoInstant;
 }) {
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      card: {
+        backgroundColor: color.bg.surface,
+        borderColor: color.accent.default,
+        borderWidth: 1,
+        borderRadius: radius.lg,
+        padding: space.lg,
+        gap: space.sm,
+      },
+      sourceRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: space.sm,
+        flexWrap: 'wrap',
+      },
+    }),
+    [color],
+  );
   return (
     <View style={styles.card}>
       <Text variant="label" tone="accent">
@@ -39,21 +62,3 @@ export function CreditCallout({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: color.bg.surface,
-    borderColor: color.accent.default,
-    borderWidth: 1,
-    borderRadius: radius.lg,
-    padding: space.lg,
-    gap: space.sm,
-  },
-  sourceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: space.sm,
-    flexWrap: 'wrap',
-  },
-});

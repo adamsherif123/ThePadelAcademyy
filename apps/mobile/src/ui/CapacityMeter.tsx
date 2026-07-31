@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color } from '@tpa/theme';
 import { StyleSheet, View } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 
 /**
@@ -25,6 +25,7 @@ export function CapacityMeter({
   capacity: number;
   muted?: boolean;
 }) {
+  const { color } = useTheme();
   const total = Math.min(capacity, 8);
   const remaining = Math.max(0, capacity - booked);
   const full = remaining <= 0;

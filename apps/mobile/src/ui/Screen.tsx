@@ -1,7 +1,9 @@
-import { color, space } from '@tpa/theme';
+import { space } from '@tpa/theme';
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
+
+import { useTheme } from '../theme/ThemeProvider';
 
 export type ScreenTone = 'light' | 'navy';
 
@@ -35,6 +37,7 @@ export function Screen({
   footer?: ReactNode;
   style?: ViewStyle;
 }) {
+  const { color } = useTheme();
   const insets = useSafeAreaInsets();
   const isNavy = tone === 'navy';
   const bg = isNavy ? color.bg.inverse : color.bg.canvas;

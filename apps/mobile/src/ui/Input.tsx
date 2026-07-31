@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color, fontSize, radius, space } from '@tpa/theme';
-import { useState } from 'react';
+import { fontSize, radius, space } from '@tpa/theme';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
 import { fontFamilyForWeight } from '../theme/fonts';
+import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 
 export interface InputProps extends Omit<TextInputProps, 'style' | 'editable'> {
@@ -25,6 +26,7 @@ export interface InputProps extends Omit<TextInputProps, 'style' | 'editable'> {
  * through this one component, so the toggle needs wiring here only.
  */
 export function Input({ label, error, disabled = false, tone = 'light', secureTextEntry, ...rest }: InputProps) {
+  const { color, scheme } = useTheme();
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const isNavy = tone === 'navy';
@@ -39,6 +41,36 @@ export function Input({ label, error, disabled = false, tone = 'light', secureTe
         ? color.border.onInverse
         : color.border.strong;
 
+  const styles = useMemo(
+    () => StyleSheet.create({
+      wrap: { gap: space.xs },
+      inputRow: { justifyContent: 'center' },
+      input: {
+        minHeight: 54,
+        borderWidth: 1,
+        borderRadius: radius.md,
+        paddingHorizontal: space.lg,
+        fontFamily: fontFamilyForWeight.regular,
+        fontSize: fontSize.body,
+        // No textAlign: RN aligns to the writing direction's start by default (RTL-safe).
+      },
+      inputWithIcon: { paddingEnd: 48 },
+      inputLight: { backgroundColor: color.bg.surface, color: color.text.primary },
+      inputNavy: { backgroundColor: color.pillOnInverse.bg, color: color.text.inverse },
+      disabled: { backgroundColor: color.bg.canvas, opacity: 0.7 },
+      error: { color: color.status.danger },
+      eyeButton: {
+        position: 'absolute',
+        end: 0,
+        height: '100%',
+        paddingHorizontal: space.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+    }),
+    [color],
+  );
+
   return (
     <View style={styles.wrap}>
       {label ? (
@@ -49,6 +81,7 @@ export function Input({ label, error, disabled = false, tone = 'light', secureTe
       <View style={styles.inputRow}>
         <TextInput
           {...rest}
+          keyboardAppearance={scheme}
           secureTextEntry={isPassword && !revealed}
           editable={!disabled}
           onFocus={(e) => {
@@ -88,30 +121,3 @@ export function Input({ label, error, disabled = false, tone = 'light', secureTe
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wrap: { gap: space.xs },
-  inputRow: { justifyContent: 'center' },
-  input: {
-    minHeight: 54,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    paddingHorizontal: space.lg,
-    fontFamily: fontFamilyForWeight.regular,
-    fontSize: fontSize.body,
-    // No textAlign: RN aligns to the writing direction's start by default (RTL-safe).
-  },
-  inputWithIcon: { paddingEnd: 48 },
-  inputLight: { backgroundColor: color.bg.surface, color: color.text.primary },
-  inputNavy: { backgroundColor: color.pillOnInverse.bg, color: color.text.inverse },
-  disabled: { backgroundColor: color.bg.canvas, opacity: 0.7 },
-  error: { color: color.status.danger },
-  eyeButton: {
-    position: 'absolute',
-    end: 0,
-    height: '100%',
-    paddingHorizontal: space.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

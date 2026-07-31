@@ -1,9 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { formatInstantDate, formatInstantTime, isSessionConfirmed } from '@tpa/core';
-import { color, radius, space } from '@tpa/theme';
+import { radius, space } from '@tpa/theme';
 import type { BookingStatus, Coach, IsoInstant, Level, SessionSlot } from '@tpa/types';
+import { useMemo } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { ACADEMY } from './AcademyCard';
 import { Avatar } from './Avatar';
 import { Badge, type BadgeTone } from './Badge';
@@ -50,6 +52,25 @@ type BookingCardProps = {
  * verdict and deadline (from @tpa/core). RTL-safe / tokens only.
  */
 export function BookingCard(props: BookingCardProps) {
+  const { color } = useTheme();
+  const styles = useMemo(
+    () => StyleSheet.create({
+      card: {
+        backgroundColor: color.bg.surface,
+        borderColor: color.border.subtle,
+        borderWidth: 1,
+        borderRadius: radius.lg,
+        padding: space.lg,
+        gap: space.md,
+      },
+      top: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+      info: { flex: 1, gap: 2 },
+      locationRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
+      locationText: { textDecorationLine: 'underline' },
+      cancelRow: { flexDirection: 'row', justifyContent: 'flex-end' },
+    }),
+    [color],
+  );
   const { slot, coach } = props;
   // A booking always implies a resolved type (the first booking is what fixes
   // it) — trainingMetaFor's null-fallback here is defense-in-depth, not an
@@ -142,19 +163,3 @@ export function BookingCard(props: BookingCardProps) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: color.bg.surface,
-    borderColor: color.border.subtle,
-    borderWidth: 1,
-    borderRadius: radius.lg,
-    padding: space.lg,
-    gap: space.md,
-  },
-  top: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  info: { flex: 1, gap: 2 },
-  locationRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
-  locationText: { textDecorationLine: 'underline' },
-  cancelRow: { flexDirection: 'row', justifyContent: 'flex-end' },
-});

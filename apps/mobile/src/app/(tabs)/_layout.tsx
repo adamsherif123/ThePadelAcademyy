@@ -1,8 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { color, fontSize } from '@tpa/theme';
+import { fontSize } from '@tpa/theme';
 import { Tabs } from 'expo-router';
 
 import { fontFamilyForWeight } from '../../theme/fonts';
+import { useTheme } from '../../theme/ThemeProvider';
 
 /**
  * The four-tab app shell. No native headers — each screen's ScreenHeader (the
@@ -11,6 +12,7 @@ import { fontFamilyForWeight } from '../../theme/fonts';
  * Inter labels. Icons switch to their filled variant when focused.
  */
 export default function TabsLayout() {
+  const { color } = useTheme();
   return (
     <Tabs
       screenOptions={{

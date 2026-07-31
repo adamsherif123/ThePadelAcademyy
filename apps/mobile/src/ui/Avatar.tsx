@@ -1,7 +1,7 @@
-import { color } from '@tpa/theme';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 
+import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 
 function initials(name: string): string {
@@ -28,8 +28,20 @@ export function Avatar({
   imageUrl?: string | null;
   size?: number;
 }) {
+  const { color } = useTheme();
   const [failed, setFailed] = useState(false);
   const dimension = { width: size, height: size, borderRadius: size / 2 };
+  const styles = useMemo(
+    () => StyleSheet.create({
+      circle: {
+        backgroundColor: color.bg.inverse,
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      image: { backgroundColor: color.bg.canvas },
+    }),
+    [color],
+  );
 
   if (imageUrl && !failed) {
     return (
@@ -48,12 +60,3 @@ export function Avatar({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  circle: {
-    backgroundColor: color.bg.inverse,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  image: { backgroundColor: color.bg.canvas },
-});

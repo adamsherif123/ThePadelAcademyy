@@ -7,6 +7,7 @@ import { useBatches, useCoaches, usePurchases, combine } from '../../data/querie
 import { totalReadyToBook } from '../../data/wallet';
 import { PRIVACY_POLICY_URL } from '../../lib/legal';
 import { useSession } from '../../session/SessionProvider';
+import { useTheme, type ThemePreference } from '../../theme/ThemeProvider';
 import {
   AcademyCard,
   Avatar,
@@ -21,13 +22,21 @@ import {
   LoadingView,
   Screen,
   ScreenHeader,
+  SegmentedControl,
   Text,
 } from '../../ui';
+
+const APPEARANCE_OPTIONS: readonly { value: ThemePreference; label: string }[] = [
+  { value: 'system', label: 'System' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+];
 
 /** 15 — Profile. Identity card, links, academy, sign out. */
 export default function ProfileScreen() {
   const router = useRouter();
   const { player, email, now, signOut } = useSession();
+  const { preference, setPreference } = useTheme();
   const batches = useBatches();
   const purchases = usePurchases();
   const coaches = useCoaches();
@@ -91,6 +100,11 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text variant="label">The academy</Text>
         <AcademyCard />
+      </View>
+
+      <View style={styles.section}>
+        <Text variant="label">Appearance</Text>
+        <SegmentedControl options={APPEARANCE_OPTIONS} value={preference} onChange={setPreference} />
       </View>
 
       <Button
