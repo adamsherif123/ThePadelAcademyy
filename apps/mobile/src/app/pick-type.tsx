@@ -7,6 +7,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { coachById, slotById } from '../data/booking';
 import { useBatches, useCoaches, useSlots, combine } from '../data/queries';
+import { haptics } from '../lib/haptics';
 import { useSession } from '../session/SessionProvider';
 import {
   Avatar,
@@ -141,7 +142,10 @@ export default function PickTypeScreen() {
                 subtitle={pickerSubtitle(o.trainingType)}
                 credits={o.creditsAvailable}
                 selected={chosen === o.trainingType}
-                onPress={() => setSelected(o.trainingType)}
+                onPress={() => {
+                  haptics.light();
+                  setSelected(o.trainingType);
+                }}
               />
             ))}
           </View>

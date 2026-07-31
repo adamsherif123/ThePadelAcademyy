@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useBatches, usePackages, usePurchases, combine } from '../data/queries';
+import { haptics } from '../lib/haptics';
 import { useSession } from '../session/SessionProvider';
 import {
   Button,
@@ -66,7 +67,11 @@ export default function DeleteAccountScreen() {
     const res = await deleteAccount();
     // On success the session is torn down and the auth guard routes to sign-in — no
     // navigation needed here. On failure we stay put so the user can retry.
-    if (!res.ok) {
+    if (res.ok) {
+      // Weight matching the gravity — a deletion is consequential, not celebratory.
+      haptics.warning();
+    } else {
+      haptics.error();
       setDeleting(false);
       setError(res.error ?? 'We couldn’t delete your account. Please try again.');
     }

@@ -8,6 +8,7 @@ import { StyleSheet, View } from 'react-native';
 import { useBatches } from '../data/queries';
 import { balanceByType } from '../data/wallet';
 import { fetchPurchaseById } from '../lib/api';
+import { haptics } from '../lib/haptics';
 import { resetTo, resetToTab } from '../lib/nav';
 import { queryClient, queryKeys } from '../lib/queryClient';
 import { useSession } from '../session/SessionProvider';
@@ -67,6 +68,7 @@ export default function PurchaseSuccessScreen() {
   // The webhook settled → the batch exists. Refresh the wallet + purchase history.
   useEffect(() => {
     if (settled) {
+      haptics.success();
       void queryClient.invalidateQueries({ queryKey: queryKeys.creditBatches });
       void queryClient.invalidateQueries({ queryKey: queryKeys.purchases });
     }
@@ -75,7 +77,10 @@ export default function PurchaseSuccessScreen() {
   // A declined purchase still belongs in purchase history — refresh it so the failed
   // row shows there (it will never masquerade as pending).
   useEffect(() => {
-    if (declined) void queryClient.invalidateQueries({ queryKey: queryKeys.purchases });
+    if (declined) {
+      haptics.error();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.purchases });
+    }
   }, [declined]);
 
   // Stop polling at the deadline — a bounded wait, never an endless spinner.

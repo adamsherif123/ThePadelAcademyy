@@ -7,6 +7,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { cancelPreview } from '../data/booking';
 import { useBatches, useBookings, useCancelBooking, useCoaches, useSlots, combine } from '../data/queries';
+import { haptics } from '../lib/haptics';
 import { useSession } from '../session/SessionProvider';
 import {
   batchLabel,
@@ -88,9 +89,12 @@ export default function CancelBookingScreen() {
       expectedRefund: refundable,
     });
     if (outcome.status === 'cancelled') {
+      // Consequential but not celebratory — a firmer single tap, not the success pattern.
+      haptics.medium();
       // Sessions (underneath) was just re-read via invalidation and shows the truth.
       router.back();
     } else if (outcome.status === 'rejected') {
+      haptics.error();
       setError(
         outcome.reason === 'already_cancelled'
           ? 'This booking was already cancelled.'
