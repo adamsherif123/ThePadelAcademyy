@@ -125,11 +125,13 @@ export default function SessionsScreen() {
         onIndexChange={setIndex}
         renderScene={renderScene}
         renderTabBar={(props) => (
-          <SegmentedControl
-            options={TABS}
-            value={ROUTES[props.navigationState.index]!.key}
-            onChange={(value) => props.jumpTo(value)}
-          />
+          <View style={styles.tabBar}>
+            <SegmentedControl
+              options={TABS}
+              value={ROUTES[props.navigationState.index]!.key}
+              onChange={(value) => props.jumpTo(value)}
+            />
+          </View>
         )}
         initialLayout={{ width }}
         style={styles.tabView}
@@ -142,6 +144,7 @@ const styles = StyleSheet.create({
   content: { gap: space.lg },
   screenBody: { gap: space.lg },
   tabView: { flex: 1 },
+  tabBar: { paddingBottom: space.lg },
   page: { gap: space.lg, paddingBottom: space.xl },
   list: { gap: space.lg },
 });
