@@ -78,3 +78,22 @@
   color: var(--color-text-muted);
   font-size: var(--font-size-body);
 }
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-block-start: var(--space-md);
+}
+.pageInfo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+.pageControls {
+  display: flex;
+  gap: var(--space-sm);
+}

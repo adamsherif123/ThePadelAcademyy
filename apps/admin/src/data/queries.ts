@@ -8,11 +8,14 @@ import type {
   Purchase,
   SessionSlot,
 } from '@tpa/types';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
+import type { BookingsPageParams, BookingsPageResult } from '../lib/api';
 import {
   ApiError,
   fetchBookings,
+  fetchBookingsPage,
+  fetchBookingStatusCounts,
   fetchCoaches,
   fetchCreditBatches,
   fetchCreditRequests,
@@ -23,6 +26,7 @@ import {
   fetchTemplates,
 } from '../lib/api';
 import { queryClient, queryKeys } from '../lib/queryClient';
+import type { BookingStatusCounts } from './bookingList';
 
 /**
  * The admin's React Query layer. Resource hooks feed the pure aggregates (data/*)
@@ -60,6 +64,31 @@ export const useBookings = () => toResource(useQuery({ queryKey: queryKeys.booki
 export const usePurchases = () => toResource(useQuery({ queryKey: queryKeys.purchases, queryFn: fetchPurchases }));
 export const useCreditRequests = () =>
   toResource(useQuery({ queryKey: queryKeys.creditRequests, queryFn: fetchCreditRequests }));
+
+/**
+ * The Bookings page's own bounded, filtered, paginated read — independent of
+ * useAdminData's monolith. `placeholderData: keepPreviousData` keeps the
+ * previous page's rows on screen (instead of a blank flash) while the next
+ * page/filter is in flight; `isFetching` distinguishes that from the initial load.
+ */
+export function useBookingsPage(params: BookingsPageParams): {
+  data: BookingsPageResult | undefined;
+  isPending: boolean;
+  isFetching: boolean;
+  isError: boolean;
+  refetch: () => void;
+} {
+  const q = useQuery({
+    queryKey: [...queryKeys.bookingsPage, params],
+    queryFn: () => fetchBookingsPage(params),
+    placeholderData: keepPreviousData,
+  });
+  return { data: q.data, isPending: q.isPending, isFetching: q.isFetching, isError: q.isError, refetch: () => void q.refetch() };
+}
+
+/** The 4 status-count cards — all-time, across every booking, not just the current page. */
+export const useBookingStatusCounts = (): Resource<BookingStatusCounts> =>
+  toResource(useQuery({ queryKey: queryKeys.bookingStatusCounts, queryFn: fetchBookingStatusCounts }));
 
 /** Collapse several resources into one loading / error / retry gate for a page. */
 export function combine(...rs: Resource<unknown>[]): { isPending: boolean; isError: boolean; refetch: () => void } {

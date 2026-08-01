@@ -11,6 +11,7 @@ import { ID_PREFIXES, newId } from '@tpa/core';
 import type {
   AvailabilityTemplate,
   Booking,
+  BookingStatus,
   Coach,
   CoachId,
   CreditBatch,
@@ -28,6 +29,7 @@ import type {
   Weekday,
 } from '@tpa/types';
 
+import type { BookingRow, BookingStatusCounts } from '../data/bookingList';
 import { supabase } from './supabase';
 import {
   rowToAvailabilityTemplate,
@@ -70,6 +72,84 @@ export const fetchCreditBatches = (): Promise<CreditBatch[]> => selectAll('credi
 export const fetchBookings = (): Promise<Booking[]> => selectAll('bookings', rowToBooking);
 export const fetchPurchases = (): Promise<Purchase[]> => selectAll('purchases', rowToPurchase);
 export const fetchCreditRequests = (): Promise<CreditRequest[]> => selectAll('credit_requests', rowToCreditRequest);
+
+export type BookingStatusFilter = BookingStatus | 'all';
+export type BookingTypeFilter = TrainingType | 'all';
+
+export interface BookingsPageParams {
+  page: number; // 0-indexed
+  pageSize: number;
+  search: string; // trimmed; '' = no filter
+  status: BookingStatusFilter;
+  type: BookingTypeFilter;
+}
+
+export interface BookingsPageResult {
+  rows: BookingRow[];
+  total: number;
+}
+
+// `!inner` on both embeds: player_id/slot_id are NOT NULL FKs so this never drops a
+// legitimate row, but it's what makes .eq('session_slots.training_type', …) and
+// .ilike('players.name', …) below actually restrict the OUTER bookings rows —
+// PostgREST embeds are left joins by default, which would only filter the nested
+// object and leave every booking row in the result.
+const BOOKINGS_PAGE_SELECT = '*, players!inner(*), session_slots!inner(*, coaches(*))';
+
+function rowToBookingPageRow(r: Record<string, unknown>): BookingRow {
+  const playerRow = r.players as Record<string, unknown> | null;
+  const slotRow = r.session_slots as Record<string, unknown> | null;
+  const coachRow = slotRow ? (slotRow.coaches as Record<string, unknown> | null) : null;
+  return {
+    booking: rowToBooking(r),
+    player: playerRow ? rowToPlayer(playerRow) : undefined,
+    slot: slotRow ? rowToSlot(slotRow) : undefined,
+    coach: coachRow ? rowToCoach(coachRow) : undefined,
+  };
+}
+
+/**
+ * The Bookings page's own bounded query — newest `booked_at` first, `pageSize`
+ * rows at a time, each row's player/slot/coach embedded in the same round trip
+ * (never the whole-table monolith). Search/status/type filter server-side, so a
+ * filter change is a different WHERE clause + a fresh count, never a client-side
+ * scan of whatever page happened to be loaded.
+ */
+export async function fetchBookingsPage(params: BookingsPageParams): Promise<BookingsPageResult> {
+  const from = params.page * params.pageSize;
+  const to = from + params.pageSize - 1;
+  let query = supabase
+    .from('bookings')
+    .select(BOOKINGS_PAGE_SELECT, { count: 'exact' })
+    .order('booked_at', { ascending: false })
+    .range(from, to);
+  if (params.status !== 'all') query = query.eq('status', params.status);
+  if (params.type !== 'all') query = query.eq('session_slots.training_type', params.type);
+  const search = params.search.trim();
+  if (search !== '') query = query.ilike('players.name', `%${search}%`);
+  const { data, error, count } = await query;
+  if (error) throw new ApiError(`Failed to load bookings: ${error.message}`, error.code, error);
+  return { rows: (data ?? []).map(rowToBookingPageRow), total: count ?? 0 };
+}
+
+const BOOKING_STATUSES: BookingStatus[] = ['booked', 'attended', 'cancelled', 'no_show'];
+
+/**
+ * The 4 status-count cards — independent of the current page or filters, so they
+ * stay accurate across every booking, not just the page in view. 4 head:true
+ * counts (no rows fetched) rather than a full select('*') aggregated client-side.
+ */
+export async function fetchBookingStatusCounts(): Promise<BookingStatusCounts> {
+  const results = await Promise.all(
+    BOOKING_STATUSES.map((s) => supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('status', s)),
+  );
+  const counts = { booked: 0, attended: 0, cancelled: 0, no_show: 0 } as BookingStatusCounts;
+  results.forEach((r, i) => {
+    if (r.error) throw new ApiError(`Failed to load booking counts: ${r.error.message}`, r.error.code, r.error);
+    counts[BOOKING_STATUSES[i]!] = r.count ?? 0;
+  });
+  return counts;
+}
 
 /**
  * A short-lived signed URL to display a payment-proof screenshot from the PRIVATE

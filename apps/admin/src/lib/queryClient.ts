@@ -32,6 +32,12 @@ export const queryKeys = {
   slots: ['slots'] as const,
   batches: ['batches'] as const,
   bookings: ['bookings'] as const,
+  // Prefix keys, not full keys: the Bookings page's paginated query and the
+  // status-count cards each cache one entry per (page, filters) / are a single
+  // entry, but invalidateQueries matches by prefix, so invalidating the prefix
+  // below refetches whichever variation is currently mounted.
+  bookingsPage: ['bookingsPage'] as const,
+  bookingStatusCounts: ['bookingStatusCounts'] as const,
   purchases: ['purchases'] as const,
   creditRequests: ['creditRequests'] as const,
 };
@@ -39,13 +45,13 @@ export const queryKeys = {
 /** What each mutation family touches — the keys it must invalidate. */
 export const TOUCHED = {
   // cancel_session / remove_booking / admin_book_player affect bookings + seat counts + (refund) batches
-  booking: [queryKeys.bookings, queryKeys.slots, queryKeys.batches] as const,
+  booking: [queryKeys.bookings, queryKeys.bookingsPage, queryKeys.bookingStatusCounts, queryKeys.slots, queryKeys.batches] as const,
   // grant_credits / record_cash_purchase mint credits (+ a purchase row)
   money: [queryKeys.batches, queryKeys.purchases] as const,
   // approve mints a batch + a purchase AND resolves the request; reject resolves it (the
   // extra money keys are harmless no-ops on reject).
   creditRequests: [queryKeys.batches, queryKeys.purchases, queryKeys.creditRequests] as const,
-  attendance: [queryKeys.bookings] as const,
+  attendance: [queryKeys.bookings, queryKeys.bookingsPage, queryKeys.bookingStatusCounts] as const,
   coaches: [queryKeys.coaches] as const,
   packages: [queryKeys.packages] as const,
   templates: [queryKeys.templates] as const,

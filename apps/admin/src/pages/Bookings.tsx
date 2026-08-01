@@ -1,12 +1,14 @@
 import { TRAINING_TYPES, formatInstantTime, formatMonthDay } from '@tpa/core';
 import type { BookingStatus, Player, TrainingType } from '@tpa/types';
-import { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
-import { bookingRows, bookingStatusCounts, type BookingRow } from '../data/bookingList';
-import { useAdminData } from '../data/queries';
+import type { BookingRow } from '../data/bookingList';
+import { useAdminData, useBookingsPage, useBookingStatusCounts } from '../data/queries';
 import { PlayerDetailModal } from '../players/PlayerDetailModal';
 import {
   Avatar,
+  Button,
   ErrorView,
   LoadingView,
   PageHeader,
@@ -30,30 +32,61 @@ const STATUS_LABEL: Record<BookingStatus, string> = {
   no_show: 'No-show',
 };
 
-/** Bookings route: count cards + filters + the all-bookings table. */
+const PAGE_SIZE = 10;
+
+/** Bookings route: count cards + filters + a server-paginated bookings table. */
 export function Bookings() {
-  const data = useAdminData();
-  const [query, setQuery] = useState('');
+  const [queryText, setQueryText] = useState('');
+  const [search, setSearch] = useState(''); // queryText, debounced
   const [status, setStatus] = useState<StatusFilter>('all');
   const [type, setType] = useState<TypeFilter>('all');
+  const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Player | null>(null);
 
-  const counts = bookingStatusCounts(data.bookings);
-  const rows = bookingRows(data.bookings, data.slots, data.players, data.coaches);
-  const anyBookings = rows.length > 0;
+  // Debounce the search box ~300ms before it becomes a query param.
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(queryText.trim()), 300);
+    return () => clearTimeout(t);
+  }, [queryText]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return rows.filter((r) => {
-      if (status !== 'all' && r.booking.status !== status) return false;
-      if (type !== 'all' && r.slot?.trainingType !== type) return false;
-      if (q === '') return true;
-      return (r.player?.name.toLowerCase().includes(q) ?? false) || (r.coach?.name.toLowerCase().includes(q) ?? false);
-    });
-  }, [rows, query, status, type]);
+  // A new search/status/type is a different filtered set — page 2 of the old set
+  // is meaningless (and may not even exist) against the new one. Adjusted during
+  // render (React's "reset state when a prop changes" pattern) rather than an
+  // effect, so the stale page never flashes through a fetch before resetting.
+  const [prevFilters, setPrevFilters] = useState({ search, status, type });
+  if (prevFilters.search !== search || prevFilters.status !== status || prevFilters.type !== type) {
+    setPrevFilters({ search, status, type });
+    setPage(0);
+  }
 
-  if (data.isPending) return <LoadingView />;
-  if (data.isError) return <ErrorView onRetry={data.refetch} />;
+  const counts = useBookingStatusCounts();
+  const bookingsPage = useBookingsPage({ page, pageSize: PAGE_SIZE, search, status, type });
+  // PlayerDetailModal shows a player's FULL booking history, independent of this
+  // page's slice/filters — it still needs the whole-table monolith.
+  const modalData = useAdminData();
+
+  const rows = bookingsPage.data?.rows ?? [];
+  const total = bookingsPage.data?.total ?? 0;
+  const rangeFrom = total === 0 ? 0 : page * PAGE_SIZE + 1;
+  const rangeTo = page * PAGE_SIZE + rows.length;
+  const hasPrev = page > 0;
+  const hasNext = rangeTo < total;
+  const isFiltered = search !== '' || status !== 'all' || type !== 'all';
+
+  const isPending = bookingsPage.isPending || counts.isPending || modalData.isPending;
+  const isError = bookingsPage.isError || counts.isError || modalData.isError;
+  if (isPending) return <LoadingView />;
+  if (isError) {
+    return (
+      <ErrorView
+        onRetry={() => {
+          bookingsPage.refetch();
+          counts.refetch();
+          modalData.refetch();
+        }}
+      />
+    );
+  }
 
   const columns: Column<BookingRow>[] = [
     {
@@ -96,15 +129,15 @@ export function Bookings() {
       />
 
       <div className={styles.counts}>
-        <Count num={counts.booked} label="Booked" />
-        <Count num={counts.attended} label="Attended" />
-        <Count num={counts.cancelled} label="Cancelled" />
-        <Count num={counts.no_show} label="No-show" />
+        <Count num={counts.data?.booked ?? 0} label="Booked" />
+        <Count num={counts.data?.attended ?? 0} label="Attended" />
+        <Count num={counts.data?.cancelled ?? 0} label="Cancelled" />
+        <Count num={counts.data?.no_show ?? 0} label="No-show" />
       </div>
 
       <div className={styles.filters}>
         <div className={styles.search}>
-          <SearchInput value={query} onChange={setQuery} placeholder="Search player or coach…" />
+          <SearchInput value={queryText} onChange={setQueryText} placeholder="Search player…" />
         </div>
         <Select
           value={status}
@@ -127,27 +160,40 @@ export function Bookings() {
         />
       </div>
 
-      {filtered.length === 0 ? (
+      {rows.length === 0 ? (
         <div className={styles.tableWrap}>
-          <p className={styles.empty}>
-            {anyBookings ? 'No bookings match these filters.' : 'No bookings yet.'}
-          </p>
+          <p className={styles.empty}>{isFiltered ? 'No bookings match these filters.' : 'No bookings yet.'}</p>
         </div>
       ) : (
         <div className={styles.tableWrap}>
-          <Table columns={columns} rows={filtered} keyOf={(r) => r.booking.id} />
+          <Table columns={columns} rows={rows} keyOf={(r) => r.booking.id} />
         </div>
       )}
+
+      <div className={styles.pagination}>
+        <span className={styles.pageInfo}>
+          {total === 0 ? 'No bookings' : `Showing ${rangeFrom}–${rangeTo} of ${total}`}
+          {bookingsPage.isFetching ? <Loader2 size={14} className="tpa-spin" aria-hidden /> : null}
+        </span>
+        <div className={styles.pageControls}>
+          <Button variant="secondary" size="sm" icon={ChevronLeft} disabled={!hasPrev} onClick={() => setPage((p) => p - 1)}>
+            Previous
+          </Button>
+          <Button variant="secondary" size="sm" icon={ChevronRight} disabled={!hasNext} onClick={() => setPage((p) => p + 1)}>
+            Next
+          </Button>
+        </div>
+      </div>
 
       {selected ? (
         <PlayerDetailModal
           player={selected}
-          batches={data.batches}
-          purchases={data.purchases}
-          bookings={data.bookings}
-          slots={data.slots}
-          coaches={data.coaches}
-          packages={data.packages}
+          batches={modalData.batches}
+          purchases={modalData.purchases}
+          bookings={modalData.bookings}
+          slots={modalData.slots}
+          coaches={modalData.coaches}
+          packages={modalData.packages}
           onClose={() => setSelected(null)}
         />
       ) : null}
