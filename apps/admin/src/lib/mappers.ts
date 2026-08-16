@@ -10,6 +10,7 @@ import type {
   CreditRequest,
   IsoInstant,
   LocalTime,
+  News,
   Package,
   Player,
   Purchase,
@@ -137,6 +138,17 @@ export function rowToBooking(r: Row): Booking {
     status: str(r.status) as Booking['status'],
     bookedAt: iso(r.booked_at),
     cancelledAt: nstr(r.cancelled_at) as IsoInstant | null,
+  };
+}
+
+export function rowToNews(r: Row): News {
+  return {
+    id: str(r.id) as News['id'],
+    title: str(r.title),
+    body: str(r.body),
+    imagePath: nstr(r.image_path),
+    createdBy: str(r.created_by),
+    createdAt: iso(r.created_at),
   };
 }
 

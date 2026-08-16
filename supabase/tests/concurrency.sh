@@ -640,6 +640,46 @@ M_RETIRED=$(sql "select count(*) from public.packages where id like 'pkr_m%' and
 M_DELETED=$(sql "select $M_K - count(*) from public.packages where id like 'pkr_m%'")
 echo "  info — $M_RETIRED/$M_K: request won the lock (retired); $M_DELETED/$M_K: delete won the lock (hard-deleted) — both orderings are legitimate, real OS scheduling decides which"
 
+# ── Scenario N: the 5h-empty-slot booking-window guard ──────────────────────
+# N1: an EMPTY slot inside the 5h window — every racer must LOSE; none can be
+# the first booking, no matter who gets there first. The guard reads the live
+# pre-booking count inside the SAME guarded UPDATE that already serialises on
+# the row, so there is no window for one racer to "win" the empty state before
+# the guard closes it — booked_count never leaves 0, so every racer (however
+# many, in whatever order) sees the identical blocked state.
+# N2: a slot inside the SAME window that already has ONE booking — the guard
+# no longer applies once non-empty; ordinary capacity rules resume (capacity
+# 2, 1 seat already taken -> exactly 1 of 8 racers wins the remaining seat).
+echo "Scenario N — the 5h-empty-slot booking-window guard, 8 racers each on N1 (empty) and N2 (already booked):"
+NSETUP="insert into public.coaches (id,name,bio,is_active) values ('cor_n1','C','b',true),('cor_n2','C','b',true);
+insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status) values
+  ('slr_n1','cor_n1', now()+interval '3 hour', now()+interval '4 hour','trial',4,0,'published'),
+  ('slr_n2','cor_n2', now()+interval '3 hour', now()+interval '4 hour','trial',2,1,'published');"
+for i in $(seq 1 8); do NSETUP+="insert into auth.users (id) values ('$(uuid $((1100+i)))');"; NSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_n1_$i','+201000n1${i}','N','men','beginner',now(),'$(uuid $((1100+i)))');"; NSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_n1_$i','plr_n1_$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now());"; done
+for i in $(seq 1 8); do NSETUP+="insert into auth.users (id) values ('$(uuid $((1200+i)))');"; NSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_n2_$i','+201000n2${i}','N','men','beginner',now(),'$(uuid $((1200+i)))');"; NSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_n2_$i','plr_n2_$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now());"; done
+# N2's pre-existing booking (the state a prior successful, pre-window book_slot call would leave).
+NSETUP+="insert into auth.users (id) values ('$(uuid 1299)');"
+NSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_n2_pre','+201000n2pre','N','men','beginner',now(),'$(uuid 1299)');"
+NSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_n2_pre','plr_n2_pre','signup_grant',null,'trial',1,0,now()+interval '30 day',now());"
+NSETUP+="insert into public.bookings (id,slot_id,player_id,credit_batch_id,status,booked_at) values ('bkr_n2_pre','slr_n2','plr_n2_pre','cbr_n2_pre','booked',now());"
+sql "$NSETUP" >/dev/null
+
+T=$(target 4)
+for i in $(seq 1 8); do racer "$(uuid $((1100+i)))" slr_n1 "$T" "$TMP/n1_$i.txt"; done
+for i in $(seq 1 8); do racer "$(uuid $((1200+i)))" slr_n2 "$T" "$TMP/n2_$i.txt"; done
+wait
+
+WINS_N1=$(grep -lFx WIN "$TMP"/n1_*.txt 2>/dev/null | wc -l | tr -d ' ')
+check "N1 (empty, inside window): zero racers win — the guard blocks EVERY first-booking attempt" "$WINS_N1" "0"
+check "N1: booked_count stays 0 (no one ever became the first booking)"     "$(sql "select booked_count from public.session_slots where id='slr_n1'")" "0"
+check "N1: zero booking rows landed"                                        "$(sql "select count(*) from public.bookings where slot_id='slr_n1'")" "0"
+check "N1: zero credits spent"                                              "$(sql "select coalesce(sum(quantity_total-quantity_remaining),0) from public.credit_batches where id like 'cbr_n1_%'")" "0"
+
+WINS_N2=$(grep -lFx WIN "$TMP"/n2_*.txt 2>/dev/null | wc -l | tr -d ' ')
+check "N2 (already has 1 booking, inside window): exactly one MORE racer wins the remaining seat" "$WINS_N2" "1"
+check "N2: booked_count ends at 2/2 (the pre-existing seat + the new winner)" "$(sql "select booked_count from public.session_slots where id='slr_n2'")" "2"
+check "N2: exactly one NEW booking row among the racers"                     "$(sql "select count(*) from public.bookings where slot_id='slr_n2' and player_id <> 'plr_n2_pre'")" "1"
+
 # ── teardown ─────────────────────────────────────────────────────────────────
 cleanup_rows
 echo

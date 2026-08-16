@@ -1,4 +1,4 @@
-import type { BookingId, IsoInstant, NotificationId, SlotId, TrainingType } from '@tpa/types';
+import type { BookingId, IsoInstant, News, NewsId, NotificationId, PlayerId, SlotId, TrainingType } from '@tpa/types';
 import { useMutation, useQuery } from '@tanstack/react-query';
 
 import {
@@ -8,13 +8,16 @@ import {
   fetchCoaches,
   fetchCreditBatches,
   fetchMyCreditRequests,
+  fetchNewsSeen,
   fetchNotifications,
+  fetchVisibleNews,
   trialEligibleRpc,
   fetchPackages,
   fetchPurchases,
   fetchSlots,
   fetchTemplates,
   markAllNotificationsRead,
+  markNewsSeen,
   markNotificationRead,
   type BookReason,
   type CancelReason,
@@ -87,6 +90,49 @@ export const useMyCreditRequests = () =>
 /** Whether the player can still buy the once-per-player trial (A5) — hides trial in the store. */
 export const useTrialEligible = () =>
   toResource(useQuery({ queryKey: queryKeys.trialEligible, queryFn: trialEligibleRpc }));
+
+/** Visible news (within the window), newest first. */
+export const useNews = (now: IsoInstant) =>
+  toResource(useQuery({ queryKey: queryKeys.news, queryFn: () => fetchVisibleNews(now) }));
+
+/** This player's own news_seen rows. */
+export const useNewsSeen = () =>
+  toResource(useQuery({ queryKey: queryKeys.newsSeen, queryFn: fetchNewsSeen }));
+
+/**
+ * Visible news the player has NOT seen, newest first — the ONE derivation the nav
+ * button's red dot, the unseen pop-up, and (if it ever needs it) the feed all read,
+ * so they can never disagree about what counts as unseen. `undefined` while either
+ * underlying query hasn't loaded (offline cold start included) — callers treat that
+ * as "nothing to show yet," never as "zero unseen."
+ */
+export function useUnseenNews(now: IsoInstant): Resource<News[]> {
+  const newsQ = useNews(now);
+  const seenQ = useNewsSeen();
+  const isPending = newsQ.isPending || seenQ.isPending;
+  const isError = newsQ.isError || seenQ.isError;
+  const seenIds = new Set((seenQ.data ?? []).map((s) => s.newsId));
+  const unseen = (newsQ.data ?? []).filter((n) => !seenIds.has(n.id));
+  return {
+    data: isPending || isError ? undefined : unseen,
+    isPending,
+    isError,
+    error: newsQ.error ?? seenQ.error,
+    refetch: () => {
+      newsQ.refetch();
+      seenQ.refetch();
+    },
+  };
+}
+
+/** Mark news items seen (pop-up dismiss, or the feed marking everything visible on open). */
+export function useMarkNewsSeen() {
+  return useMutation({
+    mutationFn: ({ playerId, newsIds }: { playerId: PlayerId; newsIds: NewsId[] }) =>
+      markNewsSeen(playerId, newsIds),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.newsSeen }),
+  });
+}
 
 /** Mark one notification read (on tap / deep-link). read_at is the only writable column. */
 export function useMarkNotificationRead() {

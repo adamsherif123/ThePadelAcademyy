@@ -181,5 +181,5 @@ export function packageHasHistory(
  * not just a flag on it, but the invalidation is the same single key.
  */
 export function deletePackage(id: PackageId): Promise<DeletePackageResult | { ok: false; reason: 'network' }> {
-  return runRpc(() => deletePackageRpc(id), [TOUCHED.packages]);
+  return runRpc(() => deletePackageRpc(id), TOUCHED.packages);
 }

@@ -81,7 +81,7 @@ select is(public.grant_credits('pl_a','individual',3,'Rained-out Jul 10')->>'ok'
 select is((select source from public.credit_batches where note='Rained-out Jul 10'), 'admin_grant', 'granted batch source = admin_grant');
 select is((select purchase_id from public.credit_batches where note='Rained-out Jul 10'), null, 'granted batch purchase_id is null');
 select is((select quantity_remaining from public.credit_batches where note='Rained-out Jul 10'), 3, 'granted quantity = 3');
-select is((select expires_at - created_at from public.credit_batches where note='Rained-out Jul 10'), interval '30 days', 'grant expiry = now() + tpa.credit_expiry() (30d, no extra time)');
+select is((select expires_at - created_at from public.credit_batches where note='Rained-out Jul 10'), interval '40 days', 'grant expiry = now() + tpa.credit_expiry() (40d, no extra time)');
 select is(public.grant_credits('pl_a','group',3,'   ')->>'reason', 'reason_required', 'grant rejects a blank note');
 select is(public.grant_credits('pl_a','group',3,null)->>'reason', 'reason_required', 'grant rejects a null note (DB requires the why, like the UI)');
 select is(public.grant_credits('pl_a','group',0,'x')->>'reason', 'quantity_below_one', 'grant rejects quantity < 1');

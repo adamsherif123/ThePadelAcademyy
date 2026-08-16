@@ -1,4 +1,4 @@
-import { buildSignupGrant } from '@tpa/core';
+import { CREDIT_EXPIRY_DAYS, buildSignupGrant } from '@tpa/core';
 import type {
   CreditBatch,
   CreditBatchId,
@@ -37,13 +37,13 @@ export const mockPurchases: Purchase[] = [...handPurchases, ...generatedPurchase
 /**
  * Signup-grant trial batches, built through @tpa/core's `buildSignupGrant` so the
  * fixtures exercise the real grant code path (source, null purchaseId, quantity,
- * 30-day expiry). Only the deterministic id and the "how much is left / when"
- * knobs are overridden, to stage the three states the trial UI must handle. The
- * builder is called with the grant's own `now` (= account creation time) so its
- * expiry math produces the right expiresAt for each case.
+ * CREDIT_EXPIRY_DAYS-day expiry). Only the deterministic id and the "how much is
+ * left / when" knobs are overridden, to stage the three states the trial UI must
+ * handle. The builder is called with the grant's own `now` (= account creation
+ * time) so its expiry math produces the right expiresAt for each case.
  */
 const signupGrants: CreditBatch[] = [
-  // Fresh account: 2 unused trial credits, ~30 days of runway.
+  // Fresh account: 2 unused trial credits, a full CREDIT_EXPIRY_DAYS of runway.
   { ...buildSignupGrant('pl_omar' as PlayerId, MOCK_NOW), id: 'cb_grant_omar' as CreditBatchId },
   // Used 1 of 2.
   {
@@ -51,16 +51,22 @@ const signupGrants: CreditBatch[] = [
     id: 'cb_grant_youssef' as CreditBatchId,
     quantityRemaining: 1,
   },
-  // Granted 31 days ago, expired unused (created + 30d < now).
-  { ...buildSignupGrant('pl_nour' as PlayerId, daysFromNow(-31)), id: 'cb_grant_nour' as CreditBatchId },
+  // Granted just past CREDIT_EXPIRY_DAYS ago, expired unused (created + CREDIT_EXPIRY_DAYS < now).
+  // Relative to the constant (not a hardcoded day count) so this stays "expired" whatever the window is.
+  {
+    ...buildSignupGrant('pl_nour' as PlayerId, daysFromNow(-(CREDIT_EXPIRY_DAYS + 1))),
+    id: 'cb_grant_nour' as CreditBatchId,
+  },
 ];
 
 /**
  * The typed credit wallet. Purchased batches (`source: 'purchase'`, non-null
  * purchaseId) plus the signup-grant trial batches above. Deliberately includes a
  * batch expiring in 2 days and one already expired so the expiry UI can be built
- * and tested. Purchased expiries follow the 30-day rule except where the relative
- * anchor makes that explicit.
+ * and tested. Purchased expiries below are hand-anchored to each fixture's own
+ * story (healthy / expiring-soon / expired / fresh), not derived from
+ * CREDIT_EXPIRY_DAYS — only the signup-grant states above compute through the
+ * real rule.
  */
 const handBatches: CreditBatch[] = [
   // Healthy group credits, plenty of runway.

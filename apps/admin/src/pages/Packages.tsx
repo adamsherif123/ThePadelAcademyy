@@ -44,7 +44,7 @@ export function Packages() {
       <PageHeader
         eyebrow="Catalog"
         title="Packages"
-        subtitle="Session bundles players can buy. Each purchase adds credits of that training type to the player's wallet, valid for 30 days."
+        subtitle={`Session bundles players can buy. Each purchase adds credits of that training type to the player's wallet, valid for ${CREDIT_EXPIRY_DAYS} days.`}
       />
 
       <div className={styles.statRow}>

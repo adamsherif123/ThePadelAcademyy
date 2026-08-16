@@ -1,4 +1,5 @@
 import {
+  CANCELLATION_WINDOW_HOURS,
   cairoCalendarDate,
   formatInstantDate,
   formatInstantTime,
@@ -421,7 +422,7 @@ export function SlotModal({
           <p className={styles.confirmBody}>
             {occupied === 0
               ? 'No players are booked. The session will be removed from the schedule.'
-              : `All ${occupied} booked player${occupied === 1 ? '' : 's'} will be refunded to their original credit — regardless of the 3-hour window, since the academy is cancelling.`}
+              : `All ${occupied} booked player${occupied === 1 ? '' : 's'} will be refunded to their original credit — regardless of the ${CANCELLATION_WINDOW_HOURS}-hour window, since the academy is cancelling.`}
           </p>
         </div>
         {actionError ? (

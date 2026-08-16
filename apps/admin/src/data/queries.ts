@@ -3,6 +3,7 @@ import type {
   Booking,
   Coach,
   CreditBatch,
+  News,
   Package,
   Player,
   Purchase,
@@ -19,6 +20,7 @@ import {
   fetchCoaches,
   fetchCreditBatches,
   fetchCreditRequests,
+  fetchNews,
   fetchPackages,
   fetchPlayers,
   fetchPurchases,
@@ -64,6 +66,8 @@ export const useBookings = () => toResource(useQuery({ queryKey: queryKeys.booki
 export const usePurchases = () => toResource(useQuery({ queryKey: queryKeys.purchases, queryFn: fetchPurchases }));
 export const useCreditRequests = () =>
   toResource(useQuery({ queryKey: queryKeys.creditRequests, queryFn: fetchCreditRequests }));
+export const useNews = (): Resource<News[]> =>
+  toResource(useQuery({ queryKey: queryKeys.news, queryFn: fetchNews }));
 
 /**
  * The Bookings page's own bounded, filtered, paginated read — independent of

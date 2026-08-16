@@ -5,7 +5,7 @@
 // Mutations are the SECURITY DEFINER RPCs; each returns `{ ok, reason }` as DATA
 // (never an HTTP error), so a business rejection like `slot_full` arrives as a
 // value we can map to copy, and only transport failures throw.
-import { ID_PREFIXES, newId, type BookBlockReason } from '@tpa/core';
+import { ID_PREFIXES, NEWS_VISIBILITY_DAYS, newId, parseInstant, toInstant, type BookBlockReason } from '@tpa/core';
 import type {
   AvailabilityTemplate,
   Booking,
@@ -16,6 +16,9 @@ import type {
   Gender,
   IsoInstant,
   Level,
+  News,
+  NewsId,
+  NewsSeen,
   Notification,
   NotificationId,
   Package,
@@ -37,6 +40,8 @@ import {
   rowToCoach,
   rowToCreditBatch,
   rowToCreditRequest,
+  rowToNews,
+  rowToNewsSeen,
   rowToNotification,
   rowToPackage,
   rowToPlayer,
@@ -138,6 +143,54 @@ export async function markAllNotificationsRead(now: IsoInstant): Promise<void> {
     .update({ read_at: now })
     .is('read_at', null);
   if (error) throw new ApiError(`Failed to mark notifications read: ${error.message}`, error);
+}
+
+// ── news (client session) ────────────────────────────────────────────────────
+// RLS lets any authenticated player read every news row — the visibility window
+// is a query-side filter here, not a server-side rule (see NEWS_VISIBILITY_DAYS).
+// news_seen is the player's own-row-only "have I seen this" set: a row's mere
+// existence means seen, so marking seen is an insert, never an update.
+
+/** Visible news (within the window), newest first. */
+export async function fetchVisibleNews(now: IsoInstant): Promise<News[]> {
+  const cutoff = toInstant(new Date(parseInstant(now).getTime() - NEWS_VISIBILITY_DAYS * 86_400_000));
+  const { data, error } = await supabase
+    .from('news')
+    .select('*')
+    .gt('created_at', cutoff)
+    .order('created_at', { ascending: false });
+  if (error) throw new ApiError(`Failed to load news: ${error.message}`, error);
+  return (data ?? []).map(rowToNews);
+}
+
+/** This player's own seen-rows (RLS scopes it — every row belongs to the caller). */
+export async function fetchNewsSeen(): Promise<NewsSeen[]> {
+  const { data, error } = await supabase.from('news_seen').select('*');
+  if (error) throw new ApiError(`Failed to load seen news: ${error.message}`, error);
+  return (data ?? []).map(rowToNewsSeen);
+}
+
+/**
+ * Mark one or more news items seen for `playerId` (always the caller's own id —
+ * RLS's `player_id = current_player_id()` rejects anything else). `ignoreDuplicates`
+ * makes this safe to call repeatedly for the same item (the pop-up's dismiss and
+ * the feed's "mark everything visible seen" can race harmlessly) — a duplicate
+ * (player_id, news_id) pair is a no-op, not an error.
+ */
+export async function markNewsSeen(playerId: PlayerId, newsIds: NewsId[]): Promise<void> {
+  if (newsIds.length === 0) return;
+  const { error } = await supabase
+    .from('news_seen')
+    .upsert(
+      newsIds.map((newsId) => ({ player_id: playerId, news_id: newsId })),
+      { onConflict: 'player_id,news_id', ignoreDuplicates: true },
+    );
+  if (error) throw new ApiError(`Failed to mark news seen: ${error.message}`, error);
+}
+
+/** The public URL for a news item's image — image_path is a raw storage key, not a URL. */
+export function newsImagePublicUrl(path: string): string {
+  return supabase.storage.from('news-images').getPublicUrl(path).data.publicUrl;
 }
 
 // ── device push tokens (own-only RLS path — never service_role in the app) ──────

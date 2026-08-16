@@ -4,6 +4,7 @@ import type {
   CoachId,
   CreditBatchId,
   CreditRequestId,
+  NewsId,
   NotificationId,
   PackageId,
   PlayerId,
@@ -265,7 +266,7 @@ export interface SessionSlot {
 /**
  * A player's claim on one seat of a slot, paid for by exactly one CreditBatch.
  * `creditBatchId` records which batch paid, so a refund returns the credit to the
- * right batch — with that batch's original expiry, not a fresh 30 days.
+ * right batch — with that batch's original expiry, not a fresh window.
  */
 export interface Booking {
   id: BookingId;
@@ -279,11 +280,13 @@ export interface Booking {
 }
 
 /**
- * An in-app notification, minted server-side by tpa.notify inside the event's RPC
- * (S12). RLS lets the owning player read it and write only `read_at`. `slotId` /
- * `bookingId` are the deep-link targets (a session_confirmed row → its session; a
- * credits_granted row carries neither → the wallet). The gateway-internal `pushed_at`
- * column is not surfaced here.
+ * An in-app notification, minted server-side by tpa.notify (or, for
+ * news_published, a bulk fan-out insert — see create_news) inside the event's
+ * RPC (S12). RLS lets the owning player read it and write only `read_at`.
+ * `slotId` / `bookingId` / `newsId` are the deep-link targets (a
+ * session_confirmed row → its session; a credits_granted row carries none of
+ * the three → the wallet; a news_published row carries only `newsId`). The
+ * gateway-internal `pushed_at` column is not surfaced here.
  */
 export interface Notification {
   id: NotificationId;
@@ -291,9 +294,33 @@ export interface Notification {
   type: NotificationType;
   slotId: SlotId | null;
   bookingId: BookingId | null;
+  newsId: NewsId | null;
   title: string;
   body: string;
   createdAt: IsoInstant;
   /** Null while unread; set (by the player) when opened. */
   readAt: IsoInstant | null;
+}
+
+/**
+ * An admin-authored announcement. No draft state: create = immediately visible
+ * (createdAt doubles as publish time — see the news migration header). The
+ * player-facing 30-day visibility window is a query-side filter, not a column
+ * here; the admin's own News tab reads every row regardless of age.
+ */
+export interface News {
+  id: NewsId;
+  title: string;
+  body: string;
+  /** A news-images/ storage key (news/<uuid>.<ext>), not a URL — nullable: a news item may be text-only. */
+  imagePath: string | null;
+  createdBy: string;
+  createdAt: IsoInstant;
+}
+
+/** A row's mere existence means the player has seen this news item — nothing else to store. */
+export interface NewsSeen {
+  playerId: PlayerId;
+  newsId: NewsId;
+  seenAt: IsoInstant;
 }

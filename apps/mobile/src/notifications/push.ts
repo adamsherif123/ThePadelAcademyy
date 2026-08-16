@@ -133,11 +133,11 @@ export async function registerForPush(): Promise<PushRegistration> {
 }
 
 /** The deep-link payload send-push attaches to each notification. */
-export type PushTapData = { notificationId?: string; type?: string; slotId?: string | null };
+export type PushTapData = { notificationId?: string; type?: string; slotId?: string | null; newsId?: string | null };
 
 function tapDataFrom(response: import('expo-notifications').NotificationResponse): PushTapData {
   const d = (response?.notification?.request?.content?.data ?? {}) as PushTapData;
-  return { notificationId: d.notificationId, type: d.type, slotId: d.slotId ?? null };
+  return { notificationId: d.notificationId, type: d.type, slotId: d.slotId ?? null, newsId: d.newsId ?? null };
 }
 
 /**

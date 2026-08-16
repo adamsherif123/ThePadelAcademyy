@@ -18,6 +18,8 @@ import type {
   CreditRequest,
   Gender,
   Level,
+  News,
+  NewsId,
   Package,
   PackageId,
   Player,
@@ -37,6 +39,7 @@ import {
   rowToCoach,
   rowToCreditBatch,
   rowToCreditRequest,
+  rowToNews,
   rowToPackage,
   rowToPlayer,
   rowToPurchase,
@@ -72,6 +75,53 @@ export const fetchCreditBatches = (): Promise<CreditBatch[]> => selectAll('credi
 export const fetchBookings = (): Promise<Booking[]> => selectAll('bookings', rowToBooking);
 export const fetchPurchases = (): Promise<Purchase[]> => selectAll('purchases', rowToPurchase);
 export const fetchCreditRequests = (): Promise<CreditRequest[]> => selectAll('credit_requests', rowToCreditRequest);
+
+/**
+ * Every news row, newest first — RLS lets any authenticated user (admin
+ * sessions included) SELECT all of them directly, no RPC needed. Unlike
+ * selectAll's tables this one has an intrinsic order (publish time), so it's
+ * its own small query rather than a selectAll() call.
+ */
+export async function fetchNews(): Promise<News[]> {
+  const { data, error } = await supabase.from('news').select('*').order('created_at', { ascending: false });
+  if (error) throw new ApiError(`Failed to load news: ${error.message}`, error.code, error);
+  return (data ?? []).map(rowToNews);
+}
+
+export type CreateNewsReason = 'not_admin' | 'title_required' | 'body_required';
+export type CreateNewsResult = { ok: true; newsId: NewsId } | { ok: false; reason: CreateNewsReason };
+/** Creates a news item; if notifyPlayers, fans out one news_published push to every active player. */
+export async function createNewsRpc(
+  title: string,
+  body: string,
+  imagePath: string | null,
+  notifyPlayers: boolean,
+): Promise<CreateNewsResult> {
+  const d = await callRpc('create_news', { p_title: title, p_body: body, p_image_path: imagePath, p_notify_players: notifyPlayers });
+  return d.ok ? { ok: true, newsId: d.news_id as NewsId } : { ok: false, reason: d.reason as CreateNewsReason };
+}
+
+export type UpdateNewsReason = 'not_admin' | 'title_required' | 'body_required' | 'news_missing';
+export type UpdateNewsResult = { ok: true } | { ok: false; reason: UpdateNewsReason };
+/** Edits title/body/image — never re-notifies (only create does). imagePath must always be
+ *  passed explicitly (the current path if unchanged, a new one, or null to clear). */
+export async function updateNewsRpc(
+  id: NewsId,
+  title: string,
+  body: string,
+  imagePath: string | null,
+): Promise<UpdateNewsResult> {
+  const d = await callRpc('update_news', { p_news_id: id, p_title: title, p_body: body, p_image_path: imagePath });
+  return d.ok ? { ok: true } : { ok: false, reason: d.reason as UpdateNewsReason };
+}
+
+export type DeleteNewsReason = 'not_admin' | 'news_missing';
+export type DeleteNewsResult = { ok: true } | { ok: false; reason: DeleteNewsReason };
+/** Hard-deletes a news item — cascades its news_seen rows, sets notifications.news_id null. */
+export async function deleteNewsRpc(id: NewsId): Promise<DeleteNewsResult> {
+  const d = await callRpc('delete_news', { p_news_id: id });
+  return d.ok ? { ok: true } : { ok: false, reason: d.reason as DeleteNewsReason };
+}
 
 export type BookingStatusFilter = BookingStatus | 'all';
 export type BookingTypeFilter = TrainingType | 'all';
@@ -488,4 +538,35 @@ export async function uploadCoachPhoto(coachId: CoachId, file: File): Promise<st
 export async function deleteCoachPhoto(coachId: CoachId): Promise<void> {
   const { error } = await supabase.storage.from('coach-photos').remove(photoVariants(coachId));
   if (error) throw new ApiError(`Photo delete failed: ${error.message}`, undefined, error);
+}
+
+// ── news image upload (Storage) ────────────────────────────────────────────────
+/**
+ * Upload a news image to news-images/news/<uuid>.<ext> and return its public URL.
+ * Unlike coach photos, a news row's id doesn't exist yet at upload time (create_news
+ * generates it server-side), so the key is a fresh random id, not the news id — see
+ * the news migration's header for why. Always a brand-new key, so no upsert/cleanup
+ * of prior variants is needed here (that's what removeNewsImage is for, on edit).
+ */
+export async function uploadNewsImage(file: File): Promise<{ path: string; publicUrl: string }> {
+  const ext = PHOTO_EXT[file.type];
+  if (!ext) throw new ApiError('Image must be a JPEG, PNG, or WebP image.');
+  if (file.size > 5 * 1024 * 1024) throw new ApiError('Image must be under 5 MB.');
+
+  const bucket = supabase.storage.from('news-images');
+  const path = `news/${crypto.randomUUID()}.${ext}`;
+  const { error } = await bucket.upload(path, file, { contentType: file.type });
+  if (error) throw new ApiError(`Image upload failed: ${error.message}`, undefined, error);
+  return { path, publicUrl: bucket.getPublicUrl(path).data.publicUrl };
+}
+
+/** The public URL for an already-uploaded news image's raw storage path. */
+export function newsImagePublicUrl(path: string): string {
+  return supabase.storage.from('news-images').getPublicUrl(path).data.publicUrl;
+}
+
+/** Remove a news image object — used when an edit replaces it, so the old one doesn't orphan. */
+export async function removeNewsImage(path: string): Promise<void> {
+  const { error } = await supabase.storage.from('news-images').remove([path]);
+  if (error) throw new ApiError(`Image delete failed: ${error.message}`, undefined, error);
 }

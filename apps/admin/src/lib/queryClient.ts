@@ -40,6 +40,7 @@ export const queryKeys = {
   bookingStatusCounts: ['bookingStatusCounts'] as const,
   purchases: ['purchases'] as const,
   creditRequests: ['creditRequests'] as const,
+  news: ['news'] as const,
 };
 
 /** What each mutation family touches — the keys it must invalidate. */
@@ -57,4 +58,5 @@ export const TOUCHED = {
   templates: [queryKeys.templates] as const,
   slots: [queryKeys.slots] as const,
   players: [queryKeys.players] as const,
+  news: [queryKeys.news] as const,
 };

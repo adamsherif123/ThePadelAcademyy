@@ -40,7 +40,7 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
   ('sl_expired', 'co_exp',    now()+interval '1 day', now()+interval '1 day 1 hour', 'trial',      4, 0, null,     null,       'published'),
   ('sl_b',       'co_b',      now()+interval '1 day', now()+interval '1 day 1 hour', 'trial',      4, 0, null,     null,       'published'),
   ('sl_forfeit', 'co_ff',     now()+interval '2 hour', now()+interval '3 hour',      'trial',      4, 0, null,     null,       'published'),
-  ('sl_refund',  'co_rf',     now()+interval '5 hour', now()+interval '6 hour',      'trial',      4, 0, null,     null,       'published'),
+  ('sl_refund',  'co_rf',     now()+interval '6 hour', now()+interval '7 hour',      'trial',      4, 0, null,     null,       'published'),
   ('sl_cxl',     'co_cxl',    now()+interval '1 day', now()+interval '1 day 1 hour', 'trial',      4, 0, null,     null,       'published');
 
 insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
@@ -54,10 +54,11 @@ insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, bo
   ('bk_started', 'sl_past','pl_a', 'cb_a', 'booked', now()-interval '2 hour');
 
 -- ── constants mirror @tpa/core, and the boundary is STRICT (as postgres) ─────
-select is(tpa.cancellation_window(), interval '3 hours', 'tpa.cancellation_window() = 3h (mirrors CANCELLATION_WINDOW_HOURS)');
-select is(tpa.credit_expiry(),       interval '30 days', 'tpa.credit_expiry() = 30d (mirrors CREDIT_EXPIRY_DAYS)');
-select is((interval '3 hours'          > tpa.cancellation_window()), false, 'boundary strict: exactly the window is INSIDE → forfeit');
-select is((interval '3 hours 1 second' > tpa.cancellation_window()), true,  'boundary strict: just past the window is OUTSIDE → refund');
+select is(tpa.cancellation_window(), interval '5 hours', 'tpa.cancellation_window() = 5h (mirrors CANCELLATION_WINDOW_HOURS)');
+select is(tpa.booking_window(),      interval '5 hours', 'tpa.booking_window() = 5h (mirrors BOOKING_WINDOW_HOURS)');
+select is(tpa.credit_expiry(),       interval '40 days', 'tpa.credit_expiry() = 40d (mirrors CREDIT_EXPIRY_DAYS)');
+select is((interval '5 hours'          > tpa.cancellation_window()), false, 'boundary strict: exactly the window is INSIDE → forfeit');
+select is((interval '5 hours 1 second' > tpa.cancellation_window()), true,  'boundary strict: just past the window is OUTSIDE → refund');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- AS PLAYER A (men / beginner)
@@ -98,17 +99,30 @@ select is(public.book_slot('sl_ok')->>'reason', 'already_booked', 'canBookSlot n
 select is(public.book_slot('sl_full')->>'reason', 'slot_full', 'canBookSlot slot_full ↔ RPC slot_full');
 select is((select booked_count from public.session_slots where id = 'sl_full'), 1, 'sl_full stays 1/1 — no oversell');
 
--- cancel FORFEIT (inside the 3h window: slot starts in 2h):
-select is(public.book_slot('sl_forfeit')->>'ok', 'true', 'A books sl_forfeit (+2h)');
+-- cancel FORFEIT (inside the 5h cancellation window: slot starts in 2h). Seeded
+-- DIRECTLY (not via book_slot) because sl_forfeit is ALSO inside the new 5h
+-- booking-window guard (Task 2) — this section's subject is cancel_booking, not
+-- book_slot, so we bypass that guard by seeding the exact state a successful
+-- book_slot call would have produced (one seat taken, one credit spent from
+-- cb_a), then resume testing cancel_booking as player A. The booking-window
+-- guard itself is proven separately in booking_window_test.sql.
+reset role;
+update public.session_slots set booked_count = booked_count + 1 where id = 'sl_forfeit';
+update public.credit_batches set quantity_remaining = quantity_remaining - 1 where id = 'cb_a';
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at)
+  values ('bk_forfeit_setup', 'sl_forfeit', 'pl_a', 'cb_a', 'booked', now());
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","role":"authenticated"}', true);
 select is(
-  public.cancel_booking((select id from public.bookings where slot_id='sl_forfeit' and player_id='pl_a' and status='booked'))->>'refunded',
+  public.cancel_booking('bk_forfeit_setup')->>'refunded',
   'false', 'cancel inside window → forfeit (refunded=false)');
 select is((select quantity_remaining from public.credit_batches where id = 'cb_a'), 8,
   'forfeit keeps the credit spent (cb_a stays 8, no refund)');
 select is((select booked_count from public.session_slots where id = 'sl_forfeit'), 0, 'the seat is freed even on a forfeit');
 
--- cancel REFUND (outside the window: slot starts in 5h):
-select is(public.book_slot('sl_refund')->>'ok', 'true', 'A books sl_refund (+5h) (cb_a 8 → 7)');
+-- cancel REFUND (outside the window: slot starts in 6h — also outside the
+-- booking-window guard, so this is a real book_slot call, no bypass needed):
+select is(public.book_slot('sl_refund')->>'ok', 'true', 'A books sl_refund (+6h) (cb_a 8 → 7)');
 select is(
   public.cancel_booking((select id from public.bookings where slot_id='sl_refund' and player_id='pl_a' and status='booked'))->>'refunded',
   'true', 'cancel outside window → refund (refunded=true)');

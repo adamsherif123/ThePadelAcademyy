@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   LogOut,
   Medal,
+  Newspaper,
   Package,
   Users,
   Wallet,
@@ -28,6 +29,7 @@ const NAV: readonly { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/players', label: 'Players', icon: Users },
   { to: '/credit-requests', label: 'Credit requests', icon: Wallet },
   { to: '/packages', label: 'Packages', icon: Package },
+  { to: '/news', label: 'News', icon: Newspaper },
 ];
 
 /** The navy full-height sidebar: brand, nav (royal pill for the active item), user card. */

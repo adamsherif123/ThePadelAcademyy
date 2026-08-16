@@ -122,23 +122,23 @@ describe('isBatchUsable', () => {
 });
 
 describe('isCancellableWithoutForfeit', () => {
-  it('is true only more than 3h before start', () => {
+  it('is true only more than 5h before start', () => {
     // start 18:00Z, now 12:00Z => 6h before => free
     expect(isCancellableWithoutForfeit(slot(), NOW)).toBe(true);
     // now 15:30Z => 2.5h before => forfeit
     expect(isCancellableWithoutForfeit(slot(), '2026-07-14T15:30:00.000Z' as IsoInstant)).toBe(false);
-    // exactly 3h before => not strictly greater => forfeit
-    expect(isCancellableWithoutForfeit(slot(), '2026-07-14T15:00:00.000Z' as IsoInstant)).toBe(false);
+    // exactly 5h before => not strictly greater => forfeit
+    expect(isCancellableWithoutForfeit(slot(), '2026-07-14T13:00:00.000Z' as IsoInstant)).toBe(false);
     expect(isCancellableWithoutForfeit(slot({ status: 'cancelled' }), NOW)).toBe(false);
   });
 });
 
 describe('cancellationDeadline', () => {
-  it('is CANCELLATION_WINDOW_HOURS (3h) before the slot starts', () => {
-    // startsAt 18:00Z -> deadline 15:00Z
-    expect(cancellationDeadline(slot())).toBe('2026-07-14T15:00:00.000Z');
+  it('is CANCELLATION_WINDOW_HOURS (5h) before the slot starts', () => {
+    // startsAt 18:00Z -> deadline 13:00Z
+    expect(cancellationDeadline(slot())).toBe('2026-07-14T13:00:00.000Z');
     expect(cancellationDeadline(slot({ startsAt: '2026-07-22T16:30:00.000Z' as IsoInstant }))).toBe(
-      '2026-07-22T13:30:00.000Z',
+      '2026-07-22T11:30:00.000Z',
     );
   });
 });

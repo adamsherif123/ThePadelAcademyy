@@ -153,7 +153,7 @@ export function TemplatesPanel({
 /**
  * Guarded delete. Shows the REAL blast radius before confirming: how many
  * upcoming sessions this rule generated will be cancelled (academy
- * cancellation — refunded regardless of the 3h window) and how many booked
+ * cancellation — refunded regardless of the cancellation window) and how many booked
  * seats that refunds. Past sessions are never part of this count — they stay
  * exactly as delivered, no matter what.
  */

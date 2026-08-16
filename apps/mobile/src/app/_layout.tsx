@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { queryClient } from '../lib/queryClient';
 import { captureException, initReporting } from '../lib/reporting';
+import { NewsPopupBridge } from '../notifications/NewsPopupBridge';
 import { NotificationsBridge } from '../notifications/NotificationsBridge';
 import { nextRoute } from '../session/authMachine';
 import { SessionProvider, useSession } from '../session/SessionProvider';
@@ -127,11 +128,16 @@ function RootNavigator() {
         <Stack.Screen name="coaches" />
         <Stack.Screen name="purchase-history" />
         <Stack.Screen name="notifications" />
+        <Stack.Screen name="news" />
+        <Stack.Screen name="news-popup" options={{ presentation: 'modal' }} />
         <Stack.Screen name="delete-account" />
       </Stack>
       {/* Registers the push token, keeps the feed live, and routes tapped pushes
           (incl. cold start). No-ops until a player is ready; renders nothing. */}
       <NotificationsBridge />
+      {/* Decides when the unseen-news pop-up should appear (cold start / foreground).
+          No-ops until a player is ready; renders nothing. */}
+      <NewsPopupBridge />
     </>
   );
 }

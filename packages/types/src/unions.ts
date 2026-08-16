@@ -48,8 +48,9 @@ export type CreditSource = 'purchase' | 'signup_grant' | 'admin_grant';
  * cancellation dropping a fill-confirmed session back below capacity (a manually
  * confirmed session never reopens this way); the rest track cancels, removals,
  * reschedules, credit grants (incl. an approved credit request), a rejected
- * credit request (A3), and an admin manually seating a player (WhatsApp bookings,
- * walk-ins) who took no action of their own.
+ * credit request (A3), an admin manually seating a player (WhatsApp bookings,
+ * walk-ins) who took no action of their own, and an admin publishing a news
+ * item with notify-players on (create_news; an edit never re-notifies).
  */
 export type NotificationType =
   | 'session_confirmed'
@@ -59,7 +60,8 @@ export type NotificationType =
   | 'credits_granted'
   | 'credit_request_rejected'
   | 'admin_booked'
-  | 'session_reopened';
+  | 'session_reopened'
+  | 'news_published';
 
 /**
  * A credit request's lifecycle (A3). `pending` until an admin resolves it; `approved`

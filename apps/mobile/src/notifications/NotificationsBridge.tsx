@@ -51,7 +51,7 @@ export function NotificationsBridge(): null {
         );
       }
       refreshFromNotification();
-      router.push(notificationHref({ type: data.type ?? '', slotId: data.slotId ?? null }));
+      router.push(notificationHref({ type: data.type ?? '', slotId: data.slotId ?? null, newsId: data.newsId ?? null }));
     },
     [router],
   );

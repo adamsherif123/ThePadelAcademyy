@@ -22,6 +22,7 @@ const ICON: Record<NotificationType, IoniconName> = {
   credit_request_rejected: 'alert-circle-outline',
   admin_booked: 'person-add-outline',
   session_reopened: 'refresh-circle-outline',
+  news_published: 'newspaper-outline',
 };
 
 /**
@@ -78,7 +79,7 @@ export default function NotificationsScreen() {
             notification={n}
             unread={n.readAt === null}
             relative={formatRelativeTime(n.createdAt, now)}
-            onPress={() => router.push(notificationHref({ type: n.type, slotId: n.slotId }))}
+            onPress={() => router.push(notificationHref({ type: n.type, slotId: n.slotId, newsId: n.newsId }))}
           />
         ))
       )}

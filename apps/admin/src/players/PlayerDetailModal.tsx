@@ -417,7 +417,7 @@ function GrantView({ player, packages, onBack, onClose }: { player: Player; pack
             <Gift size={16} aria-hidden />
             <span>
               This comps <span className={styles.valueBig}>{formatPiastres(totalValue)}</span> of{' '}
-              {TRAINING_LABEL[trainingType].toLowerCase()} training. Grants expire in 30 days like any
+              {TRAINING_LABEL[trainingType].toLowerCase()} training. Grants expire in {CREDIT_EXPIRY_DAYS} days like any
               credit — a comp buys no extra time.
             </span>
           </p>

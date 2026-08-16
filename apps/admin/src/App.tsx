@@ -6,6 +6,7 @@ import { CreditRequests } from './pages/CreditRequests';
 import { Dashboard } from './pages/Dashboard';
 import { Gallery } from './pages/Gallery';
 import { Login } from './pages/Login';
+import { News } from './pages/News';
 import { NotAdmin } from './pages/NotAdmin';
 import { Packages } from './pages/Packages';
 import { Players } from './pages/Players';
@@ -51,6 +52,7 @@ export function App() {
         <Route path="/credit-requests" element={<CreditRequests />} />
         <Route path="/packages" element={<Packages />} />
         <Route path="/gallery" element={<Gallery />} />
+        <Route path="/news" element={<News />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

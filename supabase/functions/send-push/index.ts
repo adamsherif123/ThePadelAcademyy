@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     .update({ pushed_at: new Date().toISOString() })
     .eq('id', notificationId)
     .is('pushed_at', null)
-    .select('id, player_id, type, title, body, slot_id')
+    .select('id, player_id, type, title, body, slot_id, news_id')
     .maybeSingle();
   if (claimErr) return json(500, { error: 'claim_failed', detail: claimErr.message });
   if (!claimed) return json(200, { ok: true, skipped: 'already_pushed_or_missing' });
@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
     to: t.expo_push_token,
     title: claimed.title,
     body: claimed.body,
-    data: { notificationId: claimed.id, type: claimed.type, slotId: claimed.slot_id },
+    data: { notificationId: claimed.id, type: claimed.type, slotId: claimed.slot_id, newsId: claimed.news_id },
   }));
 
   const expoRes = await fetch(EXPO_PUSH_URL, {

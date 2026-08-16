@@ -18,12 +18,24 @@ export const PIASTRES_PER_EGP = 100;
  * purchased credits and for signup-grant trial credits. There is deliberately no
  * second expiry rule.
  *
- * MIRRORED IN SQL as `tpa.credit_expiry()` (interval '30 days') in
- * supabase/migrations/20260718000005_s7a_booking_rpcs.sql. Changing this number
+ * MIRRORED IN SQL as `tpa.credit_expiry()` (interval '40 days'), originally
+ * defined in supabase/migrations/20260718000005_s7a_booking_rpcs.sql and
+ * redefined (30 -> 40, future mints only — see that migration's header for why
+ * existing credit_batches rows are untouched) in
+ * supabase/migrations/20260819000039_credit_expiry_40.sql. Changing this number
  * means changing that function too; sql-parity.test.ts reads both and fails if
  * they drift.
  */
-export const CREDIT_EXPIRY_DAYS = 30;
+export const CREDIT_EXPIRY_DAYS = 40;
+
+/**
+ * A news item is visible to players for this many days after it's published —
+ * a client-side query filter (`created_at > now - NEWS_VISIBILITY_DAYS days`),
+ * NOT a server-side rule: RLS lets an authenticated player read every news row
+ * regardless of age (the admin's own News tab always sees full history), so
+ * there is no SQL-side function to mirror here the way credit expiry has one.
+ */
+export const NEWS_VISIBILITY_DAYS = 30;
 
 /**
  * Free trial credits granted once, on account creation. Single source of truth —
@@ -44,13 +56,34 @@ export const EXPIRING_SOON_DAYS = 3;
 /**
  * Free cancellation + credit refund is allowed up to this many hours before a
  * slot starts. Inside the window the credit is forfeited; a no-show forfeits too.
+ * Evaluated at cancel-time against the live DB clock — bumping this number only
+ * changes the outcome of cancellations from now on, never retroactively.
  *
- * MIRRORED IN SQL as `tpa.cancellation_window()` (interval '3 hours') in
- * supabase/migrations/20260718000005_s7a_booking_rpcs.sql, which the cancel_booking
- * RPC enforces with the DB clock. Changing this number means changing that function
- * too; sql-parity.test.ts reads both and fails if they drift.
+ * MIRRORED IN SQL as `tpa.cancellation_window()`, originally interval '3 hours' in
+ * supabase/migrations/20260718000005_s7a_booking_rpcs.sql, bumped to interval '5
+ * hours' in supabase/migrations/20260820000040_cancellation_window_5h.sql, which
+ * the cancel_booking RPC enforces with the DB clock. Changing this number means
+ * changing that function too; sql-parity.test.ts reads both and fails if they drift.
  */
-export const CANCELLATION_WINDOW_HOURS = 3;
+export const CANCELLATION_WINDOW_HOURS = 5;
+
+/**
+ * An EMPTY slot (zero bookings) cannot be booked within this many hours of its
+ * starts_at — once it has at least one booking, the window no longer applies to
+ * later bookers on the same slot. A different rule from CANCELLATION_WINDOW_HOURS
+ * (that one governs refund-vs-forfeit on a cancel; this one governs whether a
+ * FIRST booking is allowed at all) — they happen to share the same 5-hour figure
+ * today, but are two independently named constants on purpose, not one reused
+ * number, so changing one doesn't silently change the other's meaning.
+ *
+ * MIRRORED IN SQL as `tpa.booking_window()` in
+ * supabase/migrations/20260820000041_booking_window_guard.sql, which book_slot
+ * enforces inside its guarded UPDATE. Changing this number means changing that
+ * function too; sql-parity.test.ts reads both and fails if they drift. The CLIENT
+ * feed filter that hides these slots (added in a later session) must read this
+ * same constant, never a second hardcoded 5.
+ */
+export const BOOKING_WINDOW_HOURS = 5;
 
 /** All instants render in this zone. Stored data is always UTC. */
 export const CAIRO_TZ = 'Africa/Cairo';

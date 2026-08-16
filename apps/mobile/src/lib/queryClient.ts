@@ -48,6 +48,8 @@ export const queryKeys = {
   notifications: ['notifications'] as const,
   creditRequests: ['creditRequests'] as const,
   trialEligible: ['trialEligible'] as const,
+  news: ['news'] as const,
+  newsSeen: ['newsSeen'] as const,
 };
 
 /** What a booking/cancellation changes: the wallet, the player's bookings, and seat counts. */

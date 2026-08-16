@@ -17,6 +17,7 @@ import {
 } from '../../data/queries';
 import { nextSession } from '../../data/schedule';
 import { soonestExpiringBatch, totalReadyToBook } from '../../data/wallet';
+import { NewsButton } from '../../notifications/NewsButton';
 import { NotificationBell } from '../../notifications/NotificationBell';
 import { useSession } from '../../session/SessionProvider';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -79,7 +80,7 @@ export default function HomeScreen() {
       trailing={
         <View style={styles.headerTrailing}>
           <NotificationBell />
-          <Avatar name={player.name} />
+          <NewsButton />
         </View>
       }
     />

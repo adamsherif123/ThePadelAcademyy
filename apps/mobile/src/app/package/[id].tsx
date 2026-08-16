@@ -1,4 +1,4 @@
-import { formatPiastres } from '@tpa/core';
+import { CREDIT_EXPIRY_DAYS, formatPiastres } from '@tpa/core';
 import { space } from '@tpa/theme';
 import type { PackageId, Piastres } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -124,7 +124,7 @@ export default function PackageDetailScreen() {
         text={
           trialBlocked
             ? 'You’ve already used your one-time trial session — browse our other packages instead.'
-            : 'Credits are valid 30 days from purchase. Unused credits expire — plan your month.'
+            : `Credits are valid ${CREDIT_EXPIRY_DAYS} days from purchase. Unused credits expire — plan your month.`
         }
       />
     </Screen>

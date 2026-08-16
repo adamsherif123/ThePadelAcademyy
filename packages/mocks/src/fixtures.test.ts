@@ -64,7 +64,7 @@ describe('cancellation-window demo assumptions', () => {
       new Date(slotById(b.slotId).startsAt).getTime() > nowMs,
   );
 
-  it('has exactly one upcoming booking inside the 3-hour window (forfeit), and at least one outside', () => {
+  it('has exactly one upcoming booking inside the cancellation window (forfeit), and at least one outside', () => {
     const inside = upcoming.filter((b) => !isCancellableWithoutForfeit(slotById(b.slotId), MOCK_NOW));
     expect(inside.length).toBe(1);
     expect(upcoming.length).toBeGreaterThan(inside.length);

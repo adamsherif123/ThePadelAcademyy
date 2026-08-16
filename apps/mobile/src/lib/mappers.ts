@@ -11,6 +11,8 @@ import type {
   CreditRequest,
   IsoInstant,
   LocalTime,
+  News,
+  NewsSeen,
   Notification,
   Package,
   Player,
@@ -167,9 +169,29 @@ export function rowToNotification(r: Row): Notification {
     type: str(r.type) as Notification['type'],
     slotId: nstr(r.slot_id) as Notification['slotId'],
     bookingId: nstr(r.booking_id) as Notification['bookingId'],
+    newsId: nstr(r.news_id) as Notification['newsId'],
     title: str(r.title),
     body: str(r.body),
     createdAt: iso(r.created_at),
     readAt: nstr(r.read_at) as IsoInstant | null,
+  };
+}
+
+export function rowToNews(r: Row): News {
+  return {
+    id: str(r.id) as News['id'],
+    title: str(r.title),
+    body: str(r.body),
+    imagePath: nstr(r.image_path),
+    createdBy: str(r.created_by),
+    createdAt: iso(r.created_at),
+  };
+}
+
+export function rowToNewsSeen(r: Row): NewsSeen {
+  return {
+    playerId: str(r.player_id) as NewsSeen['playerId'],
+    newsId: str(r.news_id) as NewsSeen['newsId'],
+    seenAt: iso(r.seen_at),
   };
 }

@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { formatInstantDate, formatInstantTime, isSessionConfirmed } from '@tpa/core';
+import { CANCELLATION_WINDOW_HOURS, formatInstantDate, formatInstantTime, isSessionConfirmed } from '@tpa/core';
 import { radius, space } from '@tpa/theme';
 import type { BookingStatus, Coach, IsoInstant, Level, SessionSlot } from '@tpa/types';
 import { useMemo } from 'react';
@@ -145,7 +145,7 @@ export function BookingCard(props: BookingCardProps) {
             <InfoCard
               variant="danger"
               size="sm"
-              text="Inside 3-hour window — cancelling now forfeits your credit"
+              text={`Inside ${CANCELLATION_WINDOW_HOURS}-hour window — cancelling now forfeits your credit`}
             />
           )}
           <View style={styles.cancelRow}>
