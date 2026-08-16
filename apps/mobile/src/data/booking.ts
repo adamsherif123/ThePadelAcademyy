@@ -1,4 +1,5 @@
 import {
+  BOOKING_WINDOW_HOURS,
   bookableTypesFor,
   cairoCalendarDate,
   cairoWeekStart,
@@ -71,16 +72,45 @@ export interface DateStripDay extends CairoDay {
   spots: number;
 }
 
+/**
+ * The client-side mirror of book_slot's server guard (Session 1): an EMPTY
+ * slot (zero bookings) is hidden from players within BOOKING_WINDOW_HOURS of
+ * its starts_at — the server would reject a first booking there with
+ * `booking_window_closed`, so nothing should ever show it as bookable in the
+ * first place. Once a slot has at least one booking, this never applies to it
+ * again, no matter how close to start it gets (mirrors the server's own
+ * `booked_count > 0 or starts_at - now >= booking_window` condition exactly —
+ * same constant, same boundary, `>=` allows, `<` blocks). Deliberately scoped
+ * to slots still in the FUTURE (`msUntilStart > 0`): an already-started empty
+ * slot is a different, pre-existing case (the `past` verdict), not this rule —
+ * this predicate must never retroactively hide something sessionsForDay was
+ * already showing as "Started".
+ *
+ * The SINGLE shared predicate every player-facing derivation below calls —
+ * `isJoinableIgnoringCredit` (backing dateStrip's spot counts AND
+ * weekAvailabilitySummary) and `sessionsForDay` (the feed itself) — so the
+ * feed, the date-strip counts, and the weekly banner can never disagree with
+ * each other or with the server rule.
+ */
+export function isWithinBookingWindow(slot: SessionSlot, now: IsoInstant): boolean {
+  if (slot.bookedCount > 0) return false;
+  const msUntilStart = new Date(slot.startsAt).getTime() - new Date(now).getTime();
+  return msUntilStart > 0 && msUntilStart < BOOKING_WINDOW_HOURS * 3_600_000;
+}
+
 /** Would `slot` even be a candidate to count as "available" to `player` right now,
  * ignoring credit balance entirely? Mirrors canBookSlot's structural checks
  * (published, not started, has room — gender/level are both display-only now
  * and never gate) without the credit check, since "credits never hide a
  * session" applies to these coarse counts too, not just the booking feed. Reuses
- * `slotRemainingCapacity` (@tpa/core) rather than re-deriving it. */
+ * `slotRemainingCapacity` (@tpa/core) rather than re-deriving it. Also excludes
+ * an empty slot within the booking window (`isWithinBookingWindow`) — the
+ * server would reject booking it, so it isn't a real "spot" either. */
 function isJoinableIgnoringCredit(slot: SessionSlot, now: IsoInstant): boolean {
   if (slot.status !== 'published') return false;
   if (new Date(slot.startsAt).getTime() <= new Date(now).getTime()) return false;
   if (slotRemainingCapacity(slot) <= 0) return false;
+  if (isWithinBookingWindow(slot, now)) return false;
   return true;
 }
 
@@ -305,6 +335,12 @@ export interface DaySession {
  * session still comes back here with a `no_credit` / `credits_expired` verdict,
  * never filtered out — the caller renders it dimmed, exactly as the old
  * `slotDisplay` already did for `no_credit`.
+ *
+ * An empty slot inside the booking window (`isWithinBookingWindow`) is the ONE
+ * exception that IS filtered out entirely, not dimmed — the server would
+ * reject a first booking there outright (`booking_window_closed`), so showing
+ * it (even greyed) would read as a session that "should" be bookable but
+ * mysteriously isn't. A slot with ≥1 booking is never affected, at any hour.
  */
 export function sessionsForDay(
   slots: SessionSlot[],
@@ -317,6 +353,7 @@ export function sessionsForDay(
   return slots
     .filter((s) => s.status === 'published')
     .filter((s) => sameCairoDay(s.startsAt, day))
+    .filter((s) => !isWithinBookingWindow(s, now))
     .map((slot) => ({
       slot,
       availability:

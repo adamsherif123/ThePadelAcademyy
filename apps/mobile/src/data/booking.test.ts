@@ -1,4 +1,4 @@
-import { cairoCalendarDate, cairoWeekStart, templateCoveredWeekdays } from '@tpa/core';
+import { BOOKING_WINDOW_HOURS, cairoCalendarDate, cairoWeekStart, templateCoveredWeekdays } from '@tpa/core';
 import type {
   AvailabilityTemplate,
   Booking,
@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import {
   bookedSlotIds,
   dateStrip,
+  isWithinBookingWindow,
   pastSessions,
   sessionsForDay,
   slotAvailability,
@@ -258,6 +259,76 @@ describe('sessionsForDay', () => {
   });
 });
 
+describe('isWithinBookingWindow (Session 2 — the 5h-empty-slot hide, mirrors the server booking_window_closed guard)', () => {
+  const hoursFromNow = (h: number): IsoInstant =>
+    new Date(new Date(NOW).getTime() + h * 3_600_000).toISOString() as IsoInstant;
+
+  it('is true for an EMPTY slot inside the window', () => {
+    const s = slot({ id: 'bw1' as SessionSlot['id'], bookedCount: 0, startsAt: hoursFromNow(4) });
+    expect(isWithinBookingWindow(s, NOW)).toBe(true);
+  });
+
+  it('is false at exactly the window boundary and beyond — matches the server\'s ">=" (inclusive-allow)', () => {
+    const atBoundary = slot({
+      id: 'bw2' as SessionSlot['id'],
+      bookedCount: 0,
+      startsAt: hoursFromNow(BOOKING_WINDOW_HOURS),
+    });
+    const beyond = slot({
+      id: 'bw3' as SessionSlot['id'],
+      bookedCount: 0,
+      startsAt: hoursFromNow(BOOKING_WINDOW_HOURS + 1),
+    });
+    expect(isWithinBookingWindow(atBoundary, NOW)).toBe(false);
+    expect(isWithinBookingWindow(beyond, NOW)).toBe(false);
+  });
+
+  it('is false once the slot has at least one booking, however soon it starts', () => {
+    const s = slot({ id: 'bw4' as SessionSlot['id'], bookedCount: 1, startsAt: hoursFromNow(1) });
+    expect(isWithinBookingWindow(s, NOW)).toBe(false);
+  });
+
+  it('is false for an already-started empty slot — this is about the future, not the separate "past" verdict', () => {
+    const s = slot({ id: 'bw5' as SessionSlot['id'], bookedCount: 0, startsAt: hoursFromNow(-1) });
+    expect(isWithinBookingWindow(s, NOW)).toBe(false);
+  });
+});
+
+describe('sessionsForDay hides empty-within-window slots entirely (not dimmed)', () => {
+  const hoursFromNow = (h: number): IsoInstant =>
+    new Date(new Date(NOW).getTime() + h * 3_600_000).toISOString() as IsoInstant;
+
+  it('an empty slot inside the window is absent from the feed entirely — not shown dimmed', () => {
+    const startsAt = hoursFromNow(4);
+    const day = cairoCalendarDate(startsAt);
+    const s = slot({ id: 'sfd_bw1' as SessionSlot['id'], bookedCount: 0, startsAt });
+    expect(sessionsForDay([s], player, [], [], NOW, day)).toEqual([]);
+  });
+
+  it('the SAME empty slot at 6h+ out is included normally', () => {
+    const startsAt = hoursFromNow(6);
+    const day = cairoCalendarDate(startsAt);
+    const s = slot({ id: 'sfd_bw2' as SessionSlot['id'], bookedCount: 0, startsAt });
+    const out = sessionsForDay([s], player, [], [], NOW, day);
+    expect(out.map((x) => x.slot.id)).toEqual(['sfd_bw2']);
+  });
+
+  it('a slot with an existing booking is still shown even deep inside the window', () => {
+    const startsAt = hoursFromNow(1);
+    const day = cairoCalendarDate(startsAt);
+    const s = slot({ id: 'sfd_bw3' as SessionSlot['id'], bookedCount: 1, startsAt });
+    const out = sessionsForDay([s], player, [], [], NOW, day);
+    expect(out.map((x) => x.slot.id)).toEqual(['sfd_bw3']);
+  });
+
+  it('an empty OPEN (untyped) block inside the window is hidden exactly like a typed one', () => {
+    const startsAt = hoursFromNow(4);
+    const day = cairoCalendarDate(startsAt);
+    const open = openSlot({ id: 'sfd_bw4' as SessionSlot['id'], bookedCount: 0, startsAt });
+    expect(sessionsForDay([open], player, [], [], NOW, day)).toEqual([]);
+  });
+});
+
 describe('upcoming / past split', () => {
   it('upcoming = active booking with a future slot; cancelled + past go to past', () => {
     const future = slot({ id: 'f' as SessionSlot['id'], startsAt: iso(3) });
@@ -338,13 +409,14 @@ describe('templateCoveredWeekdays / dateStrip (@tpa/core isDayOpen)', () => {
     expect(days.find((d) => d.key === tuesday.key)!.closed).toBe(true);
   });
 
-  it('spots sums remaining capacity across the day, excluding only full, past-within-day and cancelled slots — gender never excludes', () => {
+  it('spots sums remaining capacity across the day, excluding full, past-within-day, cancelled, AND empty-within-the-booking-window slots — gender never excludes', () => {
     const testNow = iso(2, 14); // 2pm on day+2 — late enough in the day to have a genuine "already started" case
     const day = cairoCalendarDate(testNow);
     const slots: SessionSlot[] = [
-      slot({ id: 'sp1' as SessionSlot['id'], capacity: 4, bookedCount: 1, startsAt: iso(2, 16) }), // +3, later today
-      slot({ id: 'sp2' as SessionSlot['id'], capacity: 2, bookedCount: 0, startsAt: iso(2, 18) }), // +2, later today
-      slot({ id: 'sp_ladies' as SessionSlot['id'], gender: 'ladies', capacity: 4, startsAt: iso(2, 17) }), // +4 — gender no longer excludes (gender-display-only migration), even for this (men) player
+      slot({ id: 'sp1' as SessionSlot['id'], capacity: 4, bookedCount: 1, startsAt: iso(2, 16) }), // +2h, ALREADY has a booking — the booking-window rule never applies to it, at any hour
+      slot({ id: 'sp2' as SessionSlot['id'], capacity: 2, bookedCount: 0, startsAt: iso(2, 21) }), // +7h, empty but OUTSIDE the 5h window — counts
+      slot({ id: 'sp_ladies' as SessionSlot['id'], gender: 'ladies', capacity: 4, startsAt: iso(2, 20) }), // +6h, empty, outside the window — gender no longer excludes (gender-display-only migration), even for this (men) player
+      slot({ id: 'sp_window' as SessionSlot['id'], capacity: 4, startsAt: iso(2, 17) }), // excluded: EMPTY and only +3h out — inside the 5h booking window (Session 2)
       slot({ id: 'sp_full' as SessionSlot['id'], capacity: 2, bookedCount: 2, startsAt: iso(2, 19) }), // excluded: full
       slot({ id: 'sp_past' as SessionSlot['id'], capacity: 4, startsAt: iso(2, 10) }), // excluded: already started (10am < 2pm testNow, same day)
       slot({ id: 'sp_cancelled' as SessionSlot['id'], capacity: 4, status: 'cancelled', startsAt: iso(2, 20) }), // excluded: cancelled
@@ -378,7 +450,10 @@ describe('weekAvailabilitySummary', () => {
     new Date(weekEndMs + hoursPast * 3_600_000).toISOString() as IsoInstant;
 
   it('counts joinable sessions in the rest of this week, today, and finds the very next one', () => {
-    const laterToday = slot({ id: 'w1' as SessionSlot['id'], startsAt: soon(2) });
+    // bookedCount: 1 — soon(2) is inside the 5h booking window; an ALREADY-booked
+    // slot is exempt from that rule (Session 2), which is what this test needs to
+    // isolate: it's testing the week/today/next-session counting, not the window rule.
+    const laterToday = slot({ id: 'w1' as SessionSlot['id'], bookedCount: 1, startsAt: soon(2) });
     const laterThisWeek = slot({ id: 'w2' as SessionSlot['id'], startsAt: afterThisWeek(-1) }); // 1h before week end
     const nextWeek = slot({ id: 'w3' as SessionSlot['id'], startsAt: afterThisWeek(1) }); // 1h after week end
     const summary = weekAvailabilitySummary([laterToday, laterThisWeek, nextWeek], NOW);
@@ -388,7 +463,8 @@ describe('weekAvailabilitySummary', () => {
   });
 
   it('no longer excludes a gender-mismatched slot — gender never gates anymore (gender-display-only migration)', () => {
-    const ladiesSlot = slot({ id: 'w_ladies' as SessionSlot['id'], gender: 'ladies', startsAt: soon(2) });
+    // bookedCount: 1 so this isolates the gender question from the (separate) booking-window rule.
+    const ladiesSlot = slot({ id: 'w_ladies' as SessionSlot['id'], gender: 'ladies', bookedCount: 1, startsAt: soon(2) });
     const summary = weekAvailabilitySummary([ladiesSlot], NOW);
     expect(summary.sessionsThisWeek).toBe(1);
     expect(summary.nextSessionAt).toBe(soon(2));
@@ -398,7 +474,8 @@ describe('weekAvailabilitySummary', () => {
     const full = slot({ id: 'w_full' as SessionSlot['id'], capacity: 2, bookedCount: 2, startsAt: soon(2) });
     const past = slot({ id: 'w_past' as SessionSlot['id'], startsAt: iso(-1) });
     const cancelled = slot({ id: 'w_cancelled' as SessionSlot['id'], status: 'cancelled', startsAt: soon(2) });
-    const noCredit = slot({ id: 'w_nocredit' as SessionSlot['id'], startsAt: soon(2) });
+    // bookedCount: 1 so this isolates the credit question from the (separate) booking-window rule.
+    const noCredit = slot({ id: 'w_nocredit' as SessionSlot['id'], bookedCount: 1, startsAt: soon(2) });
     // No batches passed at all — noCredit has zero usable credit but still counts:
     // "credits never hide a session" applies to this coarse count too.
     const summary = weekAvailabilitySummary([full, past, cancelled, noCredit], NOW);
@@ -409,6 +486,16 @@ describe('weekAvailabilitySummary', () => {
   it('reports zero and a null next session when nothing at all is upcoming', () => {
     const summary = weekAvailabilitySummary([], NOW);
     expect(summary).toEqual({ sessionsThisWeek: 0, sessionsToday: 0, nextSessionAt: null });
+  });
+
+  it('excludes an empty slot inside the 5h booking window (Session 2) — an EMPTY soon(2) slot does not count, but the same slot WITH a booking does', () => {
+    const emptyAndSoon = slot({ id: 'w_bw_empty' as SessionSlot['id'], bookedCount: 0, startsAt: soon(2) });
+    const bookedAndSoon = slot({ id: 'w_bw_booked' as SessionSlot['id'], bookedCount: 1, startsAt: soon(3) });
+    const onlyEmpty = weekAvailabilitySummary([emptyAndSoon], NOW);
+    expect(onlyEmpty).toEqual({ sessionsThisWeek: 0, sessionsToday: 0, nextSessionAt: null });
+    const withBooked = weekAvailabilitySummary([emptyAndSoon, bookedAndSoon], NOW);
+    expect(withBooked.sessionsThisWeek).toBe(1);
+    expect(withBooked.nextSessionAt).toBe(soon(3)); // the empty one is invisible, so the booked one is "next"
   });
 });
 
