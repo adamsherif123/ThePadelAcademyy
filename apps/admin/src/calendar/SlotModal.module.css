@@ -384,6 +384,30 @@
     grid-template-columns: 1fr;
   }
 
+  /* ── Summary block ──────────────────────────────────────────────────────
+     `.pills` is flex-shrink: 0, so on a narrow card the badges claimed the full
+     width and `.summaryText` collapsed to one word per line — while the badges
+     themselves still overflowed the card's right edge. Wrapping the row puts the
+     icon + text on the first line at full width and drops the badges onto their
+     own line beneath, where they wrap instead of overflowing. */
+  .summary {
+    flex-wrap: wrap;
+    row-gap: var(--space-sm);
+    align-items: flex-start;
+  }
+  .summaryText {
+    /* flex-basis 0 rather than auto, so the text takes the line's remaining width
+       instead of being sized by its longest word. */
+    flex-basis: 0;
+  }
+  .pills {
+    order: 1;
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    flex-shrink: 1;
+    row-gap: var(--space-xs);
+  }
+
   /* ── Sectioning ─────────────────────────────────────────────────────────
      The main view mixes three jobs (what is this session / who is booked /
      edit it). Headers tell you which one you're looking at mid-scroll. */
