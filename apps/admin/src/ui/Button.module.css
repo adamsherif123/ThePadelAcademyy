@@ -50,3 +50,14 @@
 .destructive:hover:not(:disabled) {
   filter: brightness(0.97);
 }
+
+@media (max-width: 768px) {
+  /* 40px clears most thumbs but not the 44px iOS guideline; the small variant at 30px
+     definitely didn't. Raised, not redesigned — padding and type stay as they were. */
+  .button {
+    min-height: 44px;
+  }
+  .sm {
+    min-height: 38px;
+  }
+}

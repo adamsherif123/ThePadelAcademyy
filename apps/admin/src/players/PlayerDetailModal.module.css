@@ -215,3 +215,9 @@
   border-radius: var(--radius-md);
   font-size: var(--font-size-caption);
 }
+
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

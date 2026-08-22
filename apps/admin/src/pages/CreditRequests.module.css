@@ -149,3 +149,15 @@
   object-fit: contain;
   background: var(--color-bg-canvas);
 }
+
+@media (max-width: 768px) {
+  /* Seven columns, two of them action buttons — 620px would still crush them, so this
+     table gets a wider floor than the shared default and scrolls a little further. */
+  .tableWrap table {
+    min-width: 780px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

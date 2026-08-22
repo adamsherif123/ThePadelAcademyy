@@ -120,3 +120,55 @@
   color: var(--color-text-inverse);
   text-decoration: underline;
 }
+
+/* ── Mobile: the same sidebar, as an off-canvas drawer ──────────────────────
+   Below the shell's 768px breakpoint this stops being a flex child and becomes a
+   fixed panel that slides in over the content. `visibility` (not just transform)
+   is toggled so the closed drawer's links aren't tabbable — an off-screen but
+   focusable nav is a real keyboard trap, not a cosmetic detail.
+   ────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: 50;
+    width: min(280px, 84vw);
+    height: 100dvh;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 0.2s ease, visibility 0.2s ease;
+  }
+
+  .sidebar[data-open='true'] {
+    transform: translateX(0);
+    visibility: visible;
+  }
+
+  /* Nav rows and the sign-out button become finger-sized. */
+  .item {
+    min-height: 44px;
+  }
+
+  .signout {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+  }
+
+  .footerLink {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none;
+  }
+}

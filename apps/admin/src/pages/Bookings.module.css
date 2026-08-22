@@ -97,3 +97,29 @@
   display: flex;
   gap: var(--space-sm);
 }
+
+@media (max-width: 768px) {
+  /* The search takes its own row rather than fighting the status filter for width. */
+  .search {
+    min-width: 100%;
+  }
+
+  /* Stat cards read fine two-up at this width; the numbers are short. */
+  .counts {
+    gap: var(--space-md);
+  }
+  .countCard {
+    padding: var(--space-md);
+  }
+
+  /* Page info above, prev/next below, each full-width — space-between on a 343px row
+     put the two buttons shoulder-to-shoulder against the edge. */
+  .pagination {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-sm);
+  }
+  .pageControls {
+    justify-content: space-between;
+  }
+}

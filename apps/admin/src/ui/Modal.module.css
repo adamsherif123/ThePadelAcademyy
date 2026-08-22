@@ -68,3 +68,44 @@
   padding: var(--space-xl);
   padding-block-start: 0;
 }
+
+@media (max-width: 768px) {
+  .overlay {
+    /* Top-aligned, not centred: a tall form on a short viewport should start at the
+       top and scroll, not have its header pushed off the top edge by centring. */
+    align-items: flex-start;
+    padding: var(--space-sm);
+  }
+
+  .modal {
+    max-width: none;
+    max-height: calc(100dvh - var(--space-sm) * 2);
+  }
+
+  .header,
+  .body,
+  .footer {
+    padding: var(--space-lg);
+  }
+  .footer {
+    padding-block-start: 0;
+  }
+
+  /* The X is the primary escape on a phone (no Escape key) — make it a real target. */
+  .close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    margin-block-start: calc(-1 * var(--space-xs));
+    margin-inline-end: calc(-1 * var(--space-xs));
+  }
+
+  /* Footer actions go full-width and stack, so a two-button row can't overflow. */
+  .footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+}

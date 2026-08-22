@@ -24,27 +24,33 @@ export function Table<T>({
   keyOf: (row: T) => string;
 }) {
   return (
-    <table className={styles.table}>
-      <thead>
-        <tr>
-          {columns.map((c) => (
-            <th key={c.key} className={styles.th} data-align={c.align ?? 'start'}>
-              {c.header}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr key={keyOf(row)} className={styles.row}>
+    // The scroll container is the point: a table too wide for the viewport scrolls
+    // HERE, inside its own bounded box, instead of widening the page and making the
+    // whole layout pan sideways. On desktop the table always fits, so this div is
+    // visually inert.
+    <div className={styles.scroll}>
+      <table className={styles.table}>
+        <thead>
+          <tr>
             {columns.map((c) => (
-              <td key={c.key} className={styles.td} data-align={c.align ?? 'start'}>
-                {c.render(row)}
-              </td>
+              <th key={c.key} className={styles.th} data-align={c.align ?? 'start'}>
+                {c.header}
+              </th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={keyOf(row)} className={styles.row}>
+              {columns.map((c) => (
+                <td key={c.key} className={styles.td} data-align={c.align ?? 'start'}>
+                  {c.render(row)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

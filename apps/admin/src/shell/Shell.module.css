@@ -1,3 +1,12 @@
+/* ── Responsive breakpoint ──────────────────────────────────────────────────
+   768px is the SHELL breakpoint: below it the sidebar becomes a drawer and the
+   content takes the full width. The page grids keep their own pre-existing 900px
+   collapse (Dashboard, Coaches, News, Packages, Bookings) — between 768 and 900
+   you get the desktop sidebar with single-column content, which is exactly right
+   for a tablet in portrait. Every mobile rule in this codebase is additive: above
+   768px the rendered result is what it was before.
+   ────────────────────────────────────────────────────────────────────────── */
+
 .shell {
   display: flex;
   min-height: 100vh;
@@ -13,4 +22,64 @@
   max-width: 1200px;
   padding-block: var(--space-xxl);
   padding-inline: var(--space-xxl);
+}
+
+/* Mobile-only chrome — absent from the desktop layout entirely. */
+.topbar {
+  display: none;
+}
+.scrim {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .shell {
+    flex-direction: column;
+  }
+
+  .topbar {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding-block: var(--space-sm);
+    padding-inline: var(--space-md);
+    background: var(--color-bg-inverse);
+    border-block-end: 1px solid var(--color-border-onInverse);
+  }
+
+  .menuBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--color-text-inverse);
+    cursor: pointer;
+  }
+  .menuBtn:hover {
+    background: var(--color-pillOnInverse-bg);
+  }
+
+  .scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: block;
+    background: color-mix(in srgb, var(--color-bg-inverse) 55%, transparent);
+  }
+
+  .content {
+    /* The sidebar no longer takes 264px, so the content owns the full width — with
+       16px gutters instead of 32px, which is what buys back room at 375px. */
+    max-width: none;
+    padding-block: var(--space-xl);
+    padding-inline: var(--space-lg);
+  }
 }

@@ -1,3 +1,8 @@
+.scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -33,4 +38,13 @@
 .th[data-align='end'],
 .td[data-align='end'] {
   text-align: end;
+}
+
+@media (max-width: 768px) {
+  /* Below this the table stops shrinking and starts scrolling inside .scroll.
+     Without a floor the browser would keep squeezing columns until every cell
+     wrapped to one word per line — technically "fitting", actually unreadable. */
+  .table {
+    min-width: 620px;
+  }
 }

@@ -108,3 +108,21 @@
     display: none;
   }
 }
+
+@media (max-width: 768px) {
+  .search {
+    min-width: 100%;
+  }
+  .filterEnd {
+    justify-content: space-between;
+  }
+
+  /* 116px of reserved credits column on a 343px row squeezed the name to nothing. */
+  .credits {
+    min-width: 0;
+  }
+  .row {
+    padding-inline: var(--space-md);
+    min-height: 56px;
+  }
+}

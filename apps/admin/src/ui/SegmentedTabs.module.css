@@ -28,3 +28,17 @@
   font-weight: var(--font-weight-bold);
   box-shadow: var(--shadow-sm);
 }
+
+@media (max-width: 768px) {
+  .track {
+    display: flex;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tab {
+    min-height: 40px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}

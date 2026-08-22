@@ -142,3 +142,33 @@
   color: var(--color-text-muted);
   font-size: var(--font-size-caption);
 }
+
+@media (max-width: 768px) {
+  /* Title and "Add coach" stop competing for one row. */
+  .head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-md);
+  }
+
+  /* 4-up at 343px gives each stat ~85px, which wraps "Hours this month" onto three
+     lines. 2x2 gives them room; the dividers are rebuilt for a two-column grid since
+     `.stat + .stat` would otherwise draw a left border on the first item of row 2. */
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .stat + .stat {
+    border-inline-start: none;
+  }
+  .stat:nth-child(even) {
+    border-inline-start: 1px solid var(--color-border-subtle);
+  }
+  .stat:nth-child(n + 3) {
+    border-block-start: 1px solid var(--color-border-subtle);
+  }
+
+  .editBtn {
+    width: 44px;
+    height: 44px;
+  }
+}

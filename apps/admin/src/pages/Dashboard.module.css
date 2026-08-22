@@ -96,3 +96,21 @@
   color: var(--color-status-warning);
   flex-shrink: 0;
 }
+
+@media (max-width: 768px) {
+  /* auto-fit/minmax(190px) already collapses to one column at 375px. Two-up keeps the
+     four KPIs on one screen instead of pushing the charts below the fold. */
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-md);
+  }
+
+  /* The right-hand column of a row (amount/status) can't be allowed to squeeze the
+     name to zero width. */
+  .row {
+    gap: var(--space-sm);
+  }
+  .timeCol {
+    min-width: 56px;
+  }
+}

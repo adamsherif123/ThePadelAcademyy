@@ -32,8 +32,15 @@ const NAV: readonly { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/news', label: 'News', icon: Newspaper },
 ];
 
-/** The navy full-height sidebar: brand, nav (royal pill for the active item), user card. */
-export function Sidebar() {
+/**
+ * The navy full-height sidebar: brand, nav (royal pill for the active item), user card.
+ *
+ * Below the shell's 768px breakpoint the very same element is an off-canvas drawer:
+ * `open` slides it in, and `onNavigate` lets the Shell close it when a link is tapped.
+ * Both props are inert above the breakpoint, where the sidebar is always in flow — so
+ * the desktop sidebar is untouched.
+ */
+export function Sidebar({ open = false, onNavigate }: { open?: boolean; onNavigate?: () => void } = {}) {
   const { admin, signOut } = useSession();
   const creditRequestsQ = useCreditRequests();
   const pendingCount = (creditRequestsQ.data ?? []).filter((r) => r.status === 'pending').length;
@@ -57,7 +64,7 @@ export function Sidebar() {
   }, []);
 
   return (
-    <aside className={styles.sidebar}>
+    <aside className={styles.sidebar} data-open={open ? 'true' : 'false'}>
       <div className={styles.brand}>
         <BrandMark />
       </div>
@@ -68,6 +75,7 @@ export function Sidebar() {
             key={to}
             to={to}
             className={({ isActive }) => [styles.item, isActive ? styles.active : ''].join(' ').trim()}
+            onClick={onNavigate}
           >
             <Icon size={20} aria-hidden />
             {label}
