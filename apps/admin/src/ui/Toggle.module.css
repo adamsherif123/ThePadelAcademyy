@@ -29,3 +29,15 @@
 .track[data-on='true'] .knob {
   transform: translateX(18px);
 }
+
+@media (max-width: 768px) {
+  /* The switch stays 44x26 visually; a transparent overlay extends the tappable
+     box to 44x44. Growing `height` instead would have redrawn the control in
+     CoachModal, NewsModal and PackageModal alike. */
+  .track::after {
+    content: '';
+    position: absolute;
+    inset-block: -9px;
+    inset-inline: 0;
+  }
+}

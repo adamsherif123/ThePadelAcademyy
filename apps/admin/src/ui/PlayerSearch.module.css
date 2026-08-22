@@ -59,3 +59,10 @@
   color: var(--color-text-secondary);
   font-size: var(--font-size-body);
 }
+
+@media (max-width: 768px) {
+  /* Booking a player into a session is a tap on one of these rows. */
+  .row {
+    min-height: 52px;
+  }
+}

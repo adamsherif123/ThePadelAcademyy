@@ -17,7 +17,19 @@ import type {
   TrainingType,
   Weekday,
 } from '@tpa/types';
-import { AlertTriangle, ArrowLeft, Ban, CalendarClock, Check, Trash2, UserPlus, Users, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Ban,
+  CalendarClock,
+  Check,
+  ChevronDown,
+  Pencil,
+  Trash2,
+  UserPlus,
+  Users,
+  X,
+} from 'lucide-react';
 import { useState } from 'react';
 
 import { markAttendance, type AttendanceStatus } from '../data/attendance';
@@ -58,6 +70,7 @@ import {
   PlayerSearch,
   Select,
   StatusChip,
+  useIsMobile,
   trainingLabelFor,
   typePlayersFor,
   groupTags,
@@ -163,6 +176,12 @@ export function SlotModal({
   const cairo0 = cairoCalendarDate(slot.startsAt);
 
   const [view, setView] = useState<View>({ k: 'main' });
+  const isMobile = useIsMobile();
+  // Courtside, the job is "who turned up" — not "change the capacity". On mobile the
+  // edit form is therefore tucked behind an expander so the roster is what you land
+  // on; on desktop there's no expander at all and every field renders as before.
+  const [editOpen, setEditOpen] = useState(false);
+  const showEditFields = !isMobile || editOpen;
   const [coachId, setCoachId] = useState<CoachId>(slot.coachId);
   const [capacity, setCapacity] = useState<number>(slot.capacity);
   const [dateStr, setDateStr] = useState(`${cairo0.year}-${pad(cairo0.month)}-${pad(cairo0.day)}`);
@@ -580,6 +599,7 @@ export function SlotModal({
         </div>
 
         {/* Roster */}
+        <h3 className={styles.sectionTitle}>{isPast ? 'Attendance' : 'Booked players'}</h3>
         <div className={styles.roster}>
           {rosterBookings.map((b) => {
             const player = playerById(players, b.playerId);
@@ -598,6 +618,20 @@ export function SlotModal({
                     {player?.phone ?? 'No phone'}
                     {tags ? ` · ${tags}` : ''}
                   </span>
+                  {/* Current attendance state in WORDS. The toggle buttons already
+                      carry it via colour + aria-pressed, but colour alone is a poor
+                      only-signal, and glancing down a roster of four to see who is
+                      still unmarked is the actual courtside need. Mobile-only —
+                      `display: none` above the breakpoint. */}
+                  {isPast ? (
+                    <span className={styles.rosterStatus} data-status={b.status}>
+                      {b.status === 'attended'
+                        ? 'Attended'
+                        : b.status === 'no_show'
+                          ? 'No-show'
+                          : 'Not marked'}
+                    </span>
+                  ) : null}
                 </div>
                 {isPast ? (
                   <div className={styles.attend}>
@@ -679,42 +713,63 @@ export function SlotModal({
           </div>
         ) : null}
 
-        {/* Edit — time */}
-        <div className={styles.timeFields}>
-          <Input label="Date" type="date" value={dateStr} onChange={(e) => setDateStr(e.target.value)} />
-          <Input label="Start" type="time" value={startStr} onChange={(e) => setStartStr(e.target.value)} />
-          <Select
-            label="Duration"
-            value={String(durationMin)}
-            onChange={(e) => setDurationMin(Number(e.target.value))}
-            options={(DURATIONS.some((d) => d.value === durationMin)
-              ? DURATIONS
-              : [{ value: durationMin, label: `${durationMin} min` }, ...DURATIONS]
-            ).map((d) => ({ value: String(d.value), label: d.label }))}
-          />
-        </div>
+        {/* Edit — collapsed behind a toggle on mobile only. */}
+        {isMobile ? (
+          <button
+            type="button"
+            className={styles.editToggle}
+            aria-expanded={editOpen}
+            onClick={() => setEditOpen((o) => !o)}
+          >
+            <Pencil size={15} aria-hidden />
+            Edit session details
+            <ChevronDown className={styles.editChevron} size={16} data-open={editOpen || undefined} aria-hidden />
+          </button>
+        ) : null}
 
-        {/* Edit — coach + capacity */}
-        <div className={styles.fields}>
-          <Select
-            label="Coach"
-            value={coachId}
-            onChange={(e) => setCoachId(e.target.value as CoachId)}
-            options={coaches.map((c) => ({ value: c.id, label: c.name }))}
-          />
-          <Input
-            label="Capacity"
-            type="number"
-            min={1}
-            value={capacity}
-            onChange={(e) => setCapacity(Number(e.target.value))}
-            // FILED, NOT FIXED (see the session report): nothing here stops the
-            // admin widening an 'individual' slot's capacity past 1 — the same
-            // gap reschedule_session has server-side. Out of this session's scope.
-            hint={`${trainingLabelFor(slot.trainingType)}: ${typePlayersFor(slot.trainingType)}`}
-          />
-        </div>
+        {showEditFields ? (
+          <>
+            {/* Edit — time */}
+            <div className={styles.timeFields}>
+              <Input label="Date" type="date" value={dateStr} onChange={(e) => setDateStr(e.target.value)} />
+              <Input label="Start" type="time" value={startStr} onChange={(e) => setStartStr(e.target.value)} />
+              <Select
+                label="Duration"
+                value={String(durationMin)}
+                onChange={(e) => setDurationMin(Number(e.target.value))}
+                options={(DURATIONS.some((d) => d.value === durationMin)
+                  ? DURATIONS
+                  : [{ value: durationMin, label: `${durationMin} min` }, ...DURATIONS]
+                ).map((d) => ({ value: String(d.value), label: d.label }))}
+              />
+            </div>
 
+            {/* Edit — coach + capacity */}
+            <div className={styles.fields}>
+              <Select
+                label="Coach"
+                value={coachId}
+                onChange={(e) => setCoachId(e.target.value as CoachId)}
+                options={coaches.map((c) => ({ value: c.id, label: c.name }))}
+              />
+              <Input
+                label="Capacity"
+                type="number"
+                min={1}
+                value={capacity}
+                onChange={(e) => setCapacity(Number(e.target.value))}
+                // FILED, NOT FIXED (see the session report): nothing here stops the
+                // admin widening an 'individual' slot's capacity past 1 — the same
+                // gap reschedule_session has server-side. Out of this session's scope.
+                hint={`${trainingLabelFor(slot.trainingType)}: ${typePlayersFor(slot.trainingType)}`}
+              />
+            </div>
+          </>
+        ) : null}
+
+        {/* Validation and warnings sit OUTSIDE the collapsible region on purpose: a
+            hidden invalid state that silently disables "Save changes" would be a
+            dead end with no visible cause. */}
         {capacityTooLow ? (
           <p className={styles.error}>Capacity can’t be below the {occupied} already booked.</p>
         ) : null}

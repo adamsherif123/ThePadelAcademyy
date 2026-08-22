@@ -367,6 +367,14 @@
   font-size: var(--font-size-body);
 }
 
+/* Mobile-only chrome: present in the DOM at all widths, hidden above the
+   breakpoint so the desktop modal renders exactly as it did before. */
+.sectionTitle,
+.rosterStatus,
+.editToggle {
+  display: none;
+}
+
 @media (max-width: 768px) {
   /* Two 1fr fields inside a 375px modal leave ~140px each — a Select with a coach
      name in it can't render that. Both grids go single-column; `.timeFields`
@@ -374,5 +382,111 @@
   .fields,
   .timeFields {
     grid-template-columns: 1fr;
+  }
+
+  /* ── Sectioning ─────────────────────────────────────────────────────────
+     The main view mixes three jobs (what is this session / who is booked /
+     edit it). Headers tell you which one you're looking at mid-scroll. */
+  .sectionTitle {
+    display: block;
+    margin-block-end: calc(-1 * var(--space-sm));
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* ── Roster rows go two-line ────────────────────────────────────────────
+     One line couldn't hold avatar + name + two attendance buttons: the name
+     was left ~89px and truncated to nothing. Name on top, the decision
+     underneath at full width. */
+  .rosterRow {
+    flex-wrap: wrap;
+    row-gap: var(--space-sm);
+    padding-block: var(--space-md);
+  }
+  .rosterInfo {
+    flex-basis: 0;
+  }
+  .rosterStatus {
+    display: inline-block;
+    width: fit-content;
+    margin-block-start: 2px;
+    padding-inline: var(--space-sm);
+    border-radius: var(--radius-pill);
+    font-size: 11px;
+    font-weight: var(--font-weight-bold);
+    background: var(--color-bg-canvas);
+    color: var(--color-text-muted);
+  }
+  .rosterStatus[data-status='attended'] {
+    background: var(--expiry-ok-bg);
+    color: var(--expiry-ok-fg);
+  }
+  .rosterStatus[data-status='no_show'] {
+    background: var(--expiry-expiring_soon-bg);
+    color: var(--expiry-expiring_soon-fg);
+  }
+
+  /* The two decisions, side by side, full width, thumb-sized. */
+  .attend {
+    order: 1;
+    flex-basis: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-sm);
+  }
+  .attendBtn {
+    justify-content: center;
+    min-height: 44px;
+    font-size: var(--font-size-body);
+  }
+  /* The chosen state gets a ring as well as a fill — colour on its own is a weak
+     only-signal, and this is the tap that records money-relevant attendance. */
+  .attendBtn[data-on='true'] {
+    box-shadow: inset 0 0 0 2px currentColor;
+  }
+
+  /* Remove stays deliberately secondary — it must not compete with the
+     attendance tap — but it was a 4px-padded link. */
+  .removeLink {
+    min-height: 40px;
+    padding-inline: var(--space-md);
+  }
+
+  /* ── The edit expander ──────────────────────────────────────────────── */
+  .editToggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    width: 100%;
+    min-height: 48px;
+    padding-inline: var(--space-md);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-canvas);
+    color: var(--color-text-primary);
+    font-size: var(--font-size-body);
+    font-weight: var(--font-weight-bold);
+    cursor: pointer;
+  }
+  .editChevron {
+    margin-inline-start: auto;
+    transition: transform 0.15s ease;
+  }
+  .editChevron[data-open] {
+    transform: rotate(180deg);
+  }
+
+  /* The history toggle was a bare 12px text link. */
+  .historyToggle {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editChevron {
+    transition: none;
   }
 }
