@@ -161,3 +161,106 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Mobile: request cards instead of a 7-column table ──────────────────────
+   Rendered INSTEAD of <Table> below 768px (useIsMobile). The desktop table above
+   the breakpoint is untouched.
+   ────────────────────────────────────────────────────────────────────────── */
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+  overflow: hidden;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-md);
+  border: none;
+  background: transparent;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.cardHead:disabled {
+  cursor: default;
+}
+.cardHeadText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+.cardName {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cardSub {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-xs) var(--space-md);
+  align-items: baseline;
+  margin: 0;
+  padding: var(--space-md);
+  border-block-start: 1px solid var(--color-border-subtle);
+}
+.cardLabel {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.cardValue {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  overflow-wrap: anywhere;
+}
+.cardBadge {
+  display: block;
+  margin-block-start: var(--space-xs);
+}
+
+/* Approve/Reject: full-width, stacked, 48px — the two decisions this page exists
+   for, sized so neither is a mis-tap away from the other. */
+.cardActions {
+  display: flex;
+  flex-direction: column;
+  /* flex-start so a RESOLVED request's badge hugs its text; the buttons span the
+     full width from their own `width: 100%`, not from stretch. */
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-block-start: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-canvas);
+}
+.cardBtn {
+  width: 100%;
+  min-height: 48px;
+}

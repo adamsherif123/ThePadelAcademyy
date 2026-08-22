@@ -18,6 +18,7 @@ import {
   PageHeader,
   Table,
   TRAINING_LABEL,
+  useIsMobile,
   type Column,
 } from '../ui';
 import styles from './CreditRequests.module.css';
@@ -53,6 +54,7 @@ interface Row {
  * Pending first. Approve is the primary (money-out) action; reject is destructive.
  */
 export function CreditRequests() {
+  const isMobile = useIsMobile();
   const data = useAdminData();
   const reqsQ = useCreditRequests();
   const [selected, setSelected] = useState<Player | null>(null);
@@ -153,6 +155,18 @@ export function CreditRequests() {
         <div className={styles.tableWrap}>
           <p className={styles.empty}>No credit requests yet.</p>
         </div>
+      ) : isMobile ? (
+        <div className={styles.cards}>
+          {rows.map((r) => (
+            <RequestCard
+              key={r.request.id}
+              row={r}
+              onPlayer={() => r.player && setSelected(r.player)}
+              onApprove={() => setModal({ kind: 'approve', row: r })}
+              onReject={() => setModal({ kind: 'reject', row: r })}
+            />
+          ))}
+        </div>
       ) : (
         <div className={styles.tableWrap}>
           <Table columns={columns} rows={rows} keyOf={(r) => r.request.id} />
@@ -175,6 +189,85 @@ export function CreditRequests() {
         />
       ) : null}
     </div>
+  );
+}
+
+/**
+ * One credit request as a phone card — the flow most likely done ON a phone: a transfer
+ * lands on WhatsApp and the admin resolves it on the spot.
+ *
+ * Approve/Reject are full-width stacked buttons at the bottom of the card, Approve first
+ * as the primary and far more common outcome. They open the SAME ApproveModal /
+ * RejectModal the desktop table opens — the override, proof preview and reason flows are
+ * not reimplemented for mobile, only reached differently. A resolved request shows its
+ * badge where the buttons would be, so the card never renders dead controls.
+ */
+function RequestCard({
+  row,
+  onPlayer,
+  onApprove,
+  onReject,
+}: {
+  row: Row;
+  onPlayer: () => void;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  const { request, player, pkg } = row;
+  const pending = request.status === 'pending';
+  return (
+    <article className={styles.card}>
+      <button type="button" className={styles.cardHead} onClick={onPlayer} disabled={!player}>
+        <Avatar name={player?.name ?? 'Player'} size={36} />
+        <span className={styles.cardHeadText}>
+          <span className={styles.cardName}>{player?.name ?? 'Unknown player'}</span>
+          <span className={styles.cardSub}>{player?.email ?? player?.phone ?? '—'}</span>
+        </span>
+      </button>
+
+      <dl className={styles.cardGrid}>
+        <dt className={styles.cardLabel}>Package</dt>
+        <dd className={styles.cardValue}>
+          {pkg ? `${pkg.name} · ${pkg.sessionCount} sessions` : '—'}
+          {request.isTrial ? (
+            <span className={styles.cardBadge}>
+              <Badge tone="info">Trial · once per player</Badge>
+            </span>
+          ) : null}
+        </dd>
+
+        <dt className={styles.cardLabel}>Price</dt>
+        <dd className={styles.cardValue}>{pkg ? formatPiastres(pkg.price) : '—'}</dd>
+
+        <dt className={styles.cardLabel}>Method</dt>
+        <dd className={styles.cardValue}>{METHOD_LABEL[request.paymentMethod]}</dd>
+
+        <dt className={styles.cardLabel}>Submitted</dt>
+        <dd className={styles.cardValue}>{formatInstantDate(request.createdAt)}</dd>
+
+        <dt className={styles.cardLabel}>Proof</dt>
+        <dd className={styles.cardValue}>
+          <ProofLink path={request.proofPath} />
+        </dd>
+      </dl>
+
+      <div className={styles.cardActions}>
+        {pending ? (
+          <>
+            <Button className={styles.cardBtn} icon={Check} onClick={onApprove}>
+              Approve
+            </Button>
+            <Button className={styles.cardBtn} variant="secondary" icon={X} onClick={onReject}>
+              Reject
+            </Button>
+          </>
+        ) : (
+          <Badge tone={request.status === 'approved' ? 'success' : 'danger'}>
+            {request.status === 'approved' ? 'Approved' : 'Declined'}
+          </Badge>
+        )}
+      </div>
+    </article>
   );
 }
 

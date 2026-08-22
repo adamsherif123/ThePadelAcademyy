@@ -44,3 +44,11 @@
 .body {
   flex: 1;
 }
+
+@media (max-width: 768px) {
+  /* 24px each side spends 48 of 343px on nothing. 16px keeps the content
+     breathing without eating a seventh of the width. */
+  .panel {
+    padding: var(--space-lg);
+  }
+}

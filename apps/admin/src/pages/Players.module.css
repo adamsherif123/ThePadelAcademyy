@@ -104,8 +104,16 @@
 }
 
 @media (max-width: 720px) {
+  /* Session 1 hid these outright to buy width. Better: keep the gender/level tags —
+     they're a real part of scanning the roster — and give them their own line under
+     the name via `order`, so the first line stays name + credits + chevron. */
+  .row {
+    flex-wrap: wrap;
+    row-gap: var(--space-xs);
+  }
   .pills {
-    display: none;
+    order: 1;
+    flex-basis: 100%;
   }
 }
 

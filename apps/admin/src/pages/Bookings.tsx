@@ -18,6 +18,7 @@ import {
   Table,
   TRAINING_LABEL,
   TypePill,
+  useIsMobile,
   type Column,
 } from '../ui';
 import styles from './Bookings.module.css';
@@ -36,6 +37,7 @@ const PAGE_SIZE = 10;
 
 /** Bookings route: count cards + filters + a server-paginated bookings table. */
 export function Bookings() {
+  const isMobile = useIsMobile();
   const [queryText, setQueryText] = useState('');
   const [search, setSearch] = useState(''); // queryText, debounced
   const [status, setStatus] = useState<StatusFilter>('all');
@@ -164,6 +166,12 @@ export function Bookings() {
         <div className={styles.tableWrap}>
           <p className={styles.empty}>{isFiltered ? 'No bookings match these filters.' : 'No bookings yet.'}</p>
         </div>
+      ) : isMobile ? (
+        <div className={styles.cards}>
+          {rows.map((r) => (
+            <BookingCard key={r.booking.id} row={r} onPlayer={() => r.player && setSelected(r.player)} />
+          ))}
+        </div>
       ) : (
         <div className={styles.tableWrap}>
           <Table columns={columns} rows={rows} keyOf={(r) => r.booking.id} />
@@ -198,6 +206,40 @@ export function Bookings() {
         />
       ) : null}
     </div>
+  );
+}
+
+/**
+ * One booking as a phone card. Same BookingRow the table's columns read — the data and
+ * the player-modal handler are shared; only the presentation differs.
+ *
+ * The whole header is the tap target for opening the player (a 32px avatar alone is a
+ * poor one), and the rest is a label/value grid so every field keeps its meaning without
+ * a column header to refer back to.
+ */
+function BookingCard({ row, onPlayer }: { row: BookingRow; onPlayer: () => void }) {
+  const { booking, slot, coach, player } = row;
+  return (
+    <article className={styles.card}>
+      <button type="button" className={styles.cardHead} onClick={onPlayer} disabled={!player}>
+        <Avatar name={player?.name ?? 'Player'} size={36} />
+        <span className={styles.cardName}>{player?.name ?? 'Unknown player'}</span>
+        <StatusChip status={booking.status} />
+      </button>
+
+      <dl className={styles.cardGrid}>
+        <dt className={styles.cardLabel}>Date</dt>
+        <dd className={styles.cardValue}>
+          {slot ? `${formatMonthDay(slot.startsAt)} · ${formatInstantTime(slot.startsAt)}` : '—'}
+        </dd>
+
+        <dt className={styles.cardLabel}>Session</dt>
+        <dd className={styles.cardValue}>{slot ? <TypePill type={slot.trainingType} /> : '—'}</dd>
+
+        <dt className={styles.cardLabel}>Coach</dt>
+        <dd className={styles.cardValue}>{coach?.name ?? '—'}</dd>
+      </dl>
+    </article>
   );
 }
 

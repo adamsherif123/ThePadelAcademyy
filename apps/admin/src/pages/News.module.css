@@ -157,3 +157,20 @@
     height: 44px;
   }
 }
+
+@media (max-width: 768px) {
+  /* Thumb (56) + two 44px buttons + gaps left barely 140px for the title and
+     snippet. `order` moves the actions to their own row without touching the DOM
+     order that desktop and screen readers rely on. */
+  .card {
+    flex-wrap: wrap;
+    row-gap: var(--space-sm);
+  }
+  .cardActions {
+    order: 1;
+    flex-basis: 100%;
+    justify-content: flex-end;
+    padding-block-start: var(--space-sm);
+    border-block-start: 1px solid var(--color-border-subtle);
+  }
+}

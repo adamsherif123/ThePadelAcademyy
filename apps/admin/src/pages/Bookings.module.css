@@ -123,3 +123,74 @@
     justify-content: space-between;
   }
 }
+
+/* ── Mobile: booking cards instead of a sideways-scrolling table ────────────
+   Rendered INSTEAD of <Table> below 768px (useIsMobile), never alongside it —
+   so there is one set of controls in the DOM, not a hidden duplicate.
+   ────────────────────────────────────────────────────────────────────────── */
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+  overflow: hidden;
+}
+
+/* The whole header row opens the player — a 36px avatar on its own is too small
+   a target, and the name is what the thumb aims at anyway. */
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-md);
+  border: none;
+  background: transparent;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.cardHead:disabled {
+  cursor: default;
+}
+.cardName {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-xs) var(--space-md);
+  align-items: center;
+  margin: 0;
+  padding: var(--space-md);
+  border-block-start: 1px solid var(--color-border-subtle);
+}
+.cardLabel {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.cardValue {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-body);
+  overflow-wrap: anywhere;
+}

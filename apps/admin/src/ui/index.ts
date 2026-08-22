@@ -20,6 +20,7 @@ export { StatCard } from './StatCard';
 export { StatusChip } from './StatusChip';
 export { Table, type Column } from './Table';
 export { Toggle } from './Toggle';
+export { useIsMobile, useMediaQuery } from './useMediaQuery';
 export { TypePill } from './TypePill';
 export {
   TRAINING_LABEL,
