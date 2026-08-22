@@ -41,6 +41,7 @@ export const queryKeys = {
   purchases: ['purchases'] as const,
   creditRequests: ['creditRequests'] as const,
   news: ['news'] as const,
+  coachHours: ['coachHours'] as const,
 };
 
 /** What each mutation family touches — the keys it must invalidate. */
@@ -52,7 +53,7 @@ export const TOUCHED = {
   // approve mints a batch + a purchase AND resolves the request; reject resolves it (the
   // extra money keys are harmless no-ops on reject).
   creditRequests: [queryKeys.batches, queryKeys.purchases, queryKeys.creditRequests] as const,
-  attendance: [queryKeys.bookings, queryKeys.bookingsPage, queryKeys.bookingStatusCounts] as const,
+  attendance: [queryKeys.bookings, queryKeys.bookingsPage, queryKeys.bookingStatusCounts, queryKeys.coachHours] as const,
   coaches: [queryKeys.coaches] as const,
   packages: [queryKeys.packages] as const,
   templates: [queryKeys.templates] as const,

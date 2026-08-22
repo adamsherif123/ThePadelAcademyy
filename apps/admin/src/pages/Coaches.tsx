@@ -1,10 +1,10 @@
 import type { Booking, Coach, IsoInstant, SessionSlot } from '@tpa/types';
-import { CalendarDays, Pencil, Plus, Star, Users } from 'lucide-react';
+import { CalendarDays, Clock, Pencil, Plus, Star, Users } from 'lucide-react';
 import { useState } from 'react';
 
 import { CoachModal } from '../coaches/CoachModal';
 import { coachWeekStats } from '../data/coaches';
-import { useAdminData } from '../data/queries';
+import { useAdminData, useCoachHours } from '../data/queries';
 import { useSession } from '../session/SessionProvider';
 import { Avatar, Badge, Button, ErrorView, LoadingView, PageHeader, trainingLabelFor } from '../ui';
 import styles from './Coaches.module.css';
@@ -13,12 +13,18 @@ import styles from './Coaches.module.css';
 export function Coaches() {
   const { now } = useSession();
   const data = useAdminData();
+  // Hours coached is a SEPARATE lightweight query (the SQL aggregate) — never
+  // folded into useAdminData's monolith, and never summed client-side.
+  const hoursQ = useCoachHours();
   const [editing, setEditing] = useState<Coach | 'new' | null>(null);
 
-  if (data.isPending) return <LoadingView />;
-  if (data.isError) return <ErrorView onRetry={data.refetch} />;
+  if (data.isPending || hoursQ.isPending) return <LoadingView />;
+  if (data.isError || hoursQ.isError) {
+    return <ErrorView onRetry={() => { data.refetch(); hoursQ.refetch(); }} />;
+  }
 
   const coaches = data.coaches;
+  const hoursByCoach = hoursQ.data ?? {};
 
   return (
     <div>
@@ -41,6 +47,7 @@ export function Coaches() {
             slots={data.slots}
             bookings={data.bookings}
             now={now}
+            hoursCoached={hoursByCoach[coach.id] ?? 0}
             onEdit={() => setEditing(coach)}
           />
         ))}
@@ -58,12 +65,14 @@ function CoachCard({
   slots,
   bookings,
   now,
+  hoursCoached,
   onEdit,
 }: {
   coach: Coach;
   slots: SessionSlot[];
   bookings: Booking[];
   now: IsoInstant;
+  hoursCoached: number;
   onEdit: () => void;
 }) {
   const stats = coachWeekStats(slots, bookings, coach.id, now);
@@ -103,6 +112,11 @@ function CoachCard({
           <Star className={styles.statIcon} size={16} aria-hidden />
           <span className={styles.statValue}>{stats.attendancePct === null ? '—' : `${stats.attendancePct}%`}</span>
           <span className={styles.statLabel}>Attendance</span>
+        </div>
+        <div className={styles.stat}>
+          <Clock className={styles.statIcon} size={16} aria-hidden />
+          <span className={styles.statValue}>{hoursCoached.toFixed(1)}</span>
+          <span className={styles.statLabel}>Hours this month</span>
         </div>
       </div>
 

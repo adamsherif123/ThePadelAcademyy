@@ -2,6 +2,7 @@ import type {
   AvailabilityTemplate,
   Booking,
   Coach,
+  CoachId,
   CreditBatch,
   News,
   Package,
@@ -17,6 +18,7 @@ import {
   fetchBookings,
   fetchBookingsPage,
   fetchBookingStatusCounts,
+  fetchCoachHours,
   fetchCoaches,
   fetchCreditBatches,
   fetchCreditRequests,
@@ -57,6 +59,11 @@ function toResource<T>(q: {
 }
 
 export const useCoaches = () => toResource(useQuery({ queryKey: queryKeys.coaches, queryFn: fetchCoaches }));
+/** Hours coached per coach for the CURRENT Cairo month — a separate lightweight
+ *  query (the SQL aggregate), never folded into useAdminData's monolith.
+ *  Coaches.tsx defaults a coach absent from the map to 0. */
+export const useCoachHours = (): Resource<Record<CoachId, number>> =>
+  toResource(useQuery({ queryKey: queryKeys.coachHours, queryFn: fetchCoachHours }));
 export const usePlayers = () => toResource(useQuery({ queryKey: queryKeys.players, queryFn: fetchPlayers }));
 export const usePackages = () => toResource(useQuery({ queryKey: queryKeys.packages, queryFn: fetchPackages }));
 export const useTemplates = () => toResource(useQuery({ queryKey: queryKeys.templates, queryFn: fetchTemplates }));

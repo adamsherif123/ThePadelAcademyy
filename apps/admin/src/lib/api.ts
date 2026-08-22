@@ -66,6 +66,27 @@ async function selectAll<T>(table: string, map: (r: Record<string, unknown>) => 
 }
 
 export const fetchCoaches = (): Promise<Coach[]> => selectAll('coaches', rowToCoach);
+
+/**
+ * Hours coached per coach THIS CALENDAR MONTH (Africa/Cairo) — a SQL-side
+ * aggregate (coach_hours_coached), not a client sum over fetched slots/bookings.
+ * Returns one row per coach with at least one qualifying (finished this month,
+ * not-cancelled, ≥1 attended booking) slot; a coach with none is simply absent —
+ * the caller defaults to 0, same as a coach with zero rows would read either way.
+ *
+ * The RPC takes an optional p_month for any past month (payroll); we send none,
+ * which is the current month. Rolling to a new month is a moving WHERE clause,
+ * not a reset — every past month stays computable from the same untouched rows.
+ */
+export async function fetchCoachHours(): Promise<Record<CoachId, number>> {
+  const { data, error } = await supabase.rpc('coach_hours_coached');
+  if (error) throw new ApiError(`Failed to load coach hours: ${error.message}`, error.code, error);
+  const out: Record<string, number> = {};
+  for (const row of (data ?? []) as { coach_id: string; hours: number }[]) {
+    out[row.coach_id] = Number(row.hours);
+  }
+  return out as Record<CoachId, number>;
+}
 export const fetchPlayers = (): Promise<Player[]> => selectAll('players', rowToPlayer);
 export const fetchPackages = (): Promise<Package[]> => selectAll('packages', rowToPackage);
 export const fetchTemplates = (): Promise<AvailabilityTemplate[]> =>

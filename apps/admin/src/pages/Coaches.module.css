@@ -83,7 +83,7 @@
 /* 3-stat row */
 .stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   border-block-start: 1px solid var(--color-border-subtle);
 }
 .stat {
