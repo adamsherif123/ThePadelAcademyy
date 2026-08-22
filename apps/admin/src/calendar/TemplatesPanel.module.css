@@ -184,3 +184,30 @@
   border-radius: var(--radius-md);
   font-size: var(--font-size-caption);
 }
+
+@media (max-width: 768px) {
+  /* The panel already collapses to one column at 900px and its rows wrap, so the
+     layout was fine — but the edit/pause/delete controls were still 30px, which
+     Sessions 1-2 raised everywhere else and missed here. */
+  .iconBtn {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Two full-width actions rather than a cramped pair beside the explainer. */
+  .head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .headActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .card {
+    padding: var(--space-md);
+  }
+  .row {
+    padding: var(--space-sm) var(--space-md);
+  }
+}

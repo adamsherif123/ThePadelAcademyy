@@ -1,16 +1,19 @@
+import { cairoCalendarDate, type CairoDate } from '@tpa/core';
 import type { AvailabilityTemplate, SessionSlot } from '@tpa/types';
 import { CalendarDays, Repeat } from 'lucide-react';
 import { useState } from 'react';
 
+import { DayCalendar } from '../calendar/DayCalendar';
 import { GenerateModal } from '../calendar/GenerateModal';
 import { OneOffModal } from '../calendar/OneOffModal';
 import { SlotModal } from '../calendar/SlotModal';
 import { TemplateModal } from '../calendar/TemplateModal';
 import { TemplatesPanel } from '../calendar/TemplatesPanel';
 import { WeekCalendar } from '../calendar/WeekCalendar';
+import { weekColumns } from '../data/schedule';
 import { useAdminData } from '../data/queries';
 import { useSession } from '../session/SessionProvider';
-import { ErrorView, LoadingView, PageHeader, SegmentedTabs } from '../ui';
+import { ErrorView, LoadingView, PageHeader, SegmentedTabs, useIsMobile } from '../ui';
 import styles from './Schedule.module.css';
 
 /** Availability-template modal target: create (new) or edit an existing rule. */
@@ -19,16 +22,29 @@ type TemplateTarget = { mode: 'new' } | { mode: 'edit'; template: AvailabilityTe
 /** Schedule route: the week calendar (S4c) + availability templates & generation (S4d). */
 export function Schedule() {
   const { now } = useSession();
+  const isMobile = useIsMobile();
   const data = useAdminData();
   const [tab, setTab] = useState<'calendar' | 'templates'>('calendar');
-  const [weekOffset, setWeekOffset] = useState(0);
+  // ONE cursor for both views: days from today. Desktop steps it by 7 (a week),
+  // mobile by 1 (a day), and the week grid derives its own offset from it — so the
+  // two navigations stay on the same week and crossing a week boundary on mobile is
+  // just arithmetic, not a mode change.
+  const [dayOffset, setDayOffset] = useState(0);
   const [selected, setSelected] = useState<SessionSlot | null>(null);
   const [templateTarget, setTemplateTarget] = useState<TemplateTarget | null>(null);
   const [generating, setGenerating] = useState(false);
-  const [oneOff, setOneOff] = useState(false);
+  const [oneOff, setOneOff] = useState<{ date?: CairoDate } | null>(null);
 
   if (data.isPending) return <LoadingView />;
   if (data.isError) return <ErrorView onRetry={data.refetch} />;
+
+  // today's weekday + dayOffset, split into "which week" and "which day of it".
+  // floor()/modulo (not truncation) so negative offsets land in the previous week
+  // rather than collapsing onto week 0.
+  const cursor = cairoCalendarDate(now).weekday + dayOffset;
+  const weekOffset = Math.floor(cursor / 7);
+  const selectedIndex = ((cursor % 7) + 7) % 7;
+  const columns = weekColumns(data.templates, data.slots, now, weekOffset);
 
   return (
     <div>
@@ -50,17 +66,31 @@ export function Schedule() {
       </div>
 
       {tab === 'calendar' ? (
-        <WeekCalendar
-          now={now}
-          weekOffset={weekOffset}
-          templates={data.templates}
-          slots={data.slots}
-          coaches={data.coaches}
-          onPrevWeek={() => setWeekOffset((w) => w - 1)}
-          onNextWeek={() => setWeekOffset((w) => w + 1)}
-          onSlotClick={setSelected}
-          onAddOneOff={() => setOneOff(true)}
-        />
+        isMobile ? (
+          <DayCalendar
+            columns={columns}
+            selectedIndex={selectedIndex}
+            slots={data.slots}
+            coaches={data.coaches}
+            onPrevDay={() => setDayOffset((d) => d - 1)}
+            onNextDay={() => setDayOffset((d) => d + 1)}
+            onSelectDay={(i) => setDayOffset((d) => d + (i - selectedIndex))}
+            onSlotClick={setSelected}
+            onAddOneOff={() => setOneOff({ date: columns[selectedIndex]!.date })}
+          />
+        ) : (
+          <WeekCalendar
+            now={now}
+            weekOffset={weekOffset}
+            templates={data.templates}
+            slots={data.slots}
+            coaches={data.coaches}
+            onPrevWeek={() => setDayOffset((d) => d - 7)}
+            onNextWeek={() => setDayOffset((d) => d + 7)}
+            onSlotClick={setSelected}
+            onAddOneOff={() => setOneOff({})}
+          />
+        )
       ) : (
         <TemplatesPanel
           coaches={data.coaches}
@@ -105,7 +135,8 @@ export function Schedule() {
           coaches={data.coaches}
           slots={data.slots}
           templates={data.templates}
-          onClose={() => setOneOff(false)}
+          defaultDate={oneOff.date}
+          onClose={() => setOneOff(null)}
         />
       ) : null}
     </div>

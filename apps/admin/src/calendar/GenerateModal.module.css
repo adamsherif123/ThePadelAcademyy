@@ -127,3 +127,9 @@
   text-align: center;
   line-height: 1.5;
 }
+
+@media (max-width: 768px) {
+  .range {
+    grid-template-columns: 1fr;
+  }
+}

@@ -366,3 +366,13 @@
   color: var(--color-text-secondary);
   font-size: var(--font-size-body);
 }
+
+@media (max-width: 768px) {
+  /* Two 1fr fields inside a 375px modal leave ~140px each — a Select with a coach
+     name in it can't render that. Both grids go single-column; `.timeFields`
+     (date / start / duration) was the worst at three across. */
+  .fields,
+  .timeFields {
+    grid-template-columns: 1fr;
+  }
+}

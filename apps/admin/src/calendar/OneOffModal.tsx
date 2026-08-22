@@ -1,5 +1,13 @@
-import { cairoCalendarDate, formatInstantTime } from '@tpa/core';
-import type { AvailabilityTemplate, Coach, CoachId, SessionSlot, SlotId, TrainingType, Weekday } from '@tpa/types';
+import { cairoCalendarDate, formatInstantTime, type CairoDate } from '@tpa/core';
+import type {
+  AvailabilityTemplate,
+  Coach,
+  CoachId,
+  SessionSlot,
+  SlotId,
+  TrainingType,
+  Weekday,
+} from '@tpa/types';
 import { AlertTriangle, CalendarClock } from 'lucide-react';
 import { useState } from 'react';
 
@@ -39,15 +47,19 @@ export function OneOffModal({
   coaches,
   slots,
   templates,
+  defaultDate,
   onClose,
 }: {
   coaches: Coach[];
   slots: SessionSlot[];
   templates: AvailabilityTemplate[];
+  /** Prefill the date field. The mobile day view passes the day you're looking at;
+   *  the desktop calendar passes nothing and still opens on today, as before. */
+  defaultDate?: CairoDate;
   onClose: () => void;
 }) {
   const { now } = useSession();
-  const today = cairoCalendarDate(now);
+  const today = defaultDate ?? cairoCalendarDate(now);
   const firstCoach = coaches[0]?.id ?? ('co_hany' as CoachId);
 
   const draft = useSessionDraft({
