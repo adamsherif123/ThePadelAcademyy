@@ -61,7 +61,11 @@ export type NotificationType =
   | 'credit_request_rejected'
   | 'admin_booked'
   | 'session_reopened'
-  | 'news_published';
+  | 'news_published'
+  // Owner-only pings (players.is_owner). These are REMINDERS to go look at the
+  // admin, not player-facing events — they only ever reach a flagged owner.
+  | 'owner_credit_request'
+  | 'owner_booking';
 
 /**
  * A credit request's lifecycle (A3). `pending` until an admin resolves it; `approved`

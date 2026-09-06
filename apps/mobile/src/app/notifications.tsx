@@ -23,6 +23,8 @@ const ICON: Record<NotificationType, IoniconName> = {
   admin_booked: 'person-add-outline',
   session_reopened: 'refresh-circle-outline',
   news_published: 'newspaper-outline',
+  owner_credit_request: 'cash-outline',
+  owner_booking: 'calendar-outline',
 };
 
 /**
