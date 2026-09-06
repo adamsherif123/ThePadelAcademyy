@@ -95,6 +95,12 @@ export default function ProfileScreen() {
           onPress={() => router.push('/purchase-history')}
         />
         <LinkRow icon="people-outline" title="Meet the coaches" subtitle={`${coachCount} academy coaches`} onPress={() => router.push('/coaches')} />
+        <LinkRow
+          icon="chatbubbles-outline"
+          title="Contact us"
+          subtitle="Call or WhatsApp the academy"
+          onPress={() => router.push('/contact-us')}
+        />
       </View>
 
       <View style={styles.section}>
