@@ -25,13 +25,27 @@ const MIN_PASSWORD = 8;
  * session and returns to email entry (see `onBack`). An admin never reaches this screen —
  * the guard routes an admin credential to the refusal screen (bug #2).
  */
-// complete_signup's phone rejections → friendly copy. Everything else falls back
-// to a generic message + the sign-out escape.
+// EVERY reason complete_signup can return, mapped to copy — mirrors edit-profile's
+// REASON_COPY. The map is exhaustive against the RPC (see
+// 20260818000037_phone_required_at_signup.sql) so a rejection can never fall through
+// to a shrug; the generic fallback below exists only for a reason added later, and
+// even that says something actionable rather than nothing.
 const REASON_COPY: Record<string, string> = {
+  name_required: 'Please enter your name.',
+  invalid_gender: 'Please choose which group you train with.',
+  invalid_level: 'Please choose your level.',
   phone_required: 'Enter your phone number to continue.',
-  phone_taken: 'That phone number is already registered. Try another.',
+  phone_taken:
+    'That phone number is already registered. If it’s yours, sign in instead of creating a second account.',
   invalid_phone: 'Enter a valid Egyptian mobile (e.g. 0100 123 4567).',
+  not_authenticated: 'Your sign-in expired. Go back and sign in again to finish setting up.',
+  is_admin: 'That’s an academy staff account — it can’t be used as a player profile.',
 };
+
+/** Reasons that belong ON the name field. */
+const NAME_REASONS = new Set(['name_required']);
+/** Reasons that belong ON the phone field. */
+const PHONE_REASONS = new Set(['phone_required', 'invalid_phone', 'phone_taken']);
 
 export default function ProfileSetupScreen() {
   const router = useRouter();
@@ -71,7 +85,12 @@ export default function ProfileSetupScreen() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Field-specific rejections show inline on the field that's wrong; everything else
+  // (network, auth-layer, an unmapped reason) is a page-level notice — the same split
+  // edit-profile uses.
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
 
   const passwordTooShort = isNewFlow && password.length > 0 && password.length < MIN_PASSWORD;
   const confirmMismatch = isNewFlow && confirm.length > 0 && confirm !== password;
@@ -88,7 +107,9 @@ export default function ProfileSetupScreen() {
   const onCreate = async () => {
     if (!complete || busy || gender === null || level === null) return;
     setSubmitting(true);
-    setError(null);
+    setNameError(null);
+    setPhoneError(null);
+    setPageError(null);
     try {
       // New player: create the GoTrue auth user first (it owns the password), then the
       // profile. Only sign up if there is NO session yet — if a prior attempt already
@@ -100,9 +121,10 @@ export default function ProfileSetupScreen() {
         if (!signUpRes.ok) {
           haptics.error();
           if (signUpRes.taken) {
-            setError('That email already has an account. Go back and sign in with your password.');
+            setPageError('That email already has an account. Go back and sign in with your password.');
           } else {
-            setError(signUpRes.error ?? 'We couldn’t create your account. Please try again.');
+            // GoTrue's own message (weak password, rate limit, …) is already a sentence.
+            setPageError(signUpRes.error ?? 'We couldn’t create your account. Please try again.');
           }
           return;
         }
@@ -116,10 +138,21 @@ export default function ProfileSetupScreen() {
         return;
       }
       haptics.error();
-      setError(
-        REASON_COPY[res.error ?? ''] ??
-          'We couldn’t create your profile. If this keeps happening, sign out below and try again.',
-      );
+      // `res.error` is the RPC's reason code on a business rejection, or an already-
+      // friendly sentence on a network failure (completeProfile writes "No connection…"
+      // itself). Falling back through `res.error` — not straight to the generic — is what
+      // keeps that network sentence intact instead of mislabelling a dead connection as
+      // a bad profile.
+      const reason = res.error ?? '';
+      if (NAME_REASONS.has(reason)) setNameError(REASON_COPY[reason]!);
+      else if (PHONE_REASONS.has(reason)) setPhoneError(REASON_COPY[reason]!);
+      else {
+        setPageError(
+          REASON_COPY[reason] ??
+            res.error ??
+            'Something went wrong — please check your details and try again.',
+        );
+      }
     } finally {
       // A stuck spinner is a bug even when the error is handled: reset on EVERY path
       // (on success this screen is unmounting anyway, so it's harmless there).
@@ -155,6 +188,7 @@ export default function ProfileSetupScreen() {
       <ProfileFields
         name={name}
         onNameChange={setName}
+        nameError={nameError ?? undefined}
         gender={gender}
         onGenderChange={setGender}
         level={level}
@@ -195,6 +229,7 @@ export default function ProfileSetupScreen() {
           textContentType="telephoneNumber"
           value={phone}
           onChangeText={setPhone}
+          error={phoneError ?? undefined}
         />
         <Text variant="caption" tone="muted">
           So the academy can reach you about your sessions.
@@ -237,9 +272,9 @@ export default function ProfileSetupScreen() {
         onPress={onCreate}
         disabled={!complete || busy}
       />
-      {error ? (
+      {pageError ? (
         <Text variant="caption" tone="accent" style={styles.helper}>
-          {error}
+          {pageError}
         </Text>
       ) : !complete ? (
         <Text variant="caption" tone="muted" style={styles.helper}>

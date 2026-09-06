@@ -9,7 +9,7 @@ import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -105,7 +105,23 @@ function RootNavigator() {
     if (status !== 'loading') void SplashScreen.hideAsync();
   }, [status]);
 
-  if (status === 'loading') return null;
+  // Blank the app ONLY during the cold-start restore — never again once the navigator
+  // has mounted.
+  //
+  // `status` returns to 'loading' mid-session whenever the player/is_admin gate
+  // refetches, and the most important case is signup: signUpWithEmail creates the auth
+  // user, `hasSession` flips true, both gate queries start, and deriveStatus reports
+  // 'loading' — WHILE the user is standing on profile-setup mid-submit. Unmounting the
+  // Stack there destroyed the screen and every field they had typed, and the
+  // `setError` that followed the await landed on a dead component, so the RPC's reason
+  // was never shown either. One unmount, both bugs. Latching here keeps the tree
+  // mounted so the screen survives its own submit.
+  //
+  // Latched during render (React's "adjust state while rendering" pattern) rather than
+  // in an effect, so there's no frame in between where the tree is still torn down.
+  const [booted, setBooted] = useState(false);
+  if (!booted && status !== 'loading') setBooted(true);
+  if (!booted) return null;
 
   return (
     <>
