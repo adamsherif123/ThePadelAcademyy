@@ -49,6 +49,8 @@ export const queryKeys = {
   creditRequests: ['creditRequests'] as const,
   trialEligible: ['trialEligible'] as const,
   news: ['news'] as const,
+  /** app_config — the latest-version value the update prompt compares against. */
+  appConfig: ['appConfig'] as const,
   newsSeen: ['newsSeen'] as const,
 };
 

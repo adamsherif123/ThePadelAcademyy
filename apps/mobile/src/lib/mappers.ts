@@ -195,3 +195,17 @@ export function rowToNewsSeen(r: Row): NewsSeen {
     seenAt: iso(r.seen_at),
   };
 }
+
+/** app_config's single row — the client reads only the version fields. */
+export interface AppConfig {
+  latestIosVersion: string;
+  /** Reserved for a future mandatory-update gate; nothing reads it yet. */
+  minSupportedIosVersion: string | null;
+}
+
+export function rowToAppConfig(r: Row): AppConfig {
+  return {
+    latestIosVersion: str(r.latest_ios_version),
+    minSupportedIosVersion: nstr(r.min_supported_ios_version),
+  };
+}

@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   bookSlotRpc,
   cancelBookingRpc,
+  fetchAppConfig,
   fetchBookings,
   fetchCoaches,
   fetchCreditBatches,
@@ -94,6 +95,17 @@ export const useTrialEligible = () =>
 /** Visible news (within the window), newest first. */
 export const useNews = (now: IsoInstant) =>
   toResource(useQuery({ queryKey: queryKeys.news, queryFn: () => fetchVisibleNews(now) }));
+
+/**
+ * app_config — read once per app session for the update prompt. A long staleTime
+ * because it changes only when the academy ships a release; the default retry
+ * still applies, and a failure leaves `data` undefined, which the prompt reads as
+ * "don't show".
+ */
+export const useAppConfig = () =>
+  toResource(
+    useQuery({ queryKey: queryKeys.appConfig, queryFn: fetchAppConfig, staleTime: 60 * 60_000 }),
+  );
 
 /** This player's own news_seen rows. */
 export const useNewsSeen = () =>

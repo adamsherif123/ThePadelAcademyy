@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { queryClient } from '../lib/queryClient';
 import { captureException, initReporting } from '../lib/reporting';
 import { NewsPopupBridge } from '../notifications/NewsPopupBridge';
+import { UpdatePromptBridge } from '../update/UpdatePromptBridge';
 import { NotificationsBridge } from '../notifications/NotificationsBridge';
 import { nextRoute } from '../session/authMachine';
 import { SessionProvider, useSession } from '../session/SessionProvider';
@@ -141,6 +142,7 @@ function RootNavigator() {
         <Stack.Screen name="cancel-booking" options={{ presentation: 'modal' }} />
         <Stack.Screen name="needs-credits" options={{ presentation: 'modal' }} />
         <Stack.Screen name="contact-us" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="update-prompt" options={{ presentation: 'modal' }} />
         <Stack.Screen name="edit-profile" />
         <Stack.Screen name="coaches" />
         <Stack.Screen name="purchase-history" />
@@ -155,6 +157,10 @@ function RootNavigator() {
       {/* Decides when the unseen-news pop-up should appear (cold start / foreground).
           No-ops until a player is ready; renders nothing. */}
       <NewsPopupBridge />
+      {/* Decides when the "please update" nudge appears (cold start / foreground).
+          Defers to the news pop-up and no-ops until the session is ready; renders
+          nothing. */}
+      <UpdatePromptBridge />
     </>
   );
 }

@@ -44,9 +44,11 @@ import {
   rowToNewsSeen,
   rowToNotification,
   rowToPackage,
+  rowToAppConfig,
   rowToPlayer,
   rowToPurchase,
   rowToSlot,
+  type AppConfig,
 } from './mappers';
 
 /** A device's OS, for the push token row. */
@@ -105,6 +107,17 @@ export const fetchBookings = (): Promise<Booking[]> => selectAll('bookings', row
 export const fetchPurchases = (): Promise<Purchase[]> => selectAll('purchases', rowToPurchase);
 
 /** One purchase by id (for the return-journey poll). RLS scopes it to the caller. */
+/**
+ * app_config's single row (id = 1) — what the update prompt compares the installed
+ * version against. `maybeSingle` so a missing row is `null` rather than a throw:
+ * "no config" then behaves exactly like "offline", and the prompt simply doesn't show.
+ */
+export async function fetchAppConfig(): Promise<AppConfig | null> {
+  const { data, error } = await supabase.from('app_config').select('*').maybeSingle();
+  if (error) throw new ApiError(`Failed to load app config: ${error.message}`, error);
+  return data ? rowToAppConfig(data) : null;
+}
+
 export async function fetchPurchaseById(id: string): Promise<Purchase | null> {
   const { data, error } = await supabase.from('purchases').select('*').eq('id', id).maybeSingle();
   if (error) throw new ApiError(`Failed to load purchase: ${error.message}`, error);
