@@ -2,7 +2,7 @@
   "name": "the-padel-academy",
   "private": true,
   "version": "0.0.0",
-  "packageManager": "pnpm@11.13.0",
+  "packageManager": "pnpm@11.25.0",
   "engines": {
     "node": ">=24 <25"
   },
