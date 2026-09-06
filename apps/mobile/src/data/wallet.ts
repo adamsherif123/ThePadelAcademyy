@@ -36,6 +36,25 @@ export function balanceByType(batches: CreditBatch[], now: IsoInstant): Record<T
   return balance;
 }
 
+/**
+ * Which balance pills the Wallet shows, in TRAINING_TYPES order.
+ *
+ * Group/Duo/Individual always render (dimming at zero — they're the types you can go
+ * and buy). TRIAL renders only while one is actually held: it's a once-per-player
+ * credit, so for everyone who has used theirs a permanent dimmed "0 Trial" was pure
+ * clutter.
+ *
+ * `balance[t] > 0` is not a new rule — balanceByType only counts a batch passing
+ * @tpa/core's isBatchUsable (unexpired AND quantityRemaining > 0), and
+ * totalReadyToBook sums those same per-type numbers. So the visible pills ALWAYS
+ * tally to the headline: when the trial pill shows it contributes its credit to both,
+ * and when it doesn't it contributes 0 to both. Lives here, not in the component, so
+ * the invariant is unit-testable (wallet.tally.test.ts).
+ */
+export function visibleBalanceTypes(balance: Record<TrainingType, number>): TrainingType[] {
+  return TRAINING_TYPES.filter((t) => t !== 'trial' || balance[t] > 0);
+}
+
 /** Total credits ready to book now. */
 export function totalReadyToBook(batches: CreditBatch[], now: IsoInstant): number {
   return Object.values(balanceByType(batches, now)).reduce((sum, n) => sum + n, 0);

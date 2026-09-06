@@ -1,8 +1,8 @@
-import { TRAINING_TYPES } from '@tpa/core';
 import { space } from '@tpa/theme';
 import type { TrainingType } from '@tpa/types';
 import { StyleSheet, View } from 'react-native';
 
+import { visibleBalanceTypes } from '../data/wallet';
 import { PillOnNavy } from './PillOnNavy';
 import { TRAINING_META } from './trainingMeta';
 
@@ -11,24 +11,20 @@ import { TRAINING_META } from './trainingMeta';
  * Home shows the total, not the breakdown). Zero-balance pills dim. Passed as
  * children to CreditsSummaryCard so the shell stays composition-agnostic. RTL-safe.
  *
- * TRIAL is deliberately absent: it's a once-per-player credit, so for everyone who
- * has already used theirs the pill was a permanent dimmed "0 Trial", and for the few
- * who still hold one the batch card further down the Wallet already names it
- * ("Welcome Trial Credits", with its own remaining/total). Nothing is hidden by
- * dropping it here — only the duplicate.
+ * TRIAL is the one conditional pill: it's a once-per-player credit, so for everyone
+ * who has already used theirs a permanent dimmed "0 Trial" was pure clutter. It
+ * renders only while the player actually holds one, and dims for nothing — Group,
+ * Duo and Individual keep rendering at zero, since those are the types you can go
+ * and buy.
  *
- * NOTE the headline above these pills (totalReadyToBook) still COUNTS a trial credit,
- * because a trial credit genuinely is ready to book. So for a player holding one, the
- * pills won't sum to the headline. That's the deliberate trade: excluding trial from
- * the total too would make a trial-only player read "0 credits ready to book now"
- * while holding a bookable credit, which is a worse lie than a non-obvious sum.
+ * Which types are visible is `visibleBalanceTypes` (data/wallet), where the
+ * tally-to-the-headline invariant is documented and unit-tested.
  */
-const PILL_TYPES = TRAINING_TYPES.filter((t) => t !== 'trial');
-
 export function BalancePills({ balance }: { balance: Record<TrainingType, number> }) {
+  const types = visibleBalanceTypes(balance);
   return (
     <View style={styles.pills}>
-      {PILL_TYPES.map((t) => (
+      {types.map((t) => (
         <PillOnNavy
           key={t}
           icon={TRAINING_META[t].icon}
