@@ -2,6 +2,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  /* The grid/flex item is this wrapper, so it needs the shrink permission too —
+     see .input's min-width note below. */
+  min-width: 0;
 }
 
 .label {
@@ -12,6 +15,14 @@
 
 .input {
   width: 100%;
+  /* `width: 100%` is not enough for a native date/time control. Those carry a large
+     intrinsic min-content width, and a `1fr` grid track (or a flex item) takes its
+     MINIMUM from that content — so on a phone the Date and Start fields grew past the
+     modal's edge while every text field beside them fitted. min-width: 0 drops that
+     floor so the track can shrink to the container. No effect on desktop, where
+     there's room anyway. */
+  min-width: 0;
+  max-width: 100%;
   min-height: 44px;
   padding-block: var(--space-sm);
   padding-inline: var(--space-md);
@@ -35,4 +46,14 @@
 .hint {
   color: var(--color-text-muted);
   font-size: var(--font-size-caption);
+}
+
+@media (max-width: 768px) {
+  /* Native date/time controls centre their value while every other field is
+     start-aligned; on a narrow modal, where the fields stack, that inconsistency is
+     obvious. Mobile-only so the desktop rendering is untouched. */
+  .input[type='date'],
+  .input[type='time'] {
+    text-align: start;
+  }
 }

@@ -54,7 +54,15 @@ export function Avatar({
   }
   return (
     <View style={[styles.circle, dimension]}>
-      <Text variant="body" weight="bold" tone="inverse" style={{ fontSize: size * 0.4 }}>
+      {/* lineHeight has to scale WITH fontSize. The `body` variant ships a fixed
+          lineHeight (sized for 15px text); overriding only fontSize left a 24px glyph
+          in a 22px line box at size=60, which clipped the initials top and bottom. */}
+      <Text
+        variant="body"
+        weight="bold"
+        tone="inverse"
+        style={{ fontSize: size * 0.4, lineHeight: size * 0.5, includeFontPadding: false }}
+      >
         {initials(name)}
       </Text>
     </View>
