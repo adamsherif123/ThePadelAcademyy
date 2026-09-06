@@ -15,6 +15,7 @@ import {
 } from '../../data/booking';
 import { useBatches, useBookings, useCoaches, useSlots, useTemplates, combine } from '../../data/queries';
 import { totalReadyToBook } from '../../data/wallet';
+import { queryKeys } from '../../lib/queryClient';
 import { useSession } from '../../session/SessionProvider';
 import {
   DateChip,
@@ -29,9 +30,21 @@ import {
   type SlotCardState,
   Text,
   TRAINING_META,
+  useRefreshControl,
 } from '../../ui';
 
 const WEEKDAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+/** Exactly what the feed reads. `slots` + `templates` are the pair that go stale
+ *  when the admin publishes a session; the rest decide each card's bookable state.
+ *  Module-level so the array identity is stable across renders. */
+const BOOK_KEYS = [
+  queryKeys.slots,
+  queryKeys.templates,
+  queryKeys.creditBatches,
+  queryKeys.bookings,
+  queryKeys.coaches,
+] as const;
 
 const DAYS = 14;
 
@@ -120,6 +133,7 @@ function weekBannerText(summary: WeekAvailabilitySummary, now: IsoInstant): stri
 export default function BookScreen() {
   const router = useRouter();
   const { player, now } = useSession();
+  const refreshControl = useRefreshControl(BOOK_KEYS);
   const slotsQ = useSlots();
   const batchesQ = useBatches();
   const bookingsQ = useBookings();
@@ -132,7 +146,12 @@ export default function BookScreen() {
 
   if (gate.isPending || gate.isError) {
     return (
-      <Screen scroll tabBar contentContainerStyle={styles.content}>
+      <Screen
+        scroll
+        tabBar
+        contentContainerStyle={styles.content}
+        refreshControl={gate.isError ? refreshControl : undefined}
+      >
         <ScreenHeader eyebrow="Book your session" title="Find your next session" />
         {gate.isPending ? <LoadingView /> : <ErrorView onRetry={gate.refetch} />}
       </Screen>
@@ -169,7 +188,7 @@ export default function BookScreen() {
     router.push({ pathname: '/needs-credits', params: { slotId: slot.id, reason } });
 
   return (
-    <Screen scroll tabBar contentContainerStyle={styles.content}>
+    <Screen scroll tabBar contentContainerStyle={styles.content} refreshControl={refreshControl}>
       <ScreenHeader eyebrow="Book your session" title="Find your next session" />
 
       <InfoCard variant="neutral" icon="calendar-outline" text={weekBannerText(weekSummary, now)} />

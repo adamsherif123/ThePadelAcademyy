@@ -1,6 +1,12 @@
 import { space } from '@tpa/theme';
-import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
+import type { ReactElement, ReactNode } from 'react';
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  type RefreshControlProps,
+  type ViewStyle,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
 
 import { useTheme } from '../theme/ThemeProvider';
@@ -16,6 +22,8 @@ export type ScreenTone = 'light' | 'navy';
  *    beneath it — no gap under the button.
  * `tabBar` marks a tab screen: the top inset is still applied, but the bottom
  * inset is NOT (the tab bar already occupies it) — avoids double-padding.
+ * `refreshControl` attaches pull-to-refresh to the scroller (see useRefreshControl);
+ * it is ignored unless `scroll` is set, since there's nothing to pull otherwise.
  * `tone='navy'` powers NavyScreen. RTL-safe.
  */
 export function Screen({
@@ -26,6 +34,7 @@ export function Screen({
   tabBar = false,
   contentContainerStyle,
   footer,
+  refreshControl,
   style,
 }: {
   children?: ReactNode;
@@ -35,6 +44,7 @@ export function Screen({
   tabBar?: boolean;
   contentContainerStyle?: ViewStyle;
   footer?: ReactNode;
+  refreshControl?: ReactElement<RefreshControlProps>;
   style?: ViewStyle;
 }) {
   const { color } = useTheme();
@@ -59,6 +69,7 @@ export function Screen({
       // adjustResize soft-input mode (app.json android.softwareKeyboardLayoutMode).
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets
+      refreshControl={refreshControl}
       contentContainerStyle={[
         padded ? styles.padded : null,
         contentContainerStyle,

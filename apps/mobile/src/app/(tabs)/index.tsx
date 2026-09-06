@@ -15,6 +15,7 @@ import {
   useTrialEligible,
   combine,
 } from '../../data/queries';
+import { queryKeys } from '../../lib/queryClient';
 import { nextSession } from '../../data/schedule';
 import { soonestExpiringBatch, totalReadyToBook } from '../../data/wallet';
 import { NewsButton } from '../../notifications/NewsButton';
@@ -39,11 +40,24 @@ import {
   Text,
   TRAINING_META,
   trainingMetaFor,
+  useRefreshControl,
 } from '../../ui';
+
+/** Exactly what this screen reads — a pull here must not refetch purchases,
+ *  notifications or news. Module-level so the array identity is stable. */
+const HOME_KEYS = [
+  queryKeys.creditBatches,
+  queryKeys.bookings,
+  queryKeys.slots,
+  queryKeys.coaches,
+  queryKeys.packages,
+  queryKeys.trialEligible,
+] as const;
 
 export default function HomeScreen() {
   const router = useRouter();
   const { color } = useTheme();
+  const refreshControl = useRefreshControl(HOME_KEYS);
   const styles = useMemo(
     () => StyleSheet.create({
       headerTrailing: { flexDirection: 'row', alignItems: 'center', gap: space.md },
@@ -95,7 +109,7 @@ export default function HomeScreen() {
   }
   if (gate.isError) {
     return (
-      <Screen scroll tabBar contentContainerStyle={styles.content}>
+      <Screen scroll tabBar contentContainerStyle={styles.content} refreshControl={refreshControl}>
         {header}
         <ErrorView onRetry={gate.refetch} />
       </Screen>
@@ -120,7 +134,7 @@ export default function HomeScreen() {
     : undefined;
 
   return (
-    <Screen scroll tabBar contentContainerStyle={styles.content}>
+    <Screen scroll tabBar contentContainerStyle={styles.content} refreshControl={refreshControl}>
       {header}
 
       <CreditsSummaryCard

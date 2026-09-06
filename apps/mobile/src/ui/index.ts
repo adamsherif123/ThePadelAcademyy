@@ -18,6 +18,7 @@ export { EmptyState } from './EmptyState';
 export { IconRow } from './IconRow';
 export { InfoCard, type InfoCardVariant } from './InfoCard';
 export { Input, type InputProps } from './Input';
+export { useRefreshControl } from './useRefreshControl';
 export { LinkRow } from './LinkRow';
 export { Money } from './Money';
 export { NavyScreen } from './NavyScreen';
