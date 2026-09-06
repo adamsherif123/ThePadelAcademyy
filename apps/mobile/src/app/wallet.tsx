@@ -7,6 +7,7 @@ import { StyleSheet, View } from 'react-native';
 import { packageById } from '../data/catalog';
 import { useBatches, useMyCreditRequests, usePackages, useTrialEligible } from '../data/queries';
 import { activeBatches, balanceByType, expiredBatches, totalReadyToBook } from '../data/wallet';
+import { queryKeys } from '../lib/queryClient';
 import { useSession } from '../session/SessionProvider';
 import { useTheme } from '../theme/ThemeProvider';
 import {
@@ -23,7 +24,21 @@ import {
   StatusChip,
   Text,
   TRAINING_META,
+  useRefreshControl,
 } from '../ui';
+
+/** Exactly what this screen reads — all four, because all four are visible here:
+ *  the batches ARE the balance, and an admin approving a request resolves the
+ *  pending card (creditRequests) at the same moment the credits land. packages and
+ *  trialEligible decide the request card's package name and the empty-state copy.
+ *  A pull here must not refetch slots, bookings or notifications.
+ *  Module-level so the array identity is stable across renders. */
+const WALLET_KEYS = [
+  queryKeys.creditBatches,
+  queryKeys.creditRequests,
+  queryKeys.packages,
+  queryKeys.trialEligible,
+] as const;
 
 function batchName(b: CreditBatch): string {
   if (b.source === 'signup_grant') return 'Welcome Trial Credits';
@@ -38,6 +53,7 @@ function batchOrigin(b: CreditBatch): string {
 export default function WalletScreen() {
   const router = useRouter();
   const { player, now } = useSession();
+  const refreshControl = useRefreshControl(WALLET_KEYS);
   const batchesQ = useBatches();
   const requestsQ = useMyCreditRequests();
   const packagesQ = usePackages();
@@ -46,7 +62,11 @@ export default function WalletScreen() {
 
   if (batchesQ.isPending || batchesQ.isError) {
     return (
-      <Screen scroll contentContainerStyle={styles.content}>
+      <Screen
+        scroll
+        contentContainerStyle={styles.content}
+        refreshControl={batchesQ.isError ? refreshControl : undefined}
+      >
         <ScreenHeader eyebrow="Wallet" title="Your Credits" onBack={() => router.back()} />
         {batchesQ.isPending ? <LoadingView /> : <ErrorView onRetry={batchesQ.refetch} />}
       </Screen>
@@ -79,7 +99,7 @@ export default function WalletScreen() {
   const showEmpty = active.length === 0 && openRequest?.status !== 'pending';
 
   return (
-    <Screen scroll contentContainerStyle={styles.content}>
+    <Screen scroll contentContainerStyle={styles.content} refreshControl={refreshControl}>
       <ScreenHeader eyebrow="Wallet" title="Your Credits" onBack={() => router.back()} />
 
         <CreditsSummaryCard
