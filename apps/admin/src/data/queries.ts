@@ -12,11 +12,17 @@ import type {
 } from '@tpa/types';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
-import type { BookingsPageParams, BookingsPageResult } from '../lib/api';
+import type {
+  BookingsPageParams,
+  BookingsPageResult,
+  PlayersPageParams,
+  PlayersPageResult,
+} from '../lib/api';
 import {
   ApiError,
   fetchBookings,
   fetchBookingsPage,
+  fetchPlayersPage,
   fetchBookingStatusCounts,
   fetchCoachHours,
   fetchCoaches,
@@ -92,6 +98,27 @@ export function useBookingsPage(params: BookingsPageParams): {
   const q = useQuery({
     queryKey: [...queryKeys.bookingsPage, params],
     queryFn: () => fetchBookingsPage(params),
+    placeholderData: keepPreviousData,
+  });
+  return { data: q.data, isPending: q.isPending, isFetching: q.isFetching, isError: q.isError, refetch: () => void q.refetch() };
+}
+
+/**
+ * The Players page's own bounded, filtered, paginated read — independent of
+ * useAdminData's monolith, exactly like useBookingsPage. `keepPreviousData` holds the
+ * previous page's rows on screen while the next page is in flight, so paging doesn't
+ * flash an empty list; `isFetching` distinguishes that from the initial load.
+ */
+export function usePlayersPage(params: PlayersPageParams): {
+  data: PlayersPageResult | undefined;
+  isPending: boolean;
+  isFetching: boolean;
+  isError: boolean;
+  refetch: () => void;
+} {
+  const q = useQuery({
+    queryKey: [...queryKeys.playersPage, params],
+    queryFn: () => fetchPlayersPage(params),
     placeholderData: keepPreviousData,
   });
   return { data: q.data, isPending: q.isPending, isFetching: q.isFetching, isError: q.isError, refetch: () => void q.refetch() };

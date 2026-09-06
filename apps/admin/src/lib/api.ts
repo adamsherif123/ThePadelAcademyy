@@ -203,6 +203,82 @@ export async function fetchBookingsPage(params: BookingsPageParams): Promise<Boo
   return { rows: (data ?? []).map(rowToBookingPageRow), total: count ?? 0 };
 }
 
+// ── players page (bounded, mirrors the bookings page above) ───────────────────
+
+export type PlayerGenderFilter = Gender | 'all';
+export type PlayerLevelFilter = Level | 'all';
+
+export interface PlayersPageParams {
+  page: number; // 0-indexed
+  pageSize: number;
+  search: string; // trimmed; '' = no filter
+  gender: PlayerGenderFilter;
+  level: PlayerLevelFilter;
+}
+
+export interface PlayerRow {
+  player: Player;
+  /** This player's OWN credit batches, embedded in the same round trip. */
+  batches: CreditBatch[];
+}
+
+export interface PlayersPageResult {
+  rows: PlayerRow[];
+  total: number;
+}
+
+// The row shows a G/D/I credit breakdown, so each player's batches ride along in the
+// same request. A plain embed (not `!inner`): a player with no credits yet must still
+// appear in the roster, which an inner join would silently drop.
+const PLAYERS_PAGE_SELECT = '*, credit_batches(*)';
+
+function rowToPlayerPageRow(r: Record<string, unknown>): PlayerRow {
+  const batchRows = (r.credit_batches as Record<string, unknown>[] | null) ?? [];
+  return { player: rowToPlayer(r), batches: batchRows.map(rowToCreditBatch) };
+}
+
+/**
+ * The Players page's own bounded query — newest `created_at` first, `pageSize` rows at
+ * a time, each row's credit batches embedded (never the whole-table monolith).
+ *
+ * Search and the gender/level filters run server-side, so they reach the WHOLE roster
+ * and the count reflects the filtered set — a client-side filter over a 10-row page
+ * would only ever search the page you happen to be looking at, which is worse than no
+ * search at all.
+ *
+ * `deleted_at is null` preserves the roster's existing meaning: a deleted account is
+ * anonymised and retained (its history keeps resolving elsewhere) but never listed as
+ * someone the admin can select or act on — what `activePlayers` did client-side.
+ */
+export async function fetchPlayersPage(params: PlayersPageParams): Promise<PlayersPageResult> {
+  const from = params.page * params.pageSize;
+  const to = from + params.pageSize - 1;
+  let query = supabase
+    .from('players')
+    .select(PLAYERS_PAGE_SELECT, { count: 'exact' })
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .range(from, to);
+  if (params.gender !== 'all') query = query.eq('gender', params.gender);
+  if (params.level !== 'all') query = query.eq('level', params.level);
+  const search = params.search.trim();
+  if (search !== '') {
+    // PostgREST's `or=` grammar is comma-separated with parens, so a comma, paren,
+    // quote or backslash in the term would break the filter string itself. None of them
+    // are meaningful in a name/phone/email search, so they're dropped rather than escaped.
+    const safe = search.replace(/[,()"\\]/g, '');
+    // Stored phones are E.164 with no spaces (signup normalises them), so the space
+    // stripping matchesPlayerQuery does client-side is applied to the TERM here.
+    const phoneTerm = safe.replace(/\s+/g, '');
+    query = query.or(
+      `name.ilike.%${safe}%,email.ilike.%${safe}%,phone.ilike.%${phoneTerm}%`,
+    );
+  }
+  const { data, error, count } = await query;
+  if (error) throw new ApiError(`Failed to load players: ${error.message}`, error.code, error);
+  return { rows: (data ?? []).map(rowToPlayerPageRow), total: count ?? 0 };
+}
+
 const BOOKING_STATUSES: BookingStatus[] = ['booked', 'attended', 'cancelled', 'no_show'];
 
 /**

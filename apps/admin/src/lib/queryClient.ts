@@ -38,6 +38,10 @@ export const queryKeys = {
   // below refetches whichever variation is currently mounted.
   bookingsPage: ['bookingsPage'] as const,
   bookingStatusCounts: ['bookingStatusCounts'] as const,
+  // The Players page's own paginated read. A prefix key like bookingsPage: one cache
+  // entry per (page, search, filters), and invalidating the prefix refetches whichever
+  // variation is currently mounted.
+  playersPage: ['playersPage'] as const,
   purchases: ['purchases'] as const,
   creditRequests: ['creditRequests'] as const,
   news: ['news'] as const,
@@ -49,15 +53,15 @@ export const TOUCHED = {
   // cancel_session / remove_booking / admin_book_player affect bookings + seat counts + (refund) batches
   booking: [queryKeys.bookings, queryKeys.bookingsPage, queryKeys.bookingStatusCounts, queryKeys.slots, queryKeys.batches] as const,
   // grant_credits / record_cash_purchase mint credits (+ a purchase row)
-  money: [queryKeys.batches, queryKeys.purchases] as const,
+  money: [queryKeys.batches, queryKeys.purchases, queryKeys.playersPage] as const,
   // approve mints a batch + a purchase AND resolves the request; reject resolves it (the
   // extra money keys are harmless no-ops on reject).
-  creditRequests: [queryKeys.batches, queryKeys.purchases, queryKeys.creditRequests] as const,
+  creditRequests: [queryKeys.batches, queryKeys.purchases, queryKeys.creditRequests, queryKeys.playersPage] as const,
   attendance: [queryKeys.bookings, queryKeys.bookingsPage, queryKeys.bookingStatusCounts, queryKeys.coachHours] as const,
   coaches: [queryKeys.coaches] as const,
   packages: [queryKeys.packages] as const,
   templates: [queryKeys.templates] as const,
   slots: [queryKeys.slots] as const,
-  players: [queryKeys.players] as const,
+  players: [queryKeys.players, queryKeys.playersPage] as const,
   news: [queryKeys.news] as const,
 };
