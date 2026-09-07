@@ -46,16 +46,22 @@ export function Sidebar({ open = false, onNavigate }: { open?: boolean; onNaviga
   const pendingCount = (creditRequestsQ.data ?? []).filter((r) => r.status === 'pending').length;
 
   // Live: any insert/update on credit_requests (a player submits one, or another admin
-  // resolves one) refreshes the shared query cache — the badge count and the Credit
-  // Requests page's own list (which reads the same query key) both update with no manual
-  // reload. Mounted once here, since Sidebar is always on-screen for a signed-in admin
-  // (Shell only renders once `status === 'ready'`) — same one-subscription-for-the-whole-
-  // app shape as the mobile client's NotificationsBridge.
+  // resolves one) refreshes the query cache with no manual reload. Mounted once here,
+  // since Sidebar is always on-screen for a signed-in admin (Shell only renders once
+  // `status === 'ready'`) — same one-subscription-for-the-whole-app shape as the mobile
+  // client's NotificationsBridge.
+  //
+  // THREE keys, not one: this badge reads the whole-table `creditRequests`, but the
+  // Credit Requests page now has its own paginated read and its own whole-table counts.
+  // Invalidating only the first would light up the badge while the page the admin is
+  // staring at kept showing a stale list.
   useEffect(() => {
     const channel = supabase
       .channel('admin:credit_requests')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'credit_requests' }, () => {
         void queryClient.invalidateQueries({ queryKey: queryKeys.creditRequests });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.creditRequestsPage });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.creditRequestStatusCounts });
       })
       .subscribe();
     return () => {

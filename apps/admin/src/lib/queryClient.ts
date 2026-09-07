@@ -42,6 +42,9 @@ export const queryKeys = {
   // entry per (page, search, filters), and invalidating the prefix refetches whichever
   // variation is currently mounted.
   playersPage: ['playersPage'] as const,
+  /** The Credit Requests page's own paginated read + its whole-table status counts. */
+  creditRequestsPage: ['creditRequestsPage'] as const,
+  creditRequestStatusCounts: ['creditRequestStatusCounts'] as const,
   purchases: ['purchases'] as const,
   creditRequests: ['creditRequests'] as const,
   news: ['news'] as const,
@@ -56,7 +59,17 @@ export const TOUCHED = {
   money: [queryKeys.batches, queryKeys.purchases, queryKeys.playersPage] as const,
   // approve mints a batch + a purchase AND resolves the request; reject resolves it (the
   // extra money keys are harmless no-ops on reject).
-  creditRequests: [queryKeys.batches, queryKeys.purchases, queryKeys.creditRequests, queryKeys.playersPage] as const,
+  // Approve/reject RESOLVES the request, so the paginated list and the whole-table
+  // counts must both refetch — otherwise an approved request sits on screen inside the
+  // "pending" filter until a manual reload, and the count above it stays stale.
+  creditRequests: [
+    queryKeys.batches,
+    queryKeys.purchases,
+    queryKeys.creditRequests,
+    queryKeys.creditRequestsPage,
+    queryKeys.creditRequestStatusCounts,
+    queryKeys.playersPage,
+  ] as const,
   attendance: [queryKeys.bookings, queryKeys.bookingsPage, queryKeys.bookingStatusCounts, queryKeys.coachHours] as const,
   coaches: [queryKeys.coaches] as const,
   packages: [queryKeys.packages] as const,

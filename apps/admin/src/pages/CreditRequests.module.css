@@ -162,6 +162,53 @@
   }
 }
 
+.filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+  margin-block: var(--space-xl) var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-surface);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-block-start: var(--space-md);
+}
+.pageInfo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+.pageControls {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+@media (max-width: 768px) {
+  /* Same treatment Bookings and Players got: space-between on a 343px row put the
+     two buttons shoulder-to-shoulder against the edges. */
+  .pagination {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-sm);
+  }
+  .pageControls {
+    justify-content: space-between;
+  }
+  .filters {
+    margin-block-start: var(--space-lg);
+  }
+}
+
 /* ── Mobile: request cards instead of a 7-column table ──────────────────────
    Rendered INSTEAD of <Table> below 768px (useIsMobile). The desktop table above
    the breakpoint is untouched.

@@ -203,6 +203,97 @@ export async function fetchBookingsPage(params: BookingsPageParams): Promise<Boo
   return { rows: (data ?? []).map(rowToBookingPageRow), total: count ?? 0 };
 }
 
+// ── credit-requests page (bounded, mirrors the bookings/players pages) ───────
+
+export type CreditRequestStatusFilter = CreditRequest['status'] | 'all';
+
+export interface CreditRequestsPageParams {
+  page: number; // 0-indexed
+  pageSize: number;
+  status: CreditRequestStatusFilter;
+}
+
+export interface CreditRequestRow {
+  request: CreditRequest;
+  player: Player | undefined;
+  pkg: Package | undefined;
+}
+
+export interface CreditRequestsPageResult {
+  rows: CreditRequestRow[];
+  total: number;
+}
+
+export interface CreditRequestStatusCounts {
+  pending: number;
+  approved: number;
+  rejected: number;
+}
+
+// PLAIN embeds, not `!inner`. Both FKs are NOT NULL so an inner join wouldn't drop a
+// legitimate row today — but nothing here filters on the embedded tables (the only
+// filter is credit_requests.status), so `!inner` would buy nothing and would silently
+// drop a row if a package ever went missing. The row already renders '—' for an absent
+// package; a plain embed keeps that tolerance instead of hiding the request entirely.
+const CREDIT_REQUESTS_PAGE_SELECT = '*, players(*), packages(*)';
+
+function rowToCreditRequestPageRow(r: Record<string, unknown>): CreditRequestRow {
+  const playerRow = r.players as Record<string, unknown> | null;
+  const pkgRow = r.packages as Record<string, unknown> | null;
+  return {
+    request: rowToCreditRequest(r),
+    player: playerRow ? rowToPlayer(playerRow) : undefined,
+    pkg: pkgRow ? rowToPackage(pkgRow) : undefined,
+  };
+}
+
+/**
+ * The Credit Requests page's own bounded query — newest `created_at` first, `pageSize`
+ * rows at a time, each row's player and package embedded in the same round trip
+ * (never the whole-table monolith).
+ *
+ * The status filter runs SERVER-side, which is the whole point: this is an approval
+ * queue, and an admin filtering to "pending" must see every pending request across all
+ * pages, not the pending ones that happen to fall inside the current ten.
+ */
+export async function fetchCreditRequestsPage(
+  params: CreditRequestsPageParams,
+): Promise<CreditRequestsPageResult> {
+  const from = params.page * params.pageSize;
+  const to = from + params.pageSize - 1;
+  let query = supabase
+    .from('credit_requests')
+    .select(CREDIT_REQUESTS_PAGE_SELECT, { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(from, to);
+  if (params.status !== 'all') query = query.eq('status', params.status);
+  const { data, error, count } = await query;
+  if (error) throw new ApiError(`Failed to load credit requests: ${error.message}`, error.code, error);
+  return { rows: (data ?? []).map(rowToCreditRequestPageRow), total: count ?? 0 };
+}
+
+const CREDIT_REQUEST_STATUSES: CreditRequest['status'][] = ['pending', 'approved', 'rejected'];
+
+/**
+ * The three status counts — over the WHOLE table, independent of the current page and
+ * of the active filter, so "N awaiting review" stays true no matter what you're
+ * looking at. Three head:true counts (no rows fetched), the same shape
+ * fetchBookingStatusCounts uses.
+ */
+export async function fetchCreditRequestStatusCounts(): Promise<CreditRequestStatusCounts> {
+  const results = await Promise.all(
+    CREDIT_REQUEST_STATUSES.map((s) =>
+      supabase.from('credit_requests').select('id', { count: 'exact', head: true }).eq('status', s),
+    ),
+  );
+  const counts: CreditRequestStatusCounts = { pending: 0, approved: 0, rejected: 0 };
+  results.forEach((r, i) => {
+    if (r.error) throw new ApiError(`Failed to load credit-request counts: ${r.error.message}`, r.error.code, r.error);
+    counts[CREDIT_REQUEST_STATUSES[i]!] = r.count ?? 0;
+  });
+  return counts;
+}
+
 // ── players page (bounded, mirrors the bookings page above) ───────────────────
 
 export type PlayerGenderFilter = Gender | 'all';

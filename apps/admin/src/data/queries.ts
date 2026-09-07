@@ -15,6 +15,9 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import type {
   BookingsPageParams,
   BookingsPageResult,
+  CreditRequestsPageParams,
+  CreditRequestsPageResult,
+  CreditRequestStatusCounts,
   PlayersPageParams,
   PlayersPageResult,
 } from '../lib/api';
@@ -22,6 +25,8 @@ import {
   ApiError,
   fetchBookings,
   fetchBookingsPage,
+  fetchCreditRequestsPage,
+  fetchCreditRequestStatusCounts,
   fetchPlayersPage,
   fetchBookingStatusCounts,
   fetchCoachHours,
@@ -123,6 +128,31 @@ export function usePlayersPage(params: PlayersPageParams): {
   });
   return { data: q.data, isPending: q.isPending, isFetching: q.isFetching, isError: q.isError, refetch: () => void q.refetch() };
 }
+
+/**
+ * The Credit Requests page's own bounded, filtered, paginated read — independent of the
+ * whole-table useCreditRequests the sidebar badge and Packages still use.
+ */
+export function useCreditRequestsPage(params: CreditRequestsPageParams): {
+  data: CreditRequestsPageResult | undefined;
+  isPending: boolean;
+  isFetching: boolean;
+  isError: boolean;
+  refetch: () => void;
+} {
+  const q = useQuery({
+    queryKey: [...queryKeys.creditRequestsPage, params],
+    queryFn: () => fetchCreditRequestsPage(params),
+    placeholderData: keepPreviousData,
+  });
+  return { data: q.data, isPending: q.isPending, isFetching: q.isFetching, isError: q.isError, refetch: () => void q.refetch() };
+}
+
+/** Whole-table credit-request counts — independent of the page and the active filter. */
+export const useCreditRequestStatusCounts = (): Resource<CreditRequestStatusCounts> =>
+  toResource(
+    useQuery({ queryKey: queryKeys.creditRequestStatusCounts, queryFn: fetchCreditRequestStatusCounts }),
+  );
 
 /** The 4 status-count cards — all-time, across every booking, not just the current page. */
 export const useBookingStatusCounts = (): Resource<BookingStatusCounts> =>

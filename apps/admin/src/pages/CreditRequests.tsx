@@ -1,11 +1,15 @@
 import { formatInstantDate, formatPiastres } from '@tpa/core';
-import type { CreditRequest, Package, Piastres, Player } from '@tpa/types';
-import { ArrowLeft, Check, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import type { CreditRequest, Piastres, Player } from '@tpa/types';
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 import { approveCreditRequest, rejectCreditRequest } from '../data/creditRequests';
-import { useAdminData, useCreditRequests } from '../data/queries';
-import { proofSignedUrl } from '../lib/api';
+import { useAdminData, useCreditRequestsPage, useCreditRequestStatusCounts } from '../data/queries';
+import {
+  proofSignedUrl,
+  type CreditRequestRow,
+  type CreditRequestStatusFilter,
+} from '../lib/api';
 import { PlayerDetailModal } from '../players/PlayerDetailModal';
 import {
   Avatar,
@@ -16,6 +20,7 @@ import {
   LoadingView,
   Modal,
   PageHeader,
+  Select,
   Table,
   TRAINING_LABEL,
   useIsMobile,
@@ -41,11 +46,20 @@ const REJECT_ERROR: Record<string, string> = {
   network: GENERIC,
 };
 
-interface Row {
-  request: CreditRequest;
-  player: Player | undefined;
-  pkg: Package | undefined;
-}
+// The row shape is now produced by the paginated query (player + package embedded),
+// so it's defined once in the API layer rather than re-declared here.
+type Row = CreditRequestRow;
+
+const PAGE_SIZE = 10;
+
+type StatusFilter = CreditRequestStatusFilter;
+
+const STATUS_OPTIONS: readonly { value: StatusFilter; label: string }[] = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Declined' },
+  { value: 'all', label: 'All requests' },
+];
 
 /**
  * Credit-requests approval queue (A4). Players report an out-of-band InstaPay/cash payment;
@@ -55,37 +69,53 @@ interface Row {
  */
 export function CreditRequests() {
   const isMobile = useIsMobile();
-  const data = useAdminData();
-  const reqsQ = useCreditRequests();
+  // The unpaginated list previously sorted PENDING FIRST so the actionable requests were
+  // always on top. That property cannot survive pagination (an old pending request would
+  // sit on page 5 behind resolved ones), and PostgREST can't order by a computed
+  // "is pending" expression. So the queue's job moved from the sort to the FILTER: it
+  // opens on Pending, which is what this page exists for, and history is one dropdown
+  // away. Within a filter, newest first — consistent with Bookings.
+  const [status, setStatus] = useState<StatusFilter>('pending');
+  const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Player | null>(null);
   const [modal, setModal] = useState<{ kind: 'approve' | 'reject'; row: Row } | null>(null);
 
-  const rows: Row[] = useMemo(() => {
-    const byPlayer = new Map(data.players.map((p) => [p.id, p]));
-    const byPkg = new Map(data.packages.map((p) => [p.id, p]));
-    return [...(reqsQ.data ?? [])]
-      .map((request) => ({ request, player: byPlayer.get(request.playerId), pkg: byPkg.get(request.packageId) }))
-      .sort((a, b) => {
-        // Pending first; then newest first.
-        const ap = a.request.status === 'pending' ? 0 : 1;
-        const bp = b.request.status === 'pending' ? 0 : 1;
-        return ap !== bp ? ap - bp : b.request.createdAt.localeCompare(a.request.createdAt);
-      });
-  }, [reqsQ.data, data.players, data.packages]);
+  // A new filter is a different result set — page 3 of the old one is meaningless
+  // against it. Adjusted during render so the stale page never flashes through a fetch.
+  const [prevStatus, setPrevStatus] = useState(status);
+  if (prevStatus !== status) {
+    setPrevStatus(status);
+    setPage(0);
+  }
 
-  if (data.isPending || reqsQ.isPending) return <LoadingView />;
-  if (data.isError || reqsQ.isError) {
+  const reqsPage = useCreditRequestsPage({ page, pageSize: PAGE_SIZE, status });
+  const counts = useCreditRequestStatusCounts();
+  // PlayerDetailModal shows a player's FULL history — that still needs the monolith.
+  const modalData = useAdminData();
+
+  const rows = reqsPage.data?.rows ?? [];
+  const total = reqsPage.data?.total ?? 0;
+  const rangeFrom = total === 0 ? 0 : page * PAGE_SIZE + 1;
+  const rangeTo = page * PAGE_SIZE + rows.length;
+  const hasPrev = page > 0;
+  const hasNext = rangeTo < total;
+
+  if (reqsPage.isPending || counts.isPending || modalData.isPending) return <LoadingView />;
+  if (reqsPage.isError || counts.isError || modalData.isError) {
     return (
       <ErrorView
         onRetry={() => {
-          data.refetch();
-          reqsQ.refetch();
+          reqsPage.refetch();
+          counts.refetch();
+          modalData.refetch();
         }}
       />
     );
   }
 
-  const pending = rows.filter((r) => r.request.status === 'pending').length;
+  // Whole-table, never the current page — so "N awaiting review" stays true while
+  // you're looking at the Approved filter on page 3.
+  const pending = counts.data?.pending ?? 0;
 
   const columns: Column<Row>[] = [
     {
@@ -151,9 +181,23 @@ export function CreditRequests() {
         subtitle={`Players reporting InstaPay or cash payments for approval. ${pending} awaiting review.`}
       />
 
+      <div className={styles.filters}>
+        <Select
+          value={status}
+          onChange={(e) => setStatus(e.target.value as StatusFilter)}
+          options={STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+        />
+      </div>
+
       {rows.length === 0 ? (
         <div className={styles.tableWrap}>
-          <p className={styles.empty}>No credit requests yet.</p>
+          <p className={styles.empty}>
+            {status === 'pending'
+              ? 'Nothing awaiting review — you’re all caught up.'
+              : status === 'all'
+                ? 'No credit requests yet.'
+                : 'No requests with this status.'}
+          </p>
         </div>
       ) : isMobile ? (
         <div className={styles.cards}>
@@ -173,18 +217,33 @@ export function CreditRequests() {
         </div>
       )}
 
+      <div className={styles.pagination}>
+        <span className={styles.pageInfo}>
+          {total === 0 ? 'No requests' : `Showing ${rangeFrom}–${rangeTo} of ${total}`}
+          {reqsPage.isFetching ? <Loader2 size={14} className="tpa-spin" aria-hidden /> : null}
+        </span>
+        <div className={styles.pageControls}>
+          <Button variant="secondary" size="sm" icon={ChevronLeft} disabled={!hasPrev} onClick={() => setPage((p) => p - 1)}>
+            Previous
+          </Button>
+          <Button variant="secondary" size="sm" icon={ChevronRight} disabled={!hasNext} onClick={() => setPage((p) => p + 1)}>
+            Next
+          </Button>
+        </div>
+      </div>
+
       {modal?.kind === 'approve' ? <ApproveModal row={modal.row} onClose={() => setModal(null)} /> : null}
       {modal?.kind === 'reject' ? <RejectModal row={modal.row} onClose={() => setModal(null)} /> : null}
 
       {selected ? (
         <PlayerDetailModal
           player={selected}
-          batches={data.batches}
-          purchases={data.purchases}
-          bookings={data.bookings}
-          slots={data.slots}
-          coaches={data.coaches}
-          packages={data.packages}
+          batches={modalData.batches}
+          purchases={modalData.purchases}
+          bookings={modalData.bookings}
+          slots={modalData.slots}
+          coaches={modalData.coaches}
+          packages={modalData.packages}
           onClose={() => setSelected(null)}
         />
       ) : null}
