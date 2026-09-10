@@ -77,6 +77,7 @@ export function rowToPurchase(r: Row): Purchase {
     paymentMethod: (r.payment_method as Purchase['paymentMethod']) ?? 'cash',
     gatewayOrderId: nstr(r.gateway_order_id),
     gatewayTransactionId: nstr(r.gateway_transaction_id),
+    paid: r.paid === true,
   };
 }
 

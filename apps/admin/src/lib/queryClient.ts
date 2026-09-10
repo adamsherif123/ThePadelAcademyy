@@ -77,4 +77,9 @@ export const TOUCHED = {
   slots: [queryKeys.slots] as const,
   players: [queryKeys.players, queryKeys.playersPage] as const,
   news: [queryKeys.news] as const,
+  // set_purchase_paid flips whether a purchase counts as revenue. The Dashboard's
+  // revenue and PlayerDetailModal read the monolith `purchases`; the Credit Requests
+  // page reads the purchase EMBEDDED in its paginated rows — so both must refetch, or
+  // the toggle would appear to do nothing on one of the two screens.
+  purchasePaid: [queryKeys.purchases, queryKeys.creditRequestsPage] as const,
 };

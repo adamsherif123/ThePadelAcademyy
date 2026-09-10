@@ -104,6 +104,13 @@ export interface Purchase {
   gatewayOrderId: string | null;
   /** Gateway transaction handle; null until a transaction exists (always null for cash). */
   gatewayTransactionId: string | null;
+  /**
+   * Has the academy confirmed it COLLECTED this money? Revenue counts a purchase only
+   * when it is succeeded AND paid. Independent of credits — those are granted the
+   * moment a purchase succeeds, paid or not. Set by the admin via set_purchase_paid;
+   * a gateway (Paymob) settlement is paid automatically.
+   */
+  paid: boolean;
 }
 
 /**

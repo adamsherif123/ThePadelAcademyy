@@ -40,12 +40,19 @@ const monthStart = (now: IsoInstant): IsoInstant => {
 };
 
 const succeeded = (purchases: Purchase[]): Purchase[] => purchases.filter((p) => p.status === 'succeeded');
+/**
+ * REVENUE is money the academy has actually COLLECTED: succeeded AND paid. Every
+ * revenue figure on the Dashboard goes through this one helper, so they can never
+ * disagree about what counts. `succeeded` alone still backs the recent-purchases
+ * feed, which lists sales whether or not they've been collected yet.
+ */
+const collected = (purchases: Purchase[]): Purchase[] => succeeded(purchases).filter((p) => p.paid);
 const sumAmount = (purchases: readonly Purchase[]): Piastres =>
   purchases.reduce((s, p) => s + p.amount, 0) as Piastres;
 const inRange = (i: IsoInstant, startMs: number, endMs: number): boolean =>
   ms(i) >= startMs && ms(i) < endMs;
 
-// --- KPI 1: revenue this Cairo month vs last, succeeded only ---
+// --- KPI 1: revenue this Cairo month vs last — COLLECTED only (succeeded AND paid) ---
 export interface RevenueMonth {
   current: Piastres;
   previous: Piastres;
@@ -57,7 +64,7 @@ export function revenueThisMonth(purchases: Purchase[], now: IsoInstant): Revenu
   const start = ms(monthStart(now));
   const next = ms(cairoMidnight(addMonths({ year: cThis.year, month: cThis.month, day: 1 }, 1)));
   const prev = ms(cairoMidnight(addMonths({ year: cThis.year, month: cThis.month, day: 1 }, -1)));
-  const paid = succeeded(purchases);
+  const paid = collected(purchases);
   const current = sumAmount(paid.filter((p) => inRange(p.createdAt, start, next)));
   const previous = sumAmount(paid.filter((p) => inRange(p.createdAt, prev, start)));
   const deltaPct = previous === 0 ? null : Math.round(((current - previous) / previous) * 100);
@@ -102,6 +109,10 @@ export function batchLiability(amountPaid: number, quantityTotal: number, remain
   return Math.round((amountPaid * remaining) / quantityTotal) as Piastres;
 }
 
+// Deliberately NOT paid-gated. Liability is the service the academy still OWES for
+// credits it has granted, and credits are granted the moment a purchase succeeds —
+// whether or not the money has been collected. An unpaid purchase's credits are
+// still bookable, so they are still owed.
 export function creditLiability(batches: CreditBatch[], purchases: Purchase[], now: IsoInstant): Piastres {
   const nowMs = ms(now);
   const purchaseById = new Map(purchases.map((p) => [p.id, p]));
@@ -117,7 +128,7 @@ export function creditLiability(batches: CreditBatch[], purchases: Purchase[], n
   return total as Piastres;
 }
 
-// --- Donut: all-time succeeded revenue by training type (Trial never appears) ---
+// --- Donut: all-time COLLECTED revenue by training type (Trial never appears) ---
 export interface TypeRevenue {
   type: TrainingType;
   amount: Piastres;
@@ -126,7 +137,7 @@ export interface TypeRevenue {
 export function revenueByType(purchases: Purchase[], packages: Package[]): { rows: TypeRevenue[]; total: Piastres } {
   const pkgById = new Map(packages.map((p) => [p.id, p]));
   const totals = new Map<TrainingType, number>();
-  for (const p of succeeded(purchases)) {
+  for (const p of collected(purchases)) {
     const pkg = pkgById.get(p.packageId);
     if (!pkg) continue;
     totals.set(pkg.trainingType, (totals.get(pkg.trainingType) ?? 0) + p.amount);
@@ -139,7 +150,7 @@ export function revenueByType(purchases: Purchase[], packages: Package[]): { row
   return { rows, total };
 }
 
-// --- Line chart: succeeded revenue per Cairo week, last N weeks (Sunday-bucketed) ---
+// --- Line chart: COLLECTED revenue per Cairo week, last N weeks (Sunday-bucketed) ---
 export interface WeekBucket {
   label: string;
   weekStart: IsoInstant;
@@ -149,7 +160,7 @@ export interface WeekBucket {
 export function revenueOverTime(purchases: Purchase[], now: IsoInstant, weeks = 8): WeekBucket[] {
   const sunday = cairoCalendarDate(cairoWeekStart(now));
   const base: CairoDate = { year: sunday.year, month: sunday.month, day: sunday.day };
-  const paid = succeeded(purchases);
+  const paid = collected(purchases);
   const buckets: WeekBucket[] = [];
   for (let w = weeks - 1; w >= 0; w -= 1) {
     const start = cairoMidnight(addCairoDays(base, -w * 7));
@@ -181,7 +192,7 @@ export function creditsExpiringSoon(batches: CreditBatch[], now: IsoInstant, win
     .sort((a, b) => ms(a.expiresAt) - ms(b.expiresAt));
 }
 
-// --- Bottom card 3: recent succeeded purchases, newest first ---
+// --- Bottom card 3: recent succeeded purchases, newest first — paid or not (the row marks unpaid ones) ---
 export function recentPurchases(purchases: Purchase[], n = 4): Purchase[] {
   return succeeded(purchases)
     .slice()

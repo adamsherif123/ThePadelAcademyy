@@ -149,6 +149,7 @@ for (let dayOffset = WINDOW_DAYS; dayOffset >= 1; dayOffset -= 1) {
       paymentMethod: 'paymob',
       gatewayOrderId: `pmob_g${pn}`,
       gatewayTransactionId: status === 'succeeded' ? `ptxn_g${pn}` : null,
+      paid: status === 'succeeded',
     });
     if (status !== 'succeeded') continue;
     // A succeeded purchase grants a credit batch (30-day expiry from purchase).

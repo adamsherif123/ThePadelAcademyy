@@ -217,6 +217,8 @@ export interface CreditRequestRow {
   request: CreditRequest;
   player: Player | undefined;
   pkg: Package | undefined;
+  /** The purchase an APPROVAL created; undefined while pending or declined. */
+  purchase: Purchase | undefined;
 }
 
 export interface CreditRequestsPageResult {
@@ -235,15 +237,20 @@ export interface CreditRequestStatusCounts {
 // filter is credit_requests.status), so `!inner` would buy nothing and would silently
 // drop a row if a package ever went missing. The row already renders '—' for an absent
 // package; a plain embed keeps that tolerance instead of hiding the request entirely.
-const CREDIT_REQUESTS_PAGE_SELECT = '*, players(*), packages(*)';
+// `purchases(*)` rides along via credit_requests.purchase_id so an approved row can
+// show whether its money has been collected. That FK is NULL while a request is
+// pending or declined, which is the other reason these must stay PLAIN embeds.
+const CREDIT_REQUESTS_PAGE_SELECT = '*, players(*), packages(*), purchases(*)';
 
 function rowToCreditRequestPageRow(r: Record<string, unknown>): CreditRequestRow {
   const playerRow = r.players as Record<string, unknown> | null;
   const pkgRow = r.packages as Record<string, unknown> | null;
+  const purchaseRow = r.purchases as Record<string, unknown> | null;
   return {
     request: rowToCreditRequest(r),
     player: playerRow ? rowToPlayer(playerRow) : undefined,
     pkg: pkgRow ? rowToPackage(pkgRow) : undefined,
+    purchase: purchaseRow ? rowToPurchase(purchaseRow) : undefined,
   };
 }
 
@@ -505,7 +512,7 @@ export type ApproveRequestReason = 'not_admin' | 'request_missing' | 'not_pendin
 export type ApproveRequestResult =
   | { ok: true; alreadyResolved: boolean; purchaseId: string | null }
   | { ok: false; reason: ApproveRequestReason };
-/** Approve a request → succeeded purchase + minted credits (real revenue). granted quantity
+/** Approve a request → succeeded purchase + minted credits (revenue once marked paid). granted quantity
  *  and amount are OPTIONAL overrides (null = the package's defaults). Idempotent server-side. */
 export async function approveCreditRequestRpc(
   requestId: string,
@@ -528,6 +535,21 @@ export type RejectRequestResult = { ok: true } | { ok: false; reason: RejectRequ
 export async function rejectCreditRequestRpc(requestId: string, reason: string): Promise<RejectRequestResult> {
   const d = await callRpc('reject_credit_request', { p_request_id: requestId, p_reason: reason });
   return d.ok ? { ok: true } : { ok: false, reason: d.reason as RejectRequestReason };
+}
+
+export type SetPurchasePaidReason = 'not_admin' | 'invalid_paid' | 'purchase_missing' | 'not_succeeded';
+export type SetPurchasePaidResult =
+  | { ok: true; paid: boolean; changed: boolean }
+  | { ok: false; reason: SetPurchasePaidReason };
+/**
+ * Mark a purchase collected (or not). Flips whether it counts toward revenue; never
+ * creates or deletes a row, and never touches the credits it granted. Idempotent.
+ */
+export async function setPurchasePaidRpc(purchaseId: string, paid: boolean): Promise<SetPurchasePaidResult> {
+  const d = await callRpc('set_purchase_paid', { p_purchase_id: purchaseId, p_paid: paid });
+  return d.ok
+    ? { ok: true, paid: Boolean(d.paid), changed: Boolean(d.changed) }
+    : { ok: false, reason: d.reason as SetPurchasePaidReason };
 }
 
 export type ConfirmReason = 'not_admin' | 'slot_missing' | 'slot_cancelled' | 'slot_in_past';

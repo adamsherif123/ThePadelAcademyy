@@ -179,6 +179,7 @@ describe('unusedCreditValue', () => {
     paymentMethod: 'paymob',
     gatewayOrderId: null,
     gatewayTransactionId: null,
+    paid: true,
     ...over,
   });
   const iPkg = pkg({ id: 'pk_i4' as PackageId, trainingType: 'individual', sessionCount: 4, price: 600000 as Package['price'] });

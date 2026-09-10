@@ -11,6 +11,7 @@ import {
   type CreditRequestStatusFilter,
 } from '../lib/api';
 import { PlayerDetailModal } from '../players/PlayerDetailModal';
+import { PaidToggle } from '../purchases/PaidToggle';
 import {
   Avatar,
   Badge,
@@ -63,7 +64,8 @@ const STATUS_OPTIONS: readonly { value: StatusFilter; label: string }[] = [
 
 /**
  * Credit-requests approval queue (A4). Players report an out-of-band InstaPay/cash payment;
- * the admin reviews the proof and approves (minting real credits + recording revenue, with an
+ * the admin reviews the proof and approves (minting real credits and recording a purchase that
+ * becomes revenue once the admin marks it paid, with an
  * optional quantity/amount override when the payment didn't match) or rejects with a reason.
  * Pending first. Approve is the primary (money-out) action; reject is destructive.
  */
@@ -164,6 +166,11 @@ export function CreditRequests() {
             <Button icon={Check} onClick={() => setModal({ kind: 'approve', row: r })}>
               Approve
             </Button>
+          </div>
+        ) : r.request.status === 'approved' && r.purchase ? (
+          <div className={styles.resolved}>
+            <Badge tone="success">Approved</Badge>
+            <PaidToggle purchaseId={r.purchase.id} paid={r.purchase.paid} />
           </div>
         ) : (
           <Badge tone={r.request.status === 'approved' ? 'success' : 'danger'}>
@@ -272,7 +279,7 @@ function RequestCard({
   onApprove: () => void;
   onReject: () => void;
 }) {
-  const { request, player, pkg } = row;
+  const { request, player, pkg, purchase } = row;
   const pending = request.status === 'pending';
   return (
     <article className={styles.card}>
@@ -320,6 +327,11 @@ function RequestCard({
               Reject
             </Button>
           </>
+        ) : request.status === 'approved' && purchase ? (
+          <div className={styles.resolved}>
+            <Badge tone="success">Approved</Badge>
+            <PaidToggle purchaseId={purchase.id} paid={purchase.paid} />
+          </div>
         ) : (
           <Badge tone={request.status === 'approved' ? 'success' : 'danger'}>
             {request.status === 'approved' ? 'Approved' : 'Declined'}
@@ -436,8 +448,9 @@ function ApproveModal({ row, onClose }: { row: Row; onClose: () => void }) {
         </div>
         <p className={styles.confirm}>
           This grants <strong>{quantity}</strong> {pkg ? `${TRAINING_LABEL[pkg.trainingType]} ` : ''}
-          credit{quantity === 1 ? '' : 's'} and records <strong>{formatPiastres(amount as Piastres)}</strong> of revenue
-          {overridden ? ' — adjusted from the package default.' : '.'}
+          credit{quantity === 1 ? '' : 's'} right away and records a <strong>{formatPiastres(amount as Piastres)}</strong>{' '}
+          purchase{overridden ? ' — adjusted from the package default' : ''}. It counts toward revenue once you mark
+          it paid.
         </p>
         {error ? <p className={styles.error}>{error}</p> : null}
       </div>

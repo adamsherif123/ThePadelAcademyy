@@ -15,6 +15,7 @@ import {
   activePlayerCount,
   batchLiability,
   creditLiability,
+  recentPurchases,
   revenueByType,
   revenueOverTime,
   revenueThisMonth,
@@ -118,14 +119,14 @@ describe('S4e regression — repricing a package must not move liability for alr
 });
 
 describe('revenueThisMonth', () => {
-  it('counts succeeded purchases only, in the Cairo month', () => {
+  it('counts COLLECTED (succeeded AND paid) purchases only, in the Cairo month', () => {
     const cThis = cairoCalendarDate(now);
     const inThisMonth = (i: IsoInstant) => {
       const c = cairoCalendarDate(i);
       return c.year === cThis.year && c.month === cThis.month;
     };
     const succeededJuly = mockPurchases
-      .filter((p) => p.status === 'succeeded' && inThisMonth(p.createdAt))
+      .filter((p) => p.status === 'succeeded' && p.paid && inThisMonth(p.createdAt))
       .reduce((s, p) => s + p.amount, 0);
     const allJuly = mockPurchases
       .filter((p) => inThisMonth(p.createdAt))
@@ -199,3 +200,48 @@ function seededSlots() {
   for (const b of mockBookings) if (b.status !== 'cancelled') seats.set(b.slotId, (seats.get(b.slotId) ?? 0) + 1);
   return mockSlots.map((s) => ({ ...s, bookedCount: seats.get(s.id) ?? 0 }));
 }
+
+describe('paid gating — revenue counts only money the academy has COLLECTED', () => {
+  const cThis = cairoCalendarDate(now);
+  const inThisMonth = (i: IsoInstant) => {
+    const c = cairoCalendarDate(i);
+    return c.year === cThis.year && c.month === cThis.month;
+  };
+  const allUnpaid = mockPurchases.map((p) => ({ ...p, paid: false }));
+
+  it('an unpaid purchase is excluded from this month’s revenue, by exactly its amount', () => {
+    const target = mockPurchases.find((p) => p.status === 'succeeded' && p.paid && inThisMonth(p.createdAt));
+    expect(target).toBeDefined();
+    const withOneUnpaid = mockPurchases.map((p) => (p.id === target!.id ? { ...p, paid: false } : p));
+    expect(revenueThisMonth(withOneUnpaid, now).current).toBe(
+      revenueThisMonth(mockPurchases, now).current - target!.amount,
+    );
+  });
+
+  it('marking it paid again restores the figure — the toggle is symmetric', () => {
+    const target = mockPurchases.find((p) => p.status === 'succeeded' && p.paid && inThisMonth(p.createdAt))!;
+    const off = mockPurchases.map((p) => (p.id === target.id ? { ...p, paid: false } : p));
+    const back = off.map((p) => (p.id === target.id ? { ...p, paid: true } : p));
+    expect(revenueThisMonth(back, now).current).toBe(revenueThisMonth(mockPurchases, now).current);
+  });
+
+  it('with nothing collected, ALL three revenue figures are zero', () => {
+    expect(revenueThisMonth(allUnpaid, now).current).toBe(0);
+    expect(revenueThisMonth(allUnpaid, now).previous).toBe(0);
+    expect(revenueByType(allUnpaid, mockPackages).total).toBe(0);
+    expect(revenueByType(allUnpaid, mockPackages).rows).toHaveLength(0);
+    expect(revenueOverTime(allUnpaid, now, 8).every((b) => b.revenue === 0)).toBe(true);
+  });
+
+  it('credit liability is NOT paid-gated — granted credits are owed whether or not the money came in', () => {
+    expect(creditLiability(mockCreditBatches, allUnpaid, now)).toBe(
+      creditLiability(mockCreditBatches, mockPurchases, now),
+    );
+  });
+
+  it('the recent-purchases feed still lists unpaid sales (the row marks them)', () => {
+    const recent = recentPurchases(allUnpaid, 4);
+    expect(recent).toHaveLength(recentPurchases(mockPurchases, 4).length);
+    expect(recent.every((p) => !p.paid)).toBe(true);
+  });
+});

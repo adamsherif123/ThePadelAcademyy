@@ -154,6 +154,7 @@ function PurchaseRow({
       </div>
       <div className={styles.endCol}>
         <span className={styles.amount}>{formatPiastres(purchase.amount)}</span>
+        {purchase.paid ? null : <span className={styles.unpaid}>Not paid</span>}
         <span className={styles.sub}>{formatInstantDate(purchase.createdAt)}</span>
       </div>
     </div>

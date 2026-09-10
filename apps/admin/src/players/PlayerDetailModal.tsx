@@ -34,6 +34,7 @@ import {
   purchasesForPlayer,
 } from '../data/players';
 import { bookingsForPlayer, coachById, packageById, slotById } from '../data/selectors';
+import { PaidToggle } from '../purchases/PaidToggle';
 import { useSession } from '../session/SessionProvider';
 import {
   Avatar,
@@ -250,6 +251,9 @@ export function PlayerDetailModal({
                       <Badge tone={p.status === 'succeeded' ? 'success' : p.status === 'failed' ? 'danger' : 'neutral'}>
                         {p.status.charAt(0).toUpperCase() + p.status.slice(1)}
                       </Badge>
+                      {/* Cash sales have no credit request, so this is where their
+                          collection is confirmed. Only a completed purchase can be. */}
+                      {p.status === 'succeeded' ? <PaidToggle purchaseId={p.id} paid={p.paid} /> : null}
                     </div>
                   </div>
                 );
@@ -538,9 +542,10 @@ function CashView({
           <p className={`${styles.value} ${styles.valueIn}`}>
             <Banknote size={16} aria-hidden />
             <span>
-              Records <span className={styles.valueBig}>{formatPiastres(amount)}</span> received and grants{' '}
+              Records a <span className={styles.valueBig}>{formatPiastres(amount)}</span> purchase and grants{' '}
               {selected.sessionCount} {TRAINING_LABEL[selected.trainingType].toLowerCase()} credit
-              {selected.sessionCount === 1 ? '' : 's'}, expiring {expiryDate}.
+              {selected.sessionCount === 1 ? '' : 's'}, expiring {expiryDate}. It counts toward revenue once
+              you mark it paid.
             </span>
           </p>
         ) : (

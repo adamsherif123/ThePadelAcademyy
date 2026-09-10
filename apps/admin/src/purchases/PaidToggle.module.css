@@ -1,0 +1,29 @@
+.wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+/* Amber until collected, green once paid — the academy should be able to scan a
+   list of approvals and see which ones still owe money without reading anything. */
+.label {
+  padding-block: 2px;
+  padding-inline: var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--expiry-expiring_soon-bg);
+  color: var(--expiry-expiring_soon-fg);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+.wrap[data-paid] .label {
+  background: var(--expiry-ok-bg);
+  color: var(--expiry-ok-fg);
+}
+
+.error {
+  flex-basis: 100%;
+  color: var(--expiry-expired-fg);
+  font-size: var(--font-size-caption);
+}

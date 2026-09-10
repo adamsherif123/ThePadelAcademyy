@@ -311,3 +311,12 @@
   width: 100%;
   min-height: 48px;
 }
+
+/* An approved row: its badge plus the "have we collected it?" switch. */
+.resolved {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}

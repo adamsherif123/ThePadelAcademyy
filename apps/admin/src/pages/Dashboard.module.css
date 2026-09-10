@@ -114,3 +114,11 @@
     min-width: 56px;
   }
 }
+
+/* A recent sale whose money hasn't been collected — it isn't in the revenue above. */
+.unpaid {
+  color: var(--expiry-expiring_soon-fg);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
