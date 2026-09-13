@@ -7,6 +7,7 @@ import { slotsForDay } from '../data/schedule';
 import { coachById } from '../data/selectors';
 import { Button, EmptyState, groupTags, trainingLabelFor } from '../ui';
 import styles from './DayCalendar.module.css';
+import './scheduleTypeColors.css';
 
 const WEEKDAY_SHORT = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 

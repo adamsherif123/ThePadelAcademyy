@@ -1,0 +1,38 @@
+/* ── Session-type colours for the SCHEDULE only (week grid + day view) ─────────
+   A deliberate, schedule-local exception to "colours come from tokens only".
+
+   The shared --tint-<type>-* tokens are generated from @tpa/theme and are ALSO
+   read by TypePill (Bookings and elsewhere), Avatar, the Dashboard donut and the
+   Packages section dots. Retuning them would recolour all of those, so the
+   schedule gets its own namespaced variables instead. Nothing outside src/calendar
+   reads --schedule-*, and no existing token is redefined here.
+
+   Why new colours at all: measured in CIEDE2000, the old group and duo card tints
+   (#eaf1ff vs #e6ebf4) were ΔE 2.4 apart — under the ~3 "just noticeable"
+   threshold, so on a dense week grid they read as one colour.
+
+   Three hues spread ~120° apart and clear of trial's green:
+     group      blue    — the most common type, a calm anchor (and the brand hue)
+     duo        rose    — ΔE 12.1 from group's tint (was 2.4), ΔE 36 between spines
+     individual orange  — ΔE 18.4 / 15.6 from the other two tints
+
+   Each type has three roles, all the same hue:
+     -bg     the week-grid card fill     (tags text on it stays ≥ 4.3:1, above the old 4.2)
+     -fg     the time text on that fill  (≥ 4.8:1 — AA for small bold text)
+     -solid  the day-view spine and legend dot (≥ 3.6:1 on white — AA for graphics)
+   The admin is light-only (a single :root in tokens.generated.css), so there is
+   no dark variant to define.
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  --schedule-group-bg: #e6eeff;
+  --schedule-group-fg: #1d4ed8;
+  --schedule-group-solid: #2563eb;
+
+  --schedule-duo-bg: #fde8f3;
+  --schedule-duo-fg: #be185d;
+  --schedule-duo-solid: #db2777;
+
+  --schedule-individual-bg: #ffead3;
+  --schedule-individual-fg: #b8400c;
+  --schedule-individual-solid: #ea580c;
+}

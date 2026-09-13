@@ -6,6 +6,7 @@ import { cairoWallMinutes } from '../data/schedule';
 import { coachById } from '../data/selectors';
 import { groupTags, trainingLabelFor } from '../ui';
 import styles from './EventCard.module.css';
+import './scheduleTypeColors.css';
 
 /**
  * A calendar event card. It IS the positioned box — the caller passes the full

@@ -7,6 +7,7 @@ import { layoutDay, slotsForDay, weekColumns, weekHasSlots, weekTimeRange } from
 import { Button, EmptyState, TRAINING_LABEL } from '../ui';
 import { EventCard } from './EventCard';
 import styles from './WeekCalendar.module.css';
+import './scheduleTypeColors.css';
 
 const WEEKDAY_LABEL = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const HOUR_PX = 84;

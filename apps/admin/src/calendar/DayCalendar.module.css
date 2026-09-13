@@ -145,13 +145,13 @@
   background: var(--color-border-strong);
 }
 .slot[data-type='group'] .slotBar {
-  background: var(--tint-group-fg);
+  background: var(--schedule-group-solid);
 }
 .slot[data-type='duo'] .slotBar {
-  background: var(--tint-duo-fg);
+  background: var(--schedule-duo-solid);
 }
 .slot[data-type='individual'] .slotBar {
-  background: var(--tint-individual-fg);
+  background: var(--schedule-individual-solid);
 }
 .slot[data-type='trial'] .slotBar {
   background: var(--tint-trial-fg);

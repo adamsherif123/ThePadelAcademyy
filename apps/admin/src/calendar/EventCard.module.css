@@ -88,27 +88,28 @@
   text-overflow: ellipsis;
 }
 
-/* Training-type tints (admin-only trainingTint) for the card fill + time colour. */
+/* Training-type colours for the card fill + time text. Group/duo/individual use the
+   schedule-local palette (scheduleTypeColors.css); trial keeps the shared tint. */
 .event[data-type='group'] {
-  background: var(--tint-group-bg);
+  background: var(--schedule-group-bg);
 }
 .event[data-type='duo'] {
-  background: var(--tint-duo-bg);
+  background: var(--schedule-duo-bg);
 }
 .event[data-type='individual'] {
-  background: var(--tint-individual-bg);
+  background: var(--schedule-individual-bg);
 }
 .event[data-type='trial'] {
   background: var(--tint-trial-bg);
 }
 .event[data-type='group'] .time {
-  color: var(--tint-group-fg);
+  color: var(--schedule-group-fg);
 }
 .event[data-type='duo'] .time {
-  color: var(--tint-duo-fg);
+  color: var(--schedule-duo-fg);
 }
 .event[data-type='individual'] .time {
-  color: var(--tint-individual-fg);
+  color: var(--schedule-individual-fg);
 }
 .event[data-type='trial'] .time {
   color: var(--tint-trial-fg);

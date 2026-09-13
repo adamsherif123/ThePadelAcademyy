@@ -76,13 +76,13 @@
   border-radius: var(--radius-pill);
 }
 .legendDot[data-type='group'] {
-  background: var(--tint-group-fg);
+  background: var(--schedule-group-solid);
 }
 .legendDot[data-type='duo'] {
-  background: var(--tint-duo-fg);
+  background: var(--schedule-duo-solid);
 }
 .legendDot[data-type='individual'] {
-  background: var(--tint-individual-fg);
+  background: var(--schedule-individual-solid);
 }
 .legendDot[data-type='trial'] {
   background: var(--tint-trial-fg);
