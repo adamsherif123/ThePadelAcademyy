@@ -7,7 +7,14 @@
 .summary {
   display: flex;
   align-items: center;
+  /* The badges can out-width the 540px modal on their own (a group carries up to
+     four: state + gender + level + "Set by first booking"), which left `.summaryText`
+     a few pixels and broke its two lines into one word each. Wrapping lets the whole
+     `.pills` group drop onto its own row when it can't sit beside the text; when it
+     fits — duo / individual, which carry one or two badges — the row is unchanged. */
+  flex-wrap: wrap;
   gap: var(--space-md);
+  row-gap: var(--space-sm);
   padding: var(--space-md);
   border-radius: var(--radius-md);
   background: var(--color-bg-canvas);
@@ -24,7 +31,9 @@
   flex-shrink: 0;
 }
 .summaryText {
-  flex: 1;
+  /* A real flex-basis (not 0) is what makes the wrap above fire: it's the width the
+     text is guaranteed before the badges are allowed to share its line. */
+  flex: 1 1 10rem;
   min-width: 0;
 }
 .summaryTitle {
@@ -40,6 +49,8 @@
 .pills {
   display: flex;
   gap: var(--space-sm);
+  row-gap: var(--space-xs);
+  flex-wrap: wrap;
   flex-shrink: 0;
 }
 
