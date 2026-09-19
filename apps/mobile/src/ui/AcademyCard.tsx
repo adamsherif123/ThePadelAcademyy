@@ -9,9 +9,9 @@ import { IconRow } from './IconRow';
 /** The academy's real location + hours. Brand facts, not mock data. */
 export const ACADEMY = {
   name: 'Oro Plaza Hotel',
-  address: 'In front of Family Park, Rehab, Cairo',
+  address: 'In front of Family Park, Cairo',
   /** The canonical one-line location shown on session cards — the ONE source. */
-  locationLine: 'Oro Plaza Hotel · Rehab, Cairo',
+  locationLine: 'Oro Plaza Hotel · Cairo',
   /** Deep link to Maps — the location line taps through here before a session. */
   mapsUrl: 'https://maps.google.com/?q=Oro+Plaza+Hotel+Rehab+Cairo',
   hours: 'Sun – Wed · 5:00 PM – 11:00 PM',

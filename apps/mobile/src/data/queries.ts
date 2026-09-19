@@ -1,5 +1,7 @@
-import type { BookingId, IsoInstant, News, NewsId, NotificationId, PlayerId, SlotId, TrainingType } from '@tpa/types';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import type { BookingId, IsoInstant, News, NewsId, Notification, NotificationId, PlayerId, Purchase, SlotId, TrainingType } from '@tpa/types';
+import { SLOT_WINDOW_TRAILING_DAYS } from '@tpa/core';
+import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 
 import {
   bookSlotRpc,
@@ -7,10 +9,14 @@ import {
   fetchAppConfig,
   fetchBookings,
   fetchCoaches,
+  daysBefore,
   fetchCreditBatches,
   fetchMyCreditRequests,
   fetchNewsSeen,
-  fetchNotifications,
+  fetchNotificationsPage,
+  fetchPastSessionsPage,
+  fetchPurchaseCount,
+  fetchUnreadNotificationCount,
   fetchVisibleNews,
   trialEligibleRpc,
   fetchPackages,
@@ -21,6 +27,7 @@ import {
   markNewsSeen,
   markNotificationRead,
   type BookReason,
+  type PastSessionRow,
   type CancelReason,
 } from '../lib/api';
 import { BOOKING_TOUCHED_KEYS, queryClient, queryKeys } from '../lib/queryClient';
@@ -55,6 +62,47 @@ function toResource<T>(
   };
 }
 
+/**
+ * A cursor-paged read: the rows loaded so far, plus the one action that loads the
+ * next (older) page. Both bounded history reads in this app — the notification feed
+ * and pre-window past sessions — are this shape, so the screens that render them
+ * share one contract instead of each inventing a load-more.
+ */
+export interface PagedResource<T> {
+  items: T[];
+  isPending: boolean;
+  isError: boolean;
+  error: unknown;
+  /** Another page exists (or nothing has been loaded yet and one might). */
+  hasMore: boolean;
+  /** A page beyond the first is in flight — for the button's spinner. */
+  isLoadingMore: boolean;
+  loadMore: () => void;
+  refetch: () => void;
+}
+
+function toPaged<T>(q: {
+  data: { pages: { rows: T[] }[] } | undefined;
+  isPending: boolean;
+  isError: boolean;
+  error: unknown;
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  fetchNextPage: () => unknown;
+  refetch: () => unknown;
+}): PagedResource<T> {
+  return {
+    items: (q.data?.pages ?? []).flatMap((page) => page.rows),
+    isPending: q.isPending,
+    isError: q.isError,
+    error: q.error,
+    hasMore: q.hasNextPage,
+    isLoadingMore: q.isFetchingNextPage,
+    loadMore: () => void q.fetchNextPage(),
+    refetch: () => void q.refetch(),
+  };
+}
+
 // ── raw resource hooks ────────────────────────────────────────────────────────
 
 export const useCoaches = () =>
@@ -63,8 +111,14 @@ export const useCoaches = () =>
 export const usePackages = () =>
   toResource(useQuery({ queryKey: queryKeys.packages, queryFn: fetchPackages }));
 
-export const useSlots = () =>
-  toResource(useQuery({ queryKey: queryKeys.slots, queryFn: fetchSlots }));
+/**
+ * Published slots from the trailing window onwards (see `fetchSlots`) — bounded
+ * below, every future slot above. `now` is closed over by the queryFn and kept OUT
+ * of the key, exactly like `useNews(now)`: the key stays stable so a ticking clock
+ * never causes a refetch, and each real fetch computes a fresh cutoff.
+ */
+export const useSlots = (now: IsoInstant) =>
+  toResource(useQuery({ queryKey: queryKeys.slots, queryFn: () => fetchSlots(now) }));
 
 export const useTemplates = () =>
   toResource(useQuery({ queryKey: queryKeys.templates, queryFn: fetchTemplates }));
@@ -76,13 +130,71 @@ export const useBookings = () =>
 export const useBatches = () =>
   toResource(useQuery({ queryKey: queryKeys.creditBatches, queryFn: fetchCreditBatches }));
 
-/** The player's purchases (pending until the webhook settles them). */
-export const usePurchases = () =>
-  toResource(useQuery({ queryKey: queryKeys.purchases, queryFn: fetchPurchases }));
+/**
+ * The player's purchases (pending until the webhook settles them), newest first,
+ * bounded to `since`. Pass `null` for the lifetime list — only delete-account needs
+ * it, because it values every unused credit against the purchase that paid for it.
+ */
+export const usePurchases = (since: IsoInstant | null): Resource<Purchase[]> =>
+  toResource(
+    useQuery({ queryKey: [...queryKeys.purchases, { since }], queryFn: () => fetchPurchases(since) }),
+  );
 
-/** The player's notifications, newest first — kept live by Realtime (NotificationsBridge). */
-export const useNotifications = () =>
-  toResource(useQuery({ queryKey: queryKeys.notifications, queryFn: fetchNotifications }));
+/** Lifetime purchase count — a head:true count, so the Profile subtitle stays exact
+ *  while the list behind it is windowed. */
+export const usePurchaseCount = (): Resource<number> =>
+  toResource(useQuery({ queryKey: queryKeys.purchaseCount, queryFn: fetchPurchaseCount }));
+
+/**
+ * The notification centre's feed — one page at a time, newest first, kept live by
+ * Realtime (NotificationsBridge invalidates the ['notifications'] PREFIX, which
+ * covers both this feed and the unread count below).
+ */
+export const useNotificationsFeed = (): PagedResource<Notification> =>
+  toPaged(
+    useInfiniteQuery({
+      queryKey: queryKeys.notificationsFeed,
+      queryFn: ({ pageParam }) => fetchNotificationsPage({ before: pageParam }),
+      initialPageParam: undefined as IsoInstant | undefined,
+      getNextPageParam: (last) => (last.hasMore ? last.rows[last.rows.length - 1]?.createdAt : undefined),
+    }),
+  );
+
+/** Unread count for the bell badge — a head:true count, exact regardless of how many
+ *  pages of the feed have been loaded. */
+export const useUnreadNotificationCount = (): Resource<number> =>
+  toResource(
+    useQuery({ queryKey: queryKeys.notificationsUnread, queryFn: fetchUnreadNotificationCount }),
+  );
+
+/**
+ * The player's sessions OLDER than the slot window — fetched only when they ask.
+ * The first page starts at the window's trailing edge, so it continues exactly where
+ * the pre-loaded slots stop: no gap, no duplicates.
+ */
+export function usePastSessionsOlder(now: IsoInstant): PagedResource<PastSessionRow> {
+  // Nothing is fetched until the player actually asks. The latch lives here rather
+  // than in the screen so "load older" is one call at the call site, whether it is
+  // the first page or the fifth.
+  const [started, setStarted] = useState(false);
+  const q = useInfiniteQuery({
+    queryKey: queryKeys.pastSessions,
+    queryFn: ({ pageParam }) => fetchPastSessionsPage({ before: pageParam }),
+    initialPageParam: daysBefore(now, SLOT_WINDOW_TRAILING_DAYS),
+    getNextPageParam: (last) =>
+      last.hasMore ? last.rows[last.rows.length - 1]?.slot.startsAt : undefined,
+    enabled: started,
+  });
+  const paged = toPaged(q);
+  return {
+    ...paged,
+    // Before the first tap there is no page to judge from, so assume older sessions
+    // may exist; after it, the server's hasMore decides.
+    hasMore: started ? paged.hasMore : true,
+    isLoadingMore: started ? paged.isPending || paged.isLoadingMore : false,
+    loadMore: () => (started ? paged.loadMore() : setStarted(true)),
+  };
+}
 
 /** The player's credit requests, newest first (A4) — the pending/resolved status shown in the wallet. */
 export const useMyCreditRequests = () =>

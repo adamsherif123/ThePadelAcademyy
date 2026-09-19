@@ -134,7 +134,7 @@ export default function BookScreen() {
   const router = useRouter();
   const { player, now } = useSession();
   const refreshControl = useRefreshControl(BOOK_KEYS);
-  const slotsQ = useSlots();
+  const slotsQ = useSlots(now);
   const batchesQ = useBatches();
   const bookingsQ = useBookings();
   const coachesQ = useCoaches();
@@ -209,7 +209,7 @@ export default function BookScreen() {
       </ScrollView>
 
       <Text variant="label">
-        {`${dayLabel} · ${daySessions.length} session${daySessions.length === 1 ? '' : 's'} · ${selectedDay.spots} spot${selectedDay.spots === 1 ? '' : 's'} available`}
+        {`${dayLabel} · ${daySessions.length} session${daySessions.length === 1 ? '' : 's'}`}
       </Text>
 
       {/* Chronological feed — every session that day, once, typed or open. */}

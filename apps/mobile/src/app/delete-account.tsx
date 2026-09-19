@@ -33,7 +33,9 @@ export default function DeleteAccountScreen() {
   const router = useRouter();
   const { player, now, deleteAccount } = useSession();
   const batchesQ = useBatches();
-  const purchasesQ = usePurchases();
+  // `null` = the lifetime list, deliberately: this screen values every unused credit
+  // against the purchase that paid for it, so a recent window could under-count.
+  const purchasesQ = usePurchases(null);
   const packagesQ = usePackages();
   const gate = combine(batchesQ, purchasesQ, packagesQ);
   const [confirm, setConfirm] = useState('');

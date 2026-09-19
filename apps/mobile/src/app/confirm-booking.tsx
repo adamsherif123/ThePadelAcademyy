@@ -67,7 +67,7 @@ export default function ConfirmBookingScreen() {
   const router = useRouter();
   const { color } = useTheme();
   const { player, now } = useSession();
-  const slotsQ = useSlots();
+  const slotsQ = useSlots(now);
   const batchesQ = useBatches();
   const bookingsQ = useBookings();
   const coachesQ = useCoaches();

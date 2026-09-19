@@ -57,7 +57,7 @@ function pickerSubtitle(trainingType: TrainingType): string {
 export default function PickTypeScreen() {
   const router = useRouter();
   const { player, now } = useSession();
-  const slotsQ = useSlots();
+  const slotsQ = useSlots(now);
   const batchesQ = useBatches();
   const coachesQ = useCoaches();
   const gate = combine(slotsQ, batchesQ, coachesQ);

@@ -6,7 +6,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { packageById } from '../data/catalog';
 import { useBatches, useMyCreditRequests, usePackages, useTrialEligible } from '../data/queries';
-import { activeBatches, balanceByType, expiredBatches, totalReadyToBook } from '../data/wallet';
+import { activeBatches, balanceByType, totalReadyToBook } from '../data/wallet';
 import { queryKeys } from '../lib/queryClient';
 import { useSession } from '../session/SessionProvider';
 import { useTheme } from '../theme/ThemeProvider';
@@ -77,7 +77,6 @@ export default function WalletScreen() {
   const total = totalReadyToBook(batches, now);
   const balance = balanceByType(batches, now);
   const active = activeBatches(batches, now);
-  const expired = expiredBatches(batches, now);
 
   // Surface the player's latest OPEN credit request here (the wallet is where credits
   // appear, so "credits on the way / your last request was declined" belongs here — a
@@ -97,6 +96,11 @@ export default function WalletScreen() {
   const canGetTrial =
     Boolean(trialEligibleQ.data) && packages.some((p) => p.trainingType === 'trial' && p.isActive);
   const showEmpty = active.length === 0 && openRequest?.status !== 'pending';
+  // A player who has held credits before is not a newcomer — "No credits yet / book
+  // your first session" is the wrong sentence for someone whose batches have simply
+  // run out or lapsed. `batches` is every batch ever, active or not, so a non-empty
+  // list means they have bought (or been granted) credits at some point.
+  const returning = batches.length > 0;
 
   return (
     <Screen scroll contentContainerStyle={styles.content} refreshControl={refreshControl}>
@@ -118,19 +122,24 @@ export default function WalletScreen() {
           />
         ) : null}
 
-        {/* Active batches — or the zero-credit nudge for a player who has none yet */}
+        {/* Active batches ONLY — a spent or expired batch is history, not wallet
+            contents, so it is not listed at all. `active` is isBatchUsable (see
+            data/wallet.ts), the same rule the headline and pills above count by,
+            so the cards below can never disagree with them. */}
         {showEmpty ? (
           <Card style={styles.emptyCard}>
             <Text variant="body" weight="bold">
-              No credits yet
+              {returning ? 'No active credits' : 'No credits yet'}
             </Text>
             <Text variant="caption" tone="secondary">
-              {canGetTrial
-                ? 'Start with a one-time discounted trial session, then book your first class on court.'
-                : 'Buy a credit package to book your first session — a credit is what reserves your spot.'}
+              {returning
+                ? 'Your credits have all been used or expired — grab another package to get back on court.'
+                : canGetTrial
+                  ? 'Start with a one-time discounted trial session, then book your first class on court.'
+                  : 'Buy a credit package to book your first session — a credit is what reserves your spot.'}
             </Text>
             <Button
-              label={canGetTrial ? 'Get your trial session' : 'Browse packages'}
+              label={!returning && canGetTrial ? 'Get your trial session' : 'Browse packages'}
               onPress={() => router.push('/buy-credits')}
             />
           </Card>
@@ -142,18 +151,6 @@ export default function WalletScreen() {
             ))}
           </>
         )}
-
-        {/* Expired */}
-        {expired.length > 0 ? (
-          <>
-            <Text variant="label" tone="muted">
-              Expired
-            </Text>
-            {expired.map((b) => (
-              <BatchCard key={b.id} batch={b} now={now} expired />
-            ))}
-          </>
-        ) : null}
 
         <Text variant="caption" tone="muted" style={styles.footer}>
           {`Credits are typed — a Group credit books Group sessions only. Every batch expires ${CREDIT_EXPIRY_DAYS} days after purchase.`}
@@ -205,20 +202,14 @@ function RequestStatusCard({
   );
 }
 
-function BatchCard({
-  batch,
-  now,
-  expired = false,
-}: {
-  batch: CreditBatch;
-  now: CreditBatch['expiresAt'];
-  expired?: boolean;
-}) {
+/** One ACTIVE batch — the only kind the wallet lists, so there is no
+ *  expired/spent variant to render. */
+function BatchCard({ batch, now }: { batch: CreditBatch; now: CreditBatch['expiresAt'] }) {
   const meta = TRAINING_META[batch.trainingType];
   const fraction = batch.quantityTotal === 0 ? 0 : batch.quantityRemaining / batch.quantityTotal;
 
   return (
-    <Card style={expired ? styles.expiredCard : undefined}>
+    <Card>
       <View style={styles.batchHead}>
         <Badge label={meta.label} icon={meta.icon} />
         <StatusChip expiresAt={batch.expiresAt} now={now} />
@@ -234,7 +225,7 @@ function BatchCard({
           </Text>
         </View>
         <View style={styles.fraction}>
-          <Text variant="h1" tone={expired ? 'muted' : 'primary'}>
+          <Text variant="h1" tone="primary">
             {String(batch.quantityRemaining)}
           </Text>
           <Text variant="body" tone="muted">
@@ -243,12 +234,10 @@ function BatchCard({
         </View>
       </View>
 
-      <ProgressBar value={fraction} tone={expired ? 'muted' : 'accent'} />
+      <ProgressBar value={fraction} tone="accent" />
 
       <Text variant="caption" tone="secondary" style={styles.batchFoot}>
-        {expired
-          ? `${batch.quantityRemaining} credit${batch.quantityRemaining === 1 ? '' : 's'} lost to expiry`
-          : `${batch.quantityRemaining} of ${batch.quantityTotal} sessions left to book`}
+        {`${batch.quantityRemaining} of ${batch.quantityTotal} sessions left to book`}
       </Text>
     </Card>
   );
@@ -265,6 +254,5 @@ const styles = StyleSheet.create({
   batchName: { textTransform: 'uppercase', letterSpacing: 0.3 },
   fraction: { flexDirection: 'row', alignItems: 'baseline', gap: 2 },
   batchFoot: { marginTop: space.sm },
-  expiredCard: { opacity: 0.7 },
   footer: { marginTop: space.md, textAlign: 'center' },
 });

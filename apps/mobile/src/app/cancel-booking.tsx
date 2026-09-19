@@ -36,7 +36,7 @@ import {
 export default function CancelBookingScreen() {
   const router = useRouter();
   const { player, now } = useSession();
-  const slotsQ = useSlots();
+  const slotsQ = useSlots(now);
   const batchesQ = useBatches();
   const bookingsQ = useBookings();
   const coachesQ = useCoaches();

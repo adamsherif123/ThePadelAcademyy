@@ -6,11 +6,11 @@ import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { useNotifications, useMarkAllNotificationsRead } from '../data/queries';
+import { useNotificationsFeed, useMarkAllNotificationsRead, useUnreadNotificationCount } from '../data/queries';
 import { notificationHref } from '../notifications/deepLink';
 import { useSession } from '../session/SessionProvider';
 import { useTheme } from '../theme/ThemeProvider';
-import { Card, EmptyState, ErrorView, LoadingView, Screen, ScreenHeader, Text } from '../ui';
+import { Button, Card, EmptyState, ErrorView, LoadingView, Screen, ScreenHeader, Text } from '../ui';
 import type { IoniconName } from '../ui/trainingMeta';
 
 const ICON: Record<NotificationType, IoniconName> = {
@@ -28,28 +28,36 @@ const ICON: Record<NotificationType, IoniconName> = {
 };
 
 /**
- * The in-app notification centre — a sibling to Sessions in tone. The full feed
- * (newest first, live via Realtime), each row deep-linking to its session or the
- * wallet. Opening the centre marks everything read (read_at is the only column RLS
+ * The in-app notification centre — a sibling to Sessions in tone. The feed newest
+ * first, live via Realtime, each row deep-linking to its session or the wallet.
+ *
+ * Loaded a page at a time rather than whole: `notifications` is the fastest-growing
+ * table in the schema (every booking, cancellation and credit request mints a row,
+ * and a news post fans one out to every player), so opening the centre used to cost
+ * the player's entire history. "Load older" fetches the next page on demand. Opening the centre marks everything read (read_at is the only column RLS
  * lets the player write), so the bell badge clears — but we snapshot which were unread
  * on entry so this view still styles them, and works fully whether or not push is on.
  */
 export default function NotificationsScreen() {
   const router = useRouter();
   const { player, now } = useSession();
-  const q = useNotifications();
+  const q = useNotificationsFeed();
+  const unreadQ = useUnreadNotificationCount();
   const { mutate: markAllRead } = useMarkAllNotificationsRead();
 
   // Mark everything read once, on open — read_at is the only column RLS lets the player
   // write, and this clears the bell badge. Rows render their unread styling straight
   // from the live read_at, so they show as unread on entry and settle to read after the
   // mutation refetches. (A guard ref written in the effect, never read during render.)
+  // Driven by the unread COUNT, not by scanning the loaded rows: with the feed paged,
+  // an unread notification can sit on a page that hasn't been loaded, and "mark all"
+  // is a server-side update over every unread row anyway.
   const marked = useRef(false);
   useEffect(() => {
-    if (marked.current || !q.data) return;
+    if (marked.current || unreadQ.data === undefined) return;
     marked.current = true;
-    if (q.data.some((n) => n.readAt === null)) markAllRead(now);
-  }, [q.data, now, markAllRead]);
+    if (unreadQ.data > 0) markAllRead(now);
+  }, [unreadQ.data, now, markAllRead]);
 
   if (!player) return null;
 
@@ -62,7 +70,7 @@ export default function NotificationsScreen() {
     );
   }
 
-  const notifications = q.data ?? [];
+  const notifications = q.items;
 
   return (
     <Screen scroll contentContainerStyle={styles.content}>
@@ -85,6 +93,15 @@ export default function NotificationsScreen() {
           />
         ))
       )}
+
+      {q.hasMore ? (
+        <Button
+          variant="secondary"
+          label={q.isLoadingMore ? 'Loading…' : 'Load older'}
+          loading={q.isLoadingMore}
+          onPress={q.loadMore}
+        />
+      ) : null}
     </Screen>
   );
 }

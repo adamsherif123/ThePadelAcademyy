@@ -20,7 +20,9 @@ import {
   sessionsForDay,
   slotAvailability,
   upcomingSessions,
+  hasOlderSessions,
   weekAvailabilitySummary,
+  withOlderSessions,
 } from './booking';
 import { balanceByType } from './wallet';
 
@@ -499,3 +501,72 @@ describe('weekAvailabilitySummary', () => {
   });
 });
 
+
+describe('withOlderSessions', () => {
+  // The in-window Past list (derived from the slots already fetched) and the pages of
+  // older sessions fetched on demand are stitched into one list here.
+  const recentSlot = slot({ id: 'sl_recent' as SessionSlot['id'], startsAt: iso(-3) });
+  const oldSlot = slot({ id: 'sl_old' as SessionSlot['id'], startsAt: iso(-120) });
+  const olderSlot = slot({ id: 'sl_older' as SessionSlot['id'], startsAt: iso(-300) });
+  const recentBooking = booking({
+    id: 'bk_recent' as Booking['id'],
+    slotId: recentSlot.id,
+    status: 'attended',
+  });
+  const recent = pastSessions([recentBooking], [recentSlot], [coach], NOW);
+
+  it('keeps the in-window entries and appends the older pages after them', () => {
+    const merged = withOlderSessions(
+      recent,
+      [
+        { booking: booking({ id: 'bk_old' as Booking['id'], slotId: oldSlot.id }), slot: oldSlot },
+        { booking: booking({ id: 'bk_older' as Booking['id'], slotId: olderSlot.id }), slot: olderSlot },
+      ],
+      [coach],
+    );
+    expect(merged.map((e) => e.booking.id)).toEqual(['bk_recent', 'bk_old', 'bk_older']);
+  });
+
+  it('resolves the coach for an older entry', () => {
+    const merged = withOlderSessions(
+      [],
+      [{ booking: booking({ id: 'bk_old' as Booking['id'], slotId: oldSlot.id }), slot: oldSlot }],
+      [coach],
+    );
+    expect(merged[0]?.coach?.id).toBe(coach.id);
+  });
+
+  it('drops an older row that the window already covers, so a clock skew never double-lists it', () => {
+    const merged = withOlderSessions(
+      recent,
+      [{ booking: recentBooking, slot: recentSlot }],
+      [coach],
+    );
+    expect(merged).toHaveLength(1);
+  });
+
+  it('is just the in-window list when nothing older has been loaded', () => {
+    expect(withOlderSessions(recent, [], [coach])).toEqual(recent);
+  });
+});
+
+describe('hasOlderSessions', () => {
+  // Exactly the signal the "Load older sessions" button is gated on: the player holds
+  // every one of their bookings, so a booking whose slot is missing from the fetched
+  // window is a session older than that window.
+  const inWindow = slot({ id: 'sl_in' as SessionSlot['id'], startsAt: iso(-3) });
+
+  it('is false for a player with no bookings at all', () => {
+    expect(hasOlderSessions([], [inWindow])).toBe(false);
+  });
+
+  it('is false when every booking\'s slot is inside the window', () => {
+    const b = booking({ id: 'bk_in' as Booking['id'], slotId: inWindow.id });
+    expect(hasOlderSessions([b], [inWindow])).toBe(false);
+  });
+
+  it('is true when a booking\'s slot fell outside the window', () => {
+    const b = booking({ id: 'bk_out' as Booking['id'], slotId: 'sl_gone' as SessionSlot['id'] });
+    expect(hasOlderSessions([b], [inWindow])).toBe(true);
+  });
+});

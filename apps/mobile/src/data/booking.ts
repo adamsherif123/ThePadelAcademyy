@@ -456,6 +456,44 @@ export function pastSessions(
     .sort((a, b) => new Date(b.slot.startsAt).getTime() - new Date(a.slot.startsAt).getTime());
 }
 
+/**
+ * Does the player hold a booking whose slot fell outside the fetched window?
+ *
+ * `bookings` is the player's complete history (RLS scopes it to them, and it is
+ * small), while `slots` is only the trailing window — so a booking with no matching
+ * slot is exactly a session older than the window. That makes this an EXACT answer
+ * to "is there anything behind Load older sessions", with no extra query: a player
+ * with no history never sees the button, and one with history always does.
+ */
+export function hasOlderSessions(bookings: Booking[], slots: SessionSlot[]): boolean {
+  const loaded = new Set(slots.map((s) => s.id));
+  return bookings.some((b) => !loaded.has(b.slotId));
+}
+
+/**
+ * The Past list the Sessions tab renders: the in-window entries derived from the
+ * slots already in hand, followed by any older pages the player has asked for.
+ *
+ * The two sources are disjoint by construction — the slot fetch is
+ * `starts_at >= edge` and the older pages are `starts_at < edge` — but each side
+ * computes that edge from its own clock reading, so a booking is deduped by id
+ * rather than trusted not to appear twice. Order is preserved: `recent` is already
+ * newest-first and every older row is, by definition, older than all of them.
+ */
+export function withOlderSessions(
+  recent: SessionEntry[],
+  older: { booking: Booking; slot: SessionSlot }[],
+  coaches: Coach[],
+): SessionEntry[] {
+  const seen = new Set(recent.map((e) => e.booking.id));
+  return [
+    ...recent,
+    ...older
+      .filter((r) => !seen.has(r.booking.id))
+      .map((r) => ({ booking: r.booking, slot: r.slot, coach: coachById(coaches, r.slot.coachId) })),
+  ];
+}
+
 /** Everything the cancel screen needs for one booking. */
 export interface CancelPreview {
   booking: Booking;

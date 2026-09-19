@@ -2,8 +2,7 @@ import { space } from '@tpa/theme';
 import { useRouter } from 'expo-router';
 import { Linking, StyleSheet, View } from 'react-native';
 
-import { playerPurchases } from '../../data/purchases';
-import { useBatches, useCoaches, usePurchases, combine } from '../../data/queries';
+import { useBatches, useCoaches, usePurchaseCount, combine } from '../../data/queries';
 import { totalReadyToBook } from '../../data/wallet';
 import { PRIVACY_POLICY_URL } from '../../lib/legal';
 import { useSession } from '../../session/SessionProvider';
@@ -38,9 +37,9 @@ export default function ProfileScreen() {
   const { player, email, now, signOut } = useSession();
   const { preference, setPreference } = useTheme();
   const batches = useBatches();
-  const purchases = usePurchases();
+  const purchaseCountQ = usePurchaseCount();
   const coaches = useCoaches();
-  const gate = combine(batches, purchases, coaches);
+  const gate = combine(batches, purchaseCountQ, coaches);
   if (!player) return null;
 
   if (gate.isPending || gate.isError) {
@@ -53,7 +52,9 @@ export default function ProfileScreen() {
   }
 
   const usable = totalReadyToBook(batches.data ?? [], now);
-  const purchaseCount = playerPurchases(purchases.data ?? []).length;
+  // A head:true COUNT, not the purchase list — this row only ever shows a number, and
+  // the list itself now loads windowed on the Purchase History screen.
+  const purchaseCount = purchaseCountQ.data ?? 0;
   const coachCount = (coaches.data ?? []).length;
 
   return (

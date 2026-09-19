@@ -3,20 +3,22 @@ import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { useNotifications } from '../data/queries';
+import { useUnreadNotificationCount } from '../data/queries';
 import { useTheme } from '../theme/ThemeProvider';
 import { Text } from '../ui';
 
 /**
  * The notification-centre entry point: a bell with an unread badge (count of read_at
- * IS NULL). The count comes from the same live-by-Realtime query the centre uses, so
- * it updates instantly — push or not. Sits in the Home header.
+ * IS NULL). The count is its own head:true COUNT query — it used to be derived by
+ * pulling every notification the player has ever had and filtering in JS, which is
+ * the one thing a badge should never cost. It shares the ['notifications'] key prefix
+ * with the centre's feed, so Realtime still updates it instantly — push or not.
+ * Sits in the Home header.
  */
 export function NotificationBell() {
   const router = useRouter();
   const { color } = useTheme();
-  const q = useNotifications();
-  const unread = (q.data ?? []).filter((n) => n.readAt === null).length;
+  const unread = useUnreadNotificationCount().data ?? 0;
   const styles = useMemo(
     () => StyleSheet.create({
       badge: {

@@ -9,11 +9,13 @@ const WEEKDAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
 /**
  * A day cell in the Book date strip. Open + selected = navy fill; open =
- * white card; closed = dashed, greyed, with a CLOSED label. An open day also
- * states its `spots` — total remaining bookable seats across that day's
- * sessions (see booking.ts's `dateStrip`/`daySpots`) — so the strip itself
- * hints at where the room is before tapping a day. Closed days are not
- * pressable. RTL-safe.
+ * white card; closed = dashed, greyed, with a CLOSED label. The status line
+ * reads simply "Open" or "Closed" — no seat count: the strip answers "can I
+ * come that day", and the exact room is a per-session matter the feed below
+ * states properly. `spots` (booking.ts's `dateStrip`/`daySpots`) still tints
+ * that label — accent when the day has room, muted when it has none — so the
+ * strip keeps its at-a-glance hint without putting a number on it. Closed days
+ * are not pressable. RTL-safe.
  */
 export function DateChip({
   weekday,
@@ -25,7 +27,8 @@ export function DateChip({
 }: {
   weekday: number;
   dayNumber: number;
-  /** Ignored when `closed` — pass 0 for a closed day. */
+  /** Not displayed as a number — only tints the "Open" label. Ignored when
+   * `closed`; pass 0 for a closed day. */
   spots: number;
   selected?: boolean;
   closed?: boolean;
@@ -69,7 +72,7 @@ export function DateChip({
         </Text>
       ) : (
         <Text variant="micro" tone={selected ? 'inverse' : spots > 0 ? 'accent' : 'muted'}>
-          {`${spots} spot${spots === 1 ? '' : 's'}`}
+          Open
         </Text>
       )}
     </View>

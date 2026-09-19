@@ -5,11 +5,12 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { TabView } from 'react-native-tab-view';
 
-import { pastSessions, upcomingSessions } from '../../data/booking';
-import { useBookings, useCoaches, useSlots, combine } from '../../data/queries';
+import { hasOlderSessions, pastSessions, upcomingSessions, withOlderSessions } from '../../data/booking';
+import { useBookings, useCoaches, usePastSessionsOlder, useSlots, combine } from '../../data/queries';
 import { useSession } from '../../session/SessionProvider';
 import {
   BookingCard,
+  Button,
   EmptyState,
   ErrorView,
   LoadingView,
@@ -48,8 +49,11 @@ export default function SessionsScreen() {
   const router = useRouter();
   const { player, now } = useSession();
   const bookings = useBookings();
-  const slots = useSlots();
+  const slots = useSlots(now);
   const coaches = useCoaches();
+  // Sessions older than the slot window — nothing is fetched until "Load older" is
+  // tapped, so the common case (recent history) costs no extra round trip.
+  const older = usePastSessionsOlder(now);
   const gate = combine(bookings, slots, coaches);
   const { width } = useWindowDimensions();
   const [index, setIndex] = useState(0);
@@ -65,7 +69,18 @@ export default function SessionsScreen() {
   }
 
   const upcoming = upcomingSessions(bookings.data ?? [], slots.data ?? [], coaches.data ?? [], now);
-  const past = pastSessions(bookings.data ?? [], slots.data ?? [], coaches.data ?? [], now);
+  // Recent past comes free from the slots already in hand; older pages are appended
+  // as the player asks for them (see `withOlderSessions` for the disjointness rule).
+  const coachList = coaches.data ?? [];
+  const past = withOlderSessions(
+    pastSessions(bookings.data ?? [], slots.data ?? [], coachList, now),
+    older.items,
+    coachList,
+  );
+  // Exact, and free: the player's whole booking list is already in hand, so a booking
+  // with no slot in the window IS an older session. No button for someone who has
+  // never played; no hidden history for someone who has.
+  const canLoadOlder = older.hasMore && hasOlderSessions(bookings.data ?? [], slots.data ?? []);
 
   const renderScene = ({ route }: { route: TabRoute }) => {
     if (route.key === 'upcoming') {
@@ -100,7 +115,7 @@ export default function SessionsScreen() {
     }
     return (
       <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
-        {past.length === 0 ? (
+        {past.length === 0 && !canLoadOlder ? (
           <EmptyState
             icon="time-outline"
             title="No past sessions"
@@ -111,6 +126,14 @@ export default function SessionsScreen() {
             {past.map(({ booking, slot, coach }) => (
               <BookingCard key={booking.id} variant="past" slot={slot} coach={coach} status={booking.status} />
             ))}
+            {canLoadOlder ? (
+              <Button
+                variant="secondary"
+                label={older.isLoadingMore ? 'Loading…' : 'Load older sessions'}
+                loading={older.isLoadingMore}
+                onPress={older.loadMore}
+              />
+            ) : null}
           </View>
         )}
       </ScrollView>

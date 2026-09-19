@@ -44,8 +44,17 @@ export const queryKeys = {
   slots: ['slots'] as const,
   creditBatches: ['creditBatches'] as const,
   bookings: ['bookings'] as const,
+  /** Prefix key. The windowed list is ['purchases', {since}], the lifetime count
+   *  is ['purchases','count'] — invalidating the prefix refreshes both. */
   purchases: ['purchases'] as const,
+  purchaseCount: ['purchases', 'count'] as const,
+  /** Prefix key, same shape: the paged feed is ['notifications','feed'] and the
+   *  unread badge count is ['notifications','unread']. */
   notifications: ['notifications'] as const,
+  notificationsFeed: ['notifications', 'feed'] as const,
+  notificationsUnread: ['notifications', 'unread'] as const,
+  /** The Sessions tab's on-demand pages of sessions older than the slot window. */
+  pastSessions: ['pastSessions'] as const,
   creditRequests: ['creditRequests'] as const,
   trialEligible: ['trialEligible'] as const,
   news: ['news'] as const,

@@ -75,7 +75,7 @@ export default function HomeScreen() {
   const { player, now } = useSession();
   const batches = useBatches();
   const bookings = useBookings();
-  const slots = useSlots();
+  const slots = useSlots(now);
   const coaches = useCoaches();
   const packagesQ = usePackages();
   const trialEligibleQ = useTrialEligible();

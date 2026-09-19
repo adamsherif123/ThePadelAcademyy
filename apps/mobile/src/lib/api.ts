@@ -5,7 +5,16 @@
 // Mutations are the SECURITY DEFINER RPCs; each returns `{ ok, reason }` as DATA
 // (never an HTTP error), so a business rejection like `slot_full` arrives as a
 // value we can map to copy, and only transport failures throw.
-import { ID_PREFIXES, NEWS_VISIBILITY_DAYS, newId, parseInstant, toInstant, type BookBlockReason } from '@tpa/core';
+import {
+  HISTORY_PAGE_SIZE,
+  ID_PREFIXES,
+  NEWS_VISIBILITY_DAYS,
+  SLOT_WINDOW_TRAILING_DAYS,
+  newId,
+  parseInstant,
+  toInstant,
+  type BookBlockReason,
+} from '@tpa/core';
 import type {
   AvailabilityTemplate,
   Booking,
@@ -93,6 +102,15 @@ async function selectAll<T>(table: string, map: (r: Record<string, unknown>) => 
   return (data ?? []).map(map);
 }
 
+/**
+ * `now` shifted back by `days`, as an instant — the one place every bounded fetch
+ * in this file derives its lower bound from, so a window is always expressed the
+ * same way (`fetchVisibleNews` predates this and reads the same shape inline).
+ */
+export function daysBefore(now: IsoInstant, days: number): IsoInstant {
+  return toInstant(new Date(parseInstant(now).getTime() - days * 86_400_000));
+}
+
 export const fetchCoaches = (): Promise<Coach[]> => selectAll('coaches', rowToCoach);
 // A signed-in (authenticated) player reads ACTIVE templates via RLS policy
 // `availability_templates_select_active` (S5.1) — this is how the client knows the
@@ -100,11 +118,96 @@ export const fetchCoaches = (): Promise<Coach[]> => selectAll('coaches', rowToCo
 export const fetchTemplates = (): Promise<AvailabilityTemplate[]> =>
   selectAll('availability_templates', rowToAvailabilityTemplate);
 export const fetchPackages = (): Promise<Package[]> => selectAll('packages', rowToPackage);
-export const fetchSlots = (): Promise<SessionSlot[]> => selectAll('session_slots', rowToSlot);
+/**
+ * Published slots from `now - SLOT_WINDOW_TRAILING_DAYS` onwards — bounded below,
+ * open-ended above (every future slot the academy has scheduled).
+ *
+ * This replaced an unbounded `select('*')`. `session_slots` is the only table RLS
+ * publishes in full to every player, so that fetch was the whole slot history
+ * multiplied by the entire player base, on seven screens. The trailing window is
+ * what the Sessions tab's Past list renders from; anything older is fetched on
+ * demand by `fetchPastSessionsPage`, so no session is unreachable.
+ *
+ * `session_slots(starts_at)` is indexed, so the bound is a cheap range scan.
+ */
+export async function fetchSlots(now: IsoInstant): Promise<SessionSlot[]> {
+  const { data, error } = await supabase
+    .from('session_slots')
+    .select('*')
+    .gte('starts_at', daysBefore(now, SLOT_WINDOW_TRAILING_DAYS));
+  if (error) throw new ApiError(`Failed to load session_slots: ${error.message}`, error);
+  return (data ?? []).map(rowToSlot);
+}
 export const fetchCreditBatches = (): Promise<CreditBatch[]> =>
   selectAll('credit_batches', rowToCreditBatch);
 export const fetchBookings = (): Promise<Booking[]> => selectAll('bookings', rowToBooking);
-export const fetchPurchases = (): Promise<Purchase[]> => selectAll('purchases', rowToPurchase);
+
+export interface PastSessionRow {
+  booking: Booking;
+  slot: SessionSlot;
+}
+
+/**
+ * One page of the player's OLDER past sessions — the sessions whose slot starts
+ * before `before`, newest first.
+ *
+ * Why a cursor and not `.range(from, to)`: an offset page can shift under you when
+ * a row is inserted between fetches. `before` is the start of the oldest session
+ * already on screen, so each page picks up exactly where the last one stopped no
+ * matter what else changed. The first call passes the trailing edge of
+ * `fetchSlots`'s window, which is precisely where the pre-loaded slots run out —
+ * so the free window and the paged history meet with no gap and no overlap.
+ *
+ * `!inner` on the embed makes `.lt('session_slots.starts_at', …)` restrict the
+ * OUTER bookings rows (a plain embed would filter only the nested object), and
+ * `order('session_slots(starts_at)')` sorts the bookings BY their slot's start —
+ * PostgREST orders a top-level row by a to-one embedded column.
+ *
+ * One extra row is requested beyond the page size purely to answer "is there
+ * more?" without the cost of an exact count on every tap.
+ */
+export async function fetchPastSessionsPage(params: {
+  before: IsoInstant;
+  pageSize?: number;
+}): Promise<{ rows: PastSessionRow[]; hasMore: boolean }> {
+  const size = params.pageSize ?? HISTORY_PAGE_SIZE;
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('*, session_slots!inner(*)')
+    .lt('session_slots.starts_at', params.before)
+    .order('session_slots(starts_at)', { ascending: false })
+    .limit(size + 1);
+  if (error) throw new ApiError(`Failed to load past sessions: ${error.message}`, error);
+  const all = (data ?? []).map((r) => ({
+    booking: rowToBooking(r),
+    slot: rowToSlot(r.session_slots as Record<string, unknown>),
+  }));
+  return { rows: all.slice(0, size), hasMore: all.length > size };
+}
+/**
+ * The player's purchases, newest first. `since` bounds them to a recent window
+ * (the Purchase History screen's default); `null` is the lifetime list, which only
+ * the delete-account screen needs — it values every unused credit against the
+ * purchase that paid for it, so it cannot work from a window.
+ */
+export async function fetchPurchases(since: IsoInstant | null): Promise<Purchase[]> {
+  let query = supabase.from('purchases').select('*').order('created_at', { ascending: false });
+  if (since !== null) query = query.gte('created_at', since);
+  const { data, error } = await query;
+  if (error) throw new ApiError(`Failed to load purchases: ${error.message}`, error);
+  return (data ?? []).map(rowToPurchase);
+}
+
+/**
+ * How many purchases the player has ever made — a `head: true` count that fetches
+ * no rows, for the Profile row's "N purchases" subtitle. The lifetime number stays
+ * exact while the list behind it is windowed.
+ */
+export async function fetchPurchaseCount(): Promise<number> {
+  const { count, error } = await supabase.from('purchases').select('id', { count: 'exact', head: true });
+  if (error) throw new ApiError(`Failed to count purchases: ${error.message}`, error);
+  return count ?? 0;
+}
 
 /** One purchase by id (for the return-journey poll). RLS scopes it to the caller. */
 /**
@@ -128,14 +231,48 @@ export async function fetchPurchaseById(id: string): Promise<Purchase | null> {
 // Reads are RLS-scoped to the caller; the only writable column is read_at. Rows are
 // never inserted from the client — the event RPCs mint them via tpa.notify.
 
-/** The player's notifications, newest first (RLS returns only their own). */
-export async function fetchNotifications(): Promise<Notification[]> {
-  const { data, error } = await supabase
+/**
+ * One page of the player's notifications, newest first (RLS returns only their own).
+ *
+ * `notifications` is the fastest-growing table in the schema — every booking,
+ * cancellation and credit request mints a row, and every news post fans out one to
+ * EVERY active player — so the centre loads a page at a time instead of the whole
+ * history on open. Same cursor discipline as `fetchPastSessionsPage`: `before` is
+ * the timestamp of the oldest row already on screen, so pages can't shift or repeat
+ * when a new notification lands mid-scroll. One extra row answers "is there more?".
+ *
+ * Indexed by `(player_id, created_at desc)`, so each page is a short index walk.
+ */
+export async function fetchNotificationsPage(params: {
+  before?: IsoInstant;
+  pageSize?: number;
+}): Promise<{ rows: Notification[]; hasMore: boolean }> {
+  const size = params.pageSize ?? HISTORY_PAGE_SIZE;
+  let query = supabase
     .from('notifications')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(size + 1);
+  if (params.before !== undefined) query = query.lt('created_at', params.before);
+  const { data, error } = await query;
   if (error) throw new ApiError(`Failed to load notifications: ${error.message}`, error);
-  return (data ?? []).map(rowToNotification);
+  const all = (data ?? []).map(rowToNotification);
+  return { rows: all.slice(0, size), hasMore: all.length > size };
+}
+
+/**
+ * How many notifications are unread — a `head: true` count that fetches no rows.
+ * The bell badge used to derive this by pulling every notification and filtering in
+ * JS; now the count is the query, so the badge is exact no matter how many pages of
+ * history the centre has (or hasn't) loaded.
+ */
+export async function fetchUnreadNotificationCount(): Promise<number> {
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('id', { count: 'exact', head: true })
+    .is('read_at', null);
+  if (error) throw new ApiError(`Failed to count notifications: ${error.message}`, error);
+  return count ?? 0;
 }
 
 /** Mark one notification read (the ONE column RLS lets the player write). Guarded so

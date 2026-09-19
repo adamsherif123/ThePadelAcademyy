@@ -32,7 +32,7 @@ import {
 /** 13 — Booked success. Shared SuccessView; every number computed from live data. */
 export default function BookedSuccessScreen() {
   const { player, now } = useSession();
-  const slotsQ = useSlots();
+  const slotsQ = useSlots(now);
   const batchesQ = useBatches();
   const bookingsQ = useBookings();
   const coachesQ = useCoaches();

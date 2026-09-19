@@ -38,6 +38,30 @@ export const CREDIT_EXPIRY_DAYS = 40;
 export const NEWS_VISIBILITY_DAYS = 30;
 
 /**
+ * How far into the PAST the client's `session_slots` fetch reaches. The client
+ * needs every upcoming slot (the Book feed) plus enough recent history that the
+ * Sessions tab's Past list is populated without a second round trip — so the
+ * fetch is `starts_at >= now - SLOT_WINDOW_TRAILING_DAYS`, open-ended forwards.
+ *
+ * `session_slots` is the one table every player reads in full (RLS publishes all
+ * published slots to everyone), so an unbounded fetch here is multiplied by the
+ * whole player base and grows forever. This bound is a CLIENT-side default, not
+ * a rule: older sessions are still reachable on demand (the Past list's "Load
+ * older sessions" fetches them by date), so nothing is hidden, just not
+ * pre-loaded. 30 days matches NEWS_VISIBILITY_DAYS and covers roughly a month of
+ * a weekly player's history before they ever have to ask for more.
+ */
+export const SLOT_WINDOW_TRAILING_DAYS = 30;
+
+/**
+ * How many older past sessions the Sessions tab's "Load older sessions" pulls per
+ * tap, and how many notifications the centre loads per page. One number for both
+ * because they are the same interaction: a bounded, server-side `.range()` page
+ * fetched only when the player asks for it.
+ */
+export const HISTORY_PAGE_SIZE = 20;
+
+/**
  * Free trial credits granted once, on account creation. Single source of truth —
  * this number is expected to change (the owner may cut it to 1), so nothing else
  * may hardcode it. Consumed by @tpa/core's `buildSignupGrant`.

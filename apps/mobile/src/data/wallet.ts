@@ -10,18 +10,26 @@ import type { CreditBatch, IsoInstant, TrainingType } from '@tpa/types';
  * @tpa/core.
  */
 
-/** Non-expired batches, soonest-expiry first (the "active batches" list). */
+/**
+ * The batches the Wallet lists: ACTIVE ones only — unexpired AND with credits
+ * left — soonest-expiry first.
+ *
+ * "Active" is not a second definition of usability: it IS @tpa/core's
+ * isBatchUsable, the same predicate balanceByType sums and book_slot spends
+ * through, asked about the batch's own trainingType (a batch is always the
+ * right type for itself, so the check reduces to "unexpired and
+ * quantityRemaining > 0"). Sharing that one predicate is what keeps this list
+ * and the headline/pills above it in agreement BY CONSTRUCTION: a card appears
+ * exactly when its credits are part of the balance shown above it — never a
+ * card for credits the headline doesn't count.
+ *
+ * A spent or expired batch is history, not wallet contents, so it isn't listed
+ * at all (it remains in the DB — nothing here deletes anything).
+ */
 export function activeBatches(batches: CreditBatch[], now: IsoInstant): CreditBatch[] {
   return batches
-    .filter((b) => creditExpiryState(b.expiresAt, now) !== 'expired')
+    .filter((b) => isBatchUsable(b, b.trainingType, now))
     .sort((a, b) => new Date(a.expiresAt).getTime() - new Date(b.expiresAt).getTime());
-}
-
-/** Expired batches, most-recently-expired first. */
-export function expiredBatches(batches: CreditBatch[], now: IsoInstant): CreditBatch[] {
-  return batches
-    .filter((b) => creditExpiryState(b.expiresAt, now) === 'expired')
-    .sort((a, b) => new Date(b.expiresAt).getTime() - new Date(a.expiresAt).getTime());
 }
 
 /** Bookable (usable) remaining credits per training type. */
