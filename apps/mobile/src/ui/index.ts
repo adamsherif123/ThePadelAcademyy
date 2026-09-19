@@ -20,6 +20,7 @@ export { InfoCard, type InfoCardVariant } from './InfoCard';
 export { Input, type InputProps } from './Input';
 export { useRefreshControl } from './useRefreshControl';
 export { LinkRow } from './LinkRow';
+export { LoadMore } from './LoadMore';
 export { Money } from './Money';
 export { NavyScreen } from './NavyScreen';
 export { PackageCard } from './PackageCard';

@@ -10,10 +10,10 @@ import { useBookings, useCoaches, usePastSessionsOlder, useSlots, combine } from
 import { useSession } from '../../session/SessionProvider';
 import {
   BookingCard,
-  Button,
   EmptyState,
   ErrorView,
   LoadingView,
+  LoadMore,
   Screen,
   ScreenHeader,
   SegmentedControl,
@@ -127,12 +127,7 @@ export default function SessionsScreen() {
               <BookingCard key={booking.id} variant="past" slot={slot} coach={coach} status={booking.status} />
             ))}
             {canLoadOlder ? (
-              <Button
-                variant="secondary"
-                label={older.isLoadingMore ? 'Loading…' : 'Load older sessions'}
-                loading={older.isLoadingMore}
-                onPress={older.loadMore}
-              />
+              <LoadMore loading={older.isLoadingMore} onPress={older.loadMore} />
             ) : null}
           </View>
         )}

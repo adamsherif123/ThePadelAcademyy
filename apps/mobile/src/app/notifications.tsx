@@ -10,7 +10,7 @@ import { useNotificationsFeed, useMarkAllNotificationsRead, useUnreadNotificatio
 import { notificationHref } from '../notifications/deepLink';
 import { useSession } from '../session/SessionProvider';
 import { useTheme } from '../theme/ThemeProvider';
-import { Button, Card, EmptyState, ErrorView, LoadingView, Screen, ScreenHeader, Text } from '../ui';
+import { Card, EmptyState, ErrorView, LoadingView, LoadMore, Screen, ScreenHeader, Text } from '../ui';
 import type { IoniconName } from '../ui/trainingMeta';
 
 const ICON: Record<NotificationType, IoniconName> = {
@@ -97,14 +97,7 @@ export default function NotificationsScreen() {
         ))
       )}
 
-      {q.hasMore ? (
-        <Button
-          variant="secondary"
-          label={q.isLoadingMore ? 'Loading…' : 'Load older'}
-          loading={q.isLoadingMore}
-          onPress={q.loadMore}
-        />
-      ) : null}
+      {q.hasMore ? <LoadMore loading={q.isLoadingMore} onPress={q.loadMore} /> : null}
     </Screen>
   );
 }
