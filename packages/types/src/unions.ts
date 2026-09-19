@@ -65,7 +65,18 @@ export type NotificationType =
   // Owner-only pings (players.is_owner). These are REMINDERS to go look at the
   // admin, not player-facing events — they only ever reach a flagged owner.
   | 'owner_credit_request'
-  | 'owner_booking';
+  | 'owner_booking'
+  // Emitted by cancel_booking when a PLAYER cancels on themselves (migration 046).
+  // It has been reaching owners since that migration but was never added here, so the
+  // centre had no icon for it — added with the two types below.
+  | 'owner_cancellation'
+  // Scheduled ~30 min before a session, to everyone still holding a live booking on
+  // it (pg_cron → tpa.send_session_reminders).
+  | 'session_reminder'
+  // The booker's own confirmation, emitted by book_slot the moment their seat is
+  // taken. Distinct from `session_confirmed`, which tells the OTHER players a slot
+  // has filled.
+  | 'booking_confirmation';
 
 /**
  * A credit request's lifecycle (A3). `pending` until an admin resolves it; `approved`

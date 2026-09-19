@@ -25,6 +25,9 @@ const ICON: Record<NotificationType, IoniconName> = {
   news_published: 'newspaper-outline',
   owner_credit_request: 'cash-outline',
   owner_booking: 'calendar-outline',
+  owner_cancellation: 'calendar-clear-outline',
+  session_reminder: 'alarm-outline',
+  booking_confirmation: 'checkmark-done-outline',
 };
 
 /**

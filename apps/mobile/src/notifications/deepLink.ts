@@ -22,9 +22,17 @@ export function notificationHref(n: { type: string; slotId: string | null; newsI
   // where the request status card explains what happened.
   if (n.type === 'credits_granted' || n.type === 'credit_request_rejected') return '/wallet';
   if (n.type === 'news_published') return '/news' as Href;
-  if (n.type === 'owner_credit_request' || n.type === 'owner_booking') {
+  if (
+    n.type === 'owner_credit_request' ||
+    n.type === 'owner_booking' ||
+    n.type === 'owner_cancellation'
+  ) {
     return '/notifications' as Href;
   }
+  // session_reminder and booking_confirmation both carry their slot, so they fall
+  // through to the Sessions branch below and focus that session — the destination the
+  // player wants from either one. No branch of their own is needed.
+
   return n.slotId
     ? ({ pathname: '/(tabs)/sessions', params: { focus: n.slotId } } as Href)
     : ('/(tabs)/sessions' as Href);

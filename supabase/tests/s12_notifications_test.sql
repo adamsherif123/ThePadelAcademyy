@@ -8,7 +8,7 @@
 -- Run with:  supabase test db
 -- ============================================================================
 begin;
-select plan(48);
+select plan(50);
 
 -- ── seed as postgres ─────────────────────────────────────────────────────────
 insert into auth.users (id) values
@@ -64,14 +64,24 @@ select is(public.book_slot('sl_fill')->>'ok','true','pl_2 books sl_fill (2/2 →
 reset role;
 select is((select count(*)::int from public.notifications where slot_id='sl_fill' and type='session_confirmed'), 1, 'fill emits session_confirmed to exactly ONE other booking');
 select is((select player_id from public.notifications where slot_id='sl_fill' and type='session_confirmed'), 'pl_1', '…to pl_1 (the already-booked player)');
-select is((select count(*)::int from public.notifications where slot_id='sl_fill' and player_id='pl_2'), 0, 'the booker gets NO row (in-app success screen covers them)');
+-- SUPERSEDED by migration 048. S12 deliberately gave the booker no row, on the
+-- grounds that the in-app success screen already told them. 048 reverses that
+-- product decision: the booker now gets their own `booking_confirmation`, so the
+-- confirmation survives leaving the screen and arrives as a push. What has NOT
+-- changed is that `session_confirmed` is still for the OTHER players — the booker
+-- gets exactly one row, and it is the new type, never a duplicate of that one.
+select is((select count(*)::int from public.notifications where slot_id='sl_fill' and player_id='pl_2'), 1, 'the booker now gets exactly one row — their own confirmation (048)');
+select is((select type from public.notifications where slot_id='sl_fill' and player_id='pl_2'), 'booking_confirmation', '…and it is booking_confirmation, not the session_confirmed meant for the others');
 
 -- B) individual cap-1 fill → booker is the only booking, so ZERO session_confirmed.
 set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"cccccccc-cccc-cccc-cccc-cccccccccccc","role":"authenticated"}',true);
 select is(public.book_slot('sl_ind')->>'ok','true','pl_3 books sl_ind (1/1 → fills)');
 reset role;
-select is((select count(*)::int from public.notifications where slot_id='sl_ind'), 0, 'individual fill emits nothing (no other bookings, booker excluded)');
+-- Also superseded by 048: there are still no OTHER bookings to tell, so no
+-- session_confirmed — but the booker's own confirmation is emitted.
+select is((select count(*)::int from public.notifications where slot_id='sl_ind' and type='session_confirmed'), 0, 'individual fill still emits no session_confirmed (no other bookings)');
+select is((select count(*)::int from public.notifications where slot_id='sl_ind'), 1, '…only the booker''s own booking_confirmation (048)');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- AS ADMIN — cancel / remove / grant / reschedule / confirm
