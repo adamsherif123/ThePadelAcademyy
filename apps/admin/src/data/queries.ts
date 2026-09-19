@@ -131,7 +131,7 @@ export function usePlayersPage(params: PlayersPageParams): {
 
 /**
  * The Credit Requests page's own bounded, filtered, paginated read — independent of the
- * whole-table useCreditRequests the sidebar badge and Packages still use.
+ * whole-table useCreditRequests that Packages' delete-guard still uses.
  */
 export function useCreditRequestsPage(params: CreditRequestsPageParams): {
   data: CreditRequestsPageResult | undefined;

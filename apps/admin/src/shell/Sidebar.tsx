@@ -13,7 +13,7 @@ import {
 import { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 
-import { useCreditRequests } from '../data/queries';
+import { useCreditRequestStatusCounts } from '../data/queries';
 import { queryClient, queryKeys } from '../lib/queryClient';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../session/SessionProvider';
@@ -42,8 +42,14 @@ const NAV: readonly { to: string; label: string; icon: LucideIcon }[] = [
  */
 export function Sidebar({ open = false, onNavigate }: { open?: boolean; onNavigate?: () => void } = {}) {
   const { admin, signOut } = useSession();
-  const creditRequestsQ = useCreditRequests();
-  const pendingCount = (creditRequestsQ.data ?? []).filter((r) => r.status === 'pending').length;
+  // The whole-table read this badge used to do (every credit_requests row, on every
+  // page, filtered to 'pending' in JS) grew forever with the academy. The Credit
+  // Requests page's own whole-table counts already answer exactly this question with
+  // head:true queries that fetch no rows at all, so the badge reuses them rather than
+  // adding a fourth way to count the same table. On the Credit Requests page it's the
+  // same cache entry, so the badge costs nothing there.
+  const countsQ = useCreditRequestStatusCounts();
+  const pendingCount = countsQ.data?.pending ?? 0;
 
   // Live: any insert/update on credit_requests (a player submits one, or another admin
   // resolves one) refreshes the query cache with no manual reload. Mounted once here,
@@ -51,10 +57,10 @@ export function Sidebar({ open = false, onNavigate }: { open?: boolean; onNaviga
   // `status === 'ready'`) — same one-subscription-for-the-whole-app shape as the mobile
   // client's NotificationsBridge.
   //
-  // THREE keys, not one: this badge reads the whole-table `creditRequests`, but the
-  // Credit Requests page now has its own paginated read and its own whole-table counts.
-  // Invalidating only the first would light up the badge while the page the admin is
-  // staring at kept showing a stale list.
+  // THREE keys, not one: this badge reads `creditRequestStatusCounts`, the Credit
+  // Requests page reads its own paginated list, and Packages' delete-guard still reads
+  // the whole-table `creditRequests`. Invalidating only one would leave whichever of
+  // the three is mounted showing a stale number or a stale list.
   useEffect(() => {
     const channel = supabase
       .channel('admin:credit_requests')
