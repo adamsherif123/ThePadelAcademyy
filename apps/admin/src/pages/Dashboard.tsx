@@ -21,7 +21,6 @@ import { AlertTriangle, CalendarCheck, DollarSign, Gauge, Users, Wallet } from '
 
 import {
   activePlayerCount,
-  creditLiability,
   creditsExpiringSoon,
   recentPurchases,
   revenueByType,
@@ -31,7 +30,6 @@ import {
   slotFillRate,
   todaysSessions,
 } from '../data/dashboard';
-import { batchesForActivePlayers } from '../data/players';
 import { coachById, packageById, playerById } from '../data/selectors';
 import { useAdminData } from '../data/queries';
 import { useSession } from '../session/SessionProvider';
@@ -204,7 +202,6 @@ export function Dashboard() {
         <StatCard eyebrow="Active players" icon={Users} value={String(activePlayerCount(data.batches, data.bookings, now))} caption="with credits or bookings" />
         <StatCard eyebrow="Sessions this week" icon={CalendarCheck} value={String(sessionsThisWeek(data.slots, now))} caption="booked, Sun–Wed" />
         <StatCard eyebrow="Slot fill rate" icon={Gauge} value={`${slotFillRate(data.slots, now)}%`} caption="capacity booked this week" />
-        <StatCard eyebrow="Credit liability" icon={Wallet} value={formatPiastres(creditLiability(batchesForActivePlayers(data.batches, data.players), data.purchases, now))} caption="sold, not yet used" />
       </div>
 
       <div className={styles.charts}>
