@@ -14,6 +14,12 @@ import { Stack } from 'expo-router';
  * slide, no edge-swipe, and the tab bar stayed put underneath, because a tab
  * screen can never be above the bar that owns it.
  *
+ * The nested group is `(shell)`, NOT `(tabs)`. Naming it `(tabs)` put a SECOND
+ * route group of that name in the tree, which made the path `/(tabs)` ambiguous —
+ * the guard's redirect for a non-coach standing in the coach group resolved back
+ * into the coach group instead of out to the player app, stranding the account
+ * there with a permanently-disabled query behind a spinner. One group, one name.
+ *
  * Nested one level down rather than hoisted to the root stack so the coach app
  * stays entirely inside `(coach)` — the routing fork in session/authMachine keys
  * on that first segment, and a coach never having a route out of their own group
@@ -22,7 +28,7 @@ import { Stack } from 'expo-router';
 export default function CoachLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="(shell)" />
       {/* Default stack presentation: the native slide, with the back gesture on
           (React Navigation enables it for a card-presented stack screen on iOS —
           deliberately not overridden). Its own ScreenHeader carries the visible
