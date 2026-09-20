@@ -28,10 +28,12 @@ const fmt = (h: number): string => {
 /**
  * What the coach has EARNED — not what they are scheduled for.
  *
- * The distinction is the whole screen, and the note at the bottom says so, because
- * the two genuinely differ: an hour counts only once its session has FINISHED and
- * an admin has marked at least one player attended. A session taught this morning
- * contributes nothing until that happens.
+ * The two genuinely differ: an hour counts only once its session has FINISHED and
+ * an admin has marked at least one player attended, so a session taught this
+ * morning contributes nothing until that happens. The screen used to spell that out
+ * in a paragraph at the foot; it was removed as clutter, which means the numbers
+ * now have to speak for themselves — worth remembering if a coach ever asks why
+ * today's session is missing.
  *
  * Everything here comes from the one dashboard aggregate, whose hours are computed
  * by the same predicate coach_hours_coached uses — so this screen can never
@@ -143,13 +145,6 @@ export default function CoachHoursScreen() {
           </View>
         </Card>
       ) : null}
-
-      <Text variant="caption" tone="muted" style={styles.note}>
-        These are hours you&apos;ve been credited for, not hours on your schedule. A session counts
-        once it has finished and the academy has marked at least one player attended — so a session
-        you taught today may take a little while to appear here. If something looks missing, ask the
-        academy to check attendance.
-      </Text>
     </Screen>
   );
 }
@@ -160,5 +155,4 @@ const styles = StyleSheet.create({
   heroNumber: { flexDirection: 'row', alignItems: 'baseline', gap: space.xs },
   group: { gap: space.md },
   cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
-  note: { lineHeight: 18 },
 });
