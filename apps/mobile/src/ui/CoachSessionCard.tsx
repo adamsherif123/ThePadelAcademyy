@@ -4,6 +4,7 @@ import type { SessionSlot } from '@tpa/types';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useMemo } from 'react';
 
+import { shadow } from '../theme/shadow';
 import { useTheme } from '../theme/ThemeProvider';
 import { Badge } from './Badge';
 import { CapacityMeter } from './CapacityMeter';
@@ -66,8 +67,17 @@ export function CoachSessionCard({
           padding: space.md,
           borderRadius: radius.lg,
           backgroundColor: color.bg.surface,
+          // The hero used to be outlined in accent blue, which read as a selected
+          // state rather than an important one. It is lifted instead: a real
+          // shadow, and the same hairline every other card has.
+          //
+          // The hairline STAYS under the shadow deliberately. `shadow()` is not
+          // theme-reactive (a shadow is a dark tint whatever the scheme), so on the
+          // dark canvas it is nearly invisible — without the border the card would
+          // lose its edge entirely in dark mode.
+          ...shadow(hero ? 'md' : 'card'),
           borderWidth: 1,
-          borderColor: hero ? color.accent.default : color.border.subtle,
+          borderColor: color.border.subtle,
         },
         pressed: { opacity: 0.85 },
         dimmed: { opacity: 0.6 },
