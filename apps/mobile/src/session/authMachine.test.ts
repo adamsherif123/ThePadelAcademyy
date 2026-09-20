@@ -168,7 +168,7 @@ describe('nextRoute — the coach fork (phase 1)', () => {
   // `isCoach` is players.coach_id != null, resolved from the player row the gate
   // already fetches. The whole fork lives here, so it is provable with no UI.
   it('sends a ready COACH into the coach shell, and a ready player into the tabs', () => {
-    expect(nextRoute('ready', '(auth)', 'sign-in', true)).toBe('/(coach)');
+    expect(nextRoute('ready', '(auth)', 'sign-in', true)).toBe('/(coach)/(tabs)');
     expect(nextRoute('ready', '(auth)', 'sign-in', false)).toBe('/(tabs)');
   });
 
@@ -184,8 +184,17 @@ describe('nextRoute — the coach fork (phase 1)', () => {
 
   it('moves anyone standing in the wrong shell to theirs', () => {
     // A link granted or revoked mid-session, or a stale deep link.
-    expect(nextRoute('ready', '(tabs)', 'index', true)).toBe('/(coach)');
+    expect(nextRoute('ready', '(tabs)', 'index', true)).toBe('/(coach)/(tabs)');
     expect(nextRoute('ready', '(coach)', 'index', false)).toBe('/(tabs)');
+  });
+
+  it('leaves a coach alone on a PUSHED screen inside their group', () => {
+    // Session detail is a stack screen above the coach tab bar, so its first
+    // segment is still '(coach)'. The guard must not yank them back to the tabs
+    // mid-push — that would make the detail screen impossible to stay on.
+    expect(nextRoute('ready', '(coach)', 'session', true)).toBeNull();
+    // …and a non-coach who somehow lands there is still sent to the player app.
+    expect(nextRoute('ready', '(coach)', 'session', false)).toBe('/(tabs)');
   });
 
   it('does not bounce a coach out of the onboarding steps', () => {
@@ -196,7 +205,7 @@ describe('nextRoute — the coach fork (phase 1)', () => {
   });
 
   it('routes an offline coach to the coach shell only when stuck on an auth screen', () => {
-    expect(nextRoute('offline', '(auth)', 'sign-in', true)).toBe('/(coach)');
+    expect(nextRoute('offline', '(auth)', 'sign-in', true)).toBe('/(coach)/(tabs)');
     expect(nextRoute('offline', '(coach)', 'index', true)).toBeNull();
     expect(nextRoute('offline', '(tabs)', 'index', false)).toBeNull();
   });

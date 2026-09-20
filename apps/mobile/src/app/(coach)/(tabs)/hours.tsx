@@ -1,9 +1,9 @@
 import { space } from '@tpa/theme';
 import { StyleSheet, View } from 'react-native';
 
-import { useMyCoachHours } from '../../data/queries';
-import { queryKeys } from '../../lib/queryClient';
-import { useSession } from '../../session/SessionProvider';
+import { useMyCoachHours } from '../../../data/queries';
+import { queryKeys } from '../../../lib/queryClient';
+import { useSession } from '../../../session/SessionProvider';
 import {
   Card,
   ErrorView,
@@ -12,7 +12,7 @@ import {
   ScreenHeader,
   Text,
   useRefreshControl,
-} from '../../ui';
+} from '../../../ui';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',

@@ -1,8 +1,8 @@
 import { space } from '@tpa/theme';
 import { Linking, StyleSheet, View } from 'react-native';
 
-import { useSession } from '../../session/SessionProvider';
-import { ACADEMY, Avatar, Button, Card, LinkRow, Screen, ScreenHeader, Text } from '../../ui';
+import { useSession } from '../../../session/SessionProvider';
+import { ACADEMY, Avatar, Button, Card, LinkRow, Screen, ScreenHeader, Text } from '../../../ui';
 
 /**
  * Deliberately sparse. The player Profile carries a wallet, purchase history, an

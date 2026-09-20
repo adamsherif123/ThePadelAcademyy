@@ -103,7 +103,12 @@ export function nextRoute(
   // A linked coach's app shell is a DIFFERENT route group, not a variation of the
   // player tabs. Same seam, one extra fact — so the fork is decided by the same pure
   // function the guard already trusts, and is provable without rendering anything.
-  const shell = isCoach ? '/(coach)' : '/(tabs)';
+  // '/(coach)/(tabs)' rather than '/(coach)': the coach group's navigator is a
+  // STACK now, with the tab bar nested a group deeper so session detail can push
+  // OVER it. There is no index directly inside (coach) any more, so the bare group
+  // path has nothing to resolve to — expo-router's generated route types list
+  // `/(coach)/(tabs)` as the shortest valid href, and this matches it.
+  const shell = isCoach ? '/(coach)/(tabs)' : '/(tabs)';
   switch (status) {
     case 'loading':
       return null;
@@ -129,7 +134,7 @@ export function nextRoute(
       // stops a stale deep link dropping a coach into the booking app (or a player
       // into the coach app) and leaving them there.
       if (segment0 === COACH_GROUP && !isCoach) return '/(tabs)';
-      if (segment0 === TABS_GROUP && isCoach) return '/(coach)';
+      if (segment0 === TABS_GROUP && isCoach) return shell;
       return null;
   }
 }

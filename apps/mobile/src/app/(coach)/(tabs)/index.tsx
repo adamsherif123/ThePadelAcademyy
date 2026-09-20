@@ -2,10 +2,10 @@ import { space } from '@tpa/theme';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { coachSchedule, startsInLabel } from '../../data/coachSchedule';
-import { useCoachSlots } from '../../data/queries';
-import { queryKeys } from '../../lib/queryClient';
-import { useSession } from '../../session/SessionProvider';
+import { coachSchedule, startsInLabel } from '../../../data/coachSchedule';
+import { useCoachSlots } from '../../../data/queries';
+import { queryKeys } from '../../../lib/queryClient';
+import { useSession } from '../../../session/SessionProvider';
 import {
   CoachSessionCard,
   EmptyState,
@@ -15,7 +15,7 @@ import {
   ScreenHeader,
   Text,
   useRefreshControl,
-} from '../../ui';
+} from '../../../ui';
 
 /**
  * The coach's home: what am I teaching, and who is coming.

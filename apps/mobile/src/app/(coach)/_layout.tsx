@@ -1,70 +1,33 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
-import { fontSize } from '@tpa/theme';
-import { Tabs } from 'expo-router';
-
-import { fontFamilyForWeight } from '../../theme/fonts';
-import { useTheme } from '../../theme/ThemeProvider';
+import { Stack } from 'expo-router';
 
 /**
- * The coach app shell — the route group a linked coach (players.coach_id != null)
- * lands in instead of (tabs), decided by `nextRoute` in session/authMachine.
+ * The coach group's navigator — a STACK, with the tab bar as its first screen.
  *
- * Three tabs where the player app has four, and deliberately the SAME tab bar:
- * identical screenOptions to (tabs)/_layout, so a coach is in the academy's app
- * rather than a different-looking one. What is missing is the point — there is no
- * Book tab, because a coach account cannot book (the server refuses it outright,
- * migration 050).
+ * This mirrors the player app exactly: app/_layout.tsx is a Stack whose first
+ * screen is `(tabs)`, and every pushed detail (wallet, confirm-booking, coaches,
+ * notifications) is a SIBLING of it. Sitting above the tab navigator rather than
+ * inside it is what gives those screens the native push — slide in from the right,
+ * swipe from the left edge to go back, and the tab bar covered while they're open.
+ *
+ * Session detail was previously registered inside the Tabs navigator and merely
+ * hidden from the bar with `href: null`. That made opening it a TAB SWITCH: no
+ * slide, no edge-swipe, and the tab bar stayed put underneath, because a tab
+ * screen can never be above the bar that owns it.
+ *
+ * Nested one level down rather than hoisted to the root stack so the coach app
+ * stays entirely inside `(coach)` — the routing fork in session/authMachine keys
+ * on that first segment, and a coach never having a route out of their own group
+ * is a property worth keeping.
  */
-export default function CoachTabsLayout() {
-  const { color } = useTheme();
+export default function CoachLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: color.accent.default,
-        tabBarInactiveTintColor: color.text.muted,
-        tabBarStyle: {
-          backgroundColor: color.bg.surface,
-          borderTopColor: color.border.subtle,
-          borderTopWidth: 1,
-        },
-        tabBarLabelStyle: {
-          fontFamily: fontFamilyForWeight.medium,
-          fontSize: fontSize.caption,
-        },
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Schedule',
-          tabBarIcon: ({ color: c, size, focused }) => (
-            <Ionicons name={focused ? 'calendar' : 'calendar-outline'} color={c} size={size} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="hours"
-        options={{
-          title: 'Hours',
-          tabBarIcon: ({ color: c, size, focused }) => (
-            <Ionicons name={focused ? 'time' : 'time-outline'} color={c} size={size} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color: c, size, focused }) => (
-            <Ionicons name={focused ? 'person' : 'person-outline'} color={c} size={size} />
-          ),
-        }}
-      />
-      {/* A pushed detail screen, not a destination. Tabs registers every route in
-          the group, so without `href: null` the session detail shows up as a fourth
-          tab labelled "session/[id]". */}
-      <Tabs.Screen name="session/[id]" options={{ href: null }} />
-    </Tabs>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" />
+      {/* Default stack presentation: the native slide, with the back gesture on
+          (React Navigation enables it for a card-presented stack screen on iOS —
+          deliberately not overridden). Its own ScreenHeader carries the visible
+          back affordance, and router.back() and the swipe pop the same screen. */}
+      <Stack.Screen name="session/[id]" />
+    </Stack>
   );
 }
