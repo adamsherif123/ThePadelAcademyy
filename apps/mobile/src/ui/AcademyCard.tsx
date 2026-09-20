@@ -15,7 +15,6 @@ export const ACADEMY = {
   /** Deep link to Maps — the location line taps through here before a session. */
   mapsUrl: 'https://maps.google.com/?q=Oro+Plaza+Hotel+Rehab+Cairo',
   hours: 'Sun – Wed · 5:00 PM – 11:00 PM',
-  hoursNote: 'Group training mainly 5 – 9 PM',
   /**
    * The two people who answer for the academy (Profile → Contact us). Kept here with
    * the rest of the brand facts so there's ONE place to change a number, rather than
@@ -52,7 +51,7 @@ export function AcademyCard() {
         <IconRow icon="location-outline" title={ACADEMY.name} subtitle={ACADEMY.address} />
       </Pressable>
       <View style={styles.divider} />
-      <IconRow icon="time-outline" title={ACADEMY.hours} subtitle={ACADEMY.hoursNote} />
+      <IconRow icon="time-outline" title={ACADEMY.hours} />
     </Card>
   );
 }
