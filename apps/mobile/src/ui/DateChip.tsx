@@ -9,13 +9,21 @@ const WEEKDAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
 /**
  * A day cell in the Book date strip. Open + selected = navy fill; open =
- * white card; closed = dashed, greyed, with a CLOSED label. The status line
- * reads simply "Open" or "Closed" — no seat count: the strip answers "can I
- * come that day", and the exact room is a per-session matter the feed below
- * states properly. `spots` (booking.ts's `dateStrip`/`daySpots`) still tints
- * that label — accent when the day has room, muted when it has none — so the
- * strip keeps its at-a-glance hint without putting a number on it. Closed days
- * are not pressable. RTL-safe.
+ * white card; closed = dashed, greyed.
+ *
+ * The status line has THREE states, because "the academy is shut" and "we're open
+ * but there is nothing left to book" are different answers and only one of them is
+ * worth coming back later for:
+ *
+ *   Closed    — the academy isn't running that day.
+ *   Open      — there is room to book, in accent so the strip reads at a glance.
+ *   No slots  — the day is running, but nothing on it is bookable: every session
+ *               is full, or none is scheduled yet.
+ *
+ * Still no seat COUNT: the strip answers "can I come that day", and the exact room
+ * is a per-session matter the feed below states properly. `spots` (booking.ts's
+ * `dateStrip`/`daySpots`) is what separates the middle two. A day with no room is
+ * still pressable — the feed explains why. Closed days are not. RTL-safe.
  */
 export function DateChip({
   weekday,
@@ -27,8 +35,8 @@ export function DateChip({
 }: {
   weekday: number;
   dayNumber: number;
-  /** Not displayed as a number — only tints the "Open" label. Ignored when
-   * `closed`; pass 0 for a closed day. */
+  /** Never displayed as a number — it chooses between "Open" and "No slots", and
+   * tints the former. Ignored when `closed`; pass 0 for a closed day. */
   spots: number;
   selected?: boolean;
   closed?: boolean;
@@ -38,7 +46,12 @@ export function DateChip({
   const styles = useMemo(
     () => StyleSheet.create({
       base: {
-        width: 64,
+        // 72, not 64: "No slots" is the longest status the chip carries and needs
+        // ~59px at micro's size and tracking, which 64 left no headroom for — it
+        // wrapped, making those days taller than their neighbours and breaking the
+        // strip's baseline. The width gives it room; `numberOfLines` on each status
+        // below guarantees a single line whatever a device's font metrics do.
+        width: 72,
         borderRadius: radius.md,
         borderWidth: 1,
         paddingVertical: space.md,
@@ -67,12 +80,16 @@ export function DateChip({
         {String(dayNumber)}
       </Text>
       {closed ? (
-        <Text variant="micro" tone="muted">
+        <Text variant="micro" tone="muted" numberOfLines={1}>
           Closed
         </Text>
-      ) : (
-        <Text variant="micro" tone={selected ? 'inverse' : spots > 0 ? 'accent' : 'muted'}>
+      ) : spots > 0 ? (
+        <Text variant="micro" tone={selected ? 'inverse' : 'accent'} numberOfLines={1}>
           Open
+        </Text>
+      ) : (
+        <Text variant="micro" tone={selected ? 'inverse' : 'muted'} numberOfLines={1}>
+          No slots
         </Text>
       )}
     </View>
