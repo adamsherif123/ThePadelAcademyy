@@ -107,24 +107,37 @@ export function CoachSessionCard({
 
   const body = (
     <View style={[styles.card, dimmed ? styles.dimmed : null]}>
-      {/* 1 — the state of it: when, and whether it is going ahead. */}
-      <View style={styles.metaRow}>
-        <View style={styles.metaText}>
-          {metaLeft ? (
-            <Text variant="caption" weight="semibold" tone={dimmed ? 'muted' : hero ? 'accent' : 'secondary'}>
-              {metaLeft}
-            </Text>
-          ) : null}
+      {/* 1 and 2 — when it is, and whether it is going ahead.
+          The pill needs a row; the text beside it does not always exist. An
+          upcoming session inside a day group has nothing to say on the left (the
+          date is the group's heading), and giving the pill a row to itself left an
+          empty column above the time — a gap that read as a mistake. So in that
+          case the pill rides the TIME's row instead, and the card closes up.
+          The time still takes the remaining width and the pill never shrinks, so a
+          long range wraps inside its own column rather than pushing the pill out —
+          the rule that put them on separate rows in the first place. */}
+      {metaLeft ? (
+        <>
+          <View style={styles.metaRow}>
+            <View style={styles.metaText}>
+              <Text variant="caption" weight="semibold" tone={dimmed ? 'muted' : hero ? 'accent' : 'secondary'}>
+                {metaLeft}
+              </Text>
+            </View>
+            {statusPill}
+          </View>
+          <Text variant={hero ? 'h2' : 'body'} weight="bold">
+            {time}
+          </Text>
+        </>
+      ) : (
+        <View style={styles.metaRow}>
+          <Text variant={hero ? 'h2' : 'body'} weight="bold" style={styles.metaText}>
+            {time}
+          </Text>
+          {statusPill}
         </View>
-        {statusPill}
-      </View>
-
-      {/* 2 — the time, the one thing a coach scans for. Still the largest text on
-          the card, but h2 rather than h1: at display size a range wrapped to two
-          lines and the card grew to six rows for a single session. */}
-      <Text variant={hero ? 'h2' : 'body'} weight="bold">
-        {time}
-      </Text>
+      )}
 
       {/* 3 — everything else about it on ONE line. The type and level were a row of
           chips each; as text beside the date they cost nothing and read faster. */}
