@@ -135,18 +135,6 @@ export default function CoachDashboardScreen() {
         </View>
       </Card>
 
-      {/* 2×2 */}
-      <View style={styles.grid}>
-        <View style={styles.gridRow}>
-          <StatTile value={String(d.sessionsThisWeek)} label="Sessions this week" />
-          <StatTile value={String(d.studentsThisMonth)} label="Students this month" />
-        </View>
-        <View style={styles.gridRow}>
-          <StatTile value={`${d.fillRate}%`} label="Fill rate" meter={d.fillRate / 100} />
-          <StatTile value={String(d.upcomingCount)} label="Upcoming" />
-        </View>
-      </View>
-
       {/* Next / current session */}
       {hero ? (
         <View style={styles.group}>
@@ -159,6 +147,18 @@ export default function CoachDashboardScreen() {
           />
         </View>
       ) : null}
+
+      {/* 2×2 */}
+      <View style={styles.grid}>
+        <View style={styles.gridRow}>
+          <StatTile value={String(d.sessionsThisWeek)} label="Sessions this week" />
+          <StatTile value={String(d.studentsThisMonth)} label="Students this month" />
+        </View>
+        <View style={styles.gridRow}>
+          <StatTile value={`${d.fillRate}%`} label="Fill rate" meter={d.fillRate / 100} />
+          <StatTile value={String(d.upcomingCount)} label="Upcoming" />
+        </View>
+      </View>
 
       {/* This week, by day */}
       <Card>
