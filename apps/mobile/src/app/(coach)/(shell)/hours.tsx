@@ -6,6 +6,7 @@ import { queryKeys } from '../../../lib/queryClient';
 import { useSession } from '../../../session/SessionProvider';
 import {
   Card,
+  CoachNotLinked,
   ErrorView,
   LoadingView,
   Screen,
@@ -56,6 +57,15 @@ export default function CoachHoursScreen() {
 
   const isPending = thisMonth.isPending || lastMonth.isPending;
   const isError = thisMonth.isError || lastMonth.isError;
+
+  if (coachId == null) {
+    return (
+      <Screen scroll tabBar contentContainerStyle={styles.content}>
+        <ScreenHeader eyebrow="Your work" title="Hours coached" />
+        <CoachNotLinked />
+      </Screen>
+    );
+  }
 
   return (
     <Screen scroll tabBar contentContainerStyle={styles.content} refreshControl={refreshControl}>

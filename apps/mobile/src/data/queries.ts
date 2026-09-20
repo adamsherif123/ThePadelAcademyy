@@ -278,6 +278,33 @@ export function useMarkAllNotificationsRead() {
   });
 }
 
+/**
+ * A resource whose query is GATED on something (`enabled: x != null`).
+ *
+ * TanStack keeps a disabled query at `status: 'pending'` for good — it never ran,
+ * so it never resolved — and a screen that gates its UI on `isPending` shows a
+ * spinner that can never stop. That is exactly what stranded the coach app: a
+ * routing bug left a non-coach in the coach shell, `coachId` was null, the slot
+ * query was therefore disabled, and the Schedule spun forever with no error
+ * anywhere, because nothing had thrown.
+ *
+ * So a gated-OFF query reports `isPending: false`. It is not loading; there is
+ * nothing to load. Each screen still says WHY (the `coachId` guards below) — but if
+ * one ever forgets, the failure mode becomes an empty list, which is visible and
+ * escapable, rather than a frozen screen.
+ *
+ * With the gate OPEN this is `toResource` unchanged, so an enabled query behaves
+ * exactly as every player hook does today.
+ */
+function toGatedResource<T>(
+  q: { data: T | undefined; isPending: boolean; isError: boolean; error: unknown; refetch: () => unknown },
+  enabled: boolean,
+): Resource<T> {
+  const r = toResource(q);
+  return enabled ? r : { ...r, isPending: false };
+}
+
+
 // ── coach mode ────────────────────────────────────────────────────────
 
 /**
@@ -285,12 +312,13 @@ export function useMarkAllNotificationsRead() {
  * a player who has no coach link — nothing is fetched and nothing 400s.
  */
 export const useCoachSlots = (coachId: CoachId | null, now: IsoInstant): Resource<SessionSlot[]> =>
-  toResource(
+  toGatedResource(
     useQuery({
       queryKey: [...queryKeys.coachSlots, coachId],
       queryFn: () => fetchCoachSlots(coachId as CoachId, now),
       enabled: coachId != null,
     }),
+    coachId != null,
   );
 
 /**
@@ -300,7 +328,7 @@ export const useCoachSlots = (coachId: CoachId | null, now: IsoInstant): Resourc
  * rather than one racing the other.
  */
 export const useMyCoachHours = (enabled: boolean, monthOffset = 0): Resource<number> =>
-  toResource(
+  toGatedResource(
     useQuery({
       queryKey: [...queryKeys.coachHours, monthOffset],
       queryFn: () => {
@@ -312,16 +340,18 @@ export const useMyCoachHours = (enabled: boolean, monthOffset = 0): Resource<num
       },
       enabled,
     }),
+    enabled,
   );
 
 /** The roster for one of the coach's own sessions — name and level only. */
 export const useCoachRoster = (slotId: SlotId | null): Resource<RosterEntry[]> =>
-  toResource(
+  toGatedResource(
     useQuery({
       queryKey: [...queryKeys.coachRoster, slotId],
       queryFn: () => fetchCoachRoster(slotId as SlotId),
       enabled: slotId != null,
     }),
+    slotId != null,
   );
 
 /** Collapse several resources into one loading / error / retry gate for a screen. */

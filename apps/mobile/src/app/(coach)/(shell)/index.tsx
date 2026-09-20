@@ -7,6 +7,7 @@ import { useCoachSlots } from '../../../data/queries';
 import { queryKeys } from '../../../lib/queryClient';
 import { useSession } from '../../../session/SessionProvider';
 import {
+  CoachNotLinked,
   CoachSessionCard,
   EmptyState,
   ErrorView,
@@ -32,6 +33,17 @@ export default function CoachScheduleScreen() {
   const { now, coachId } = useSession();
   const slotsQ = useCoachSlots(coachId, now);
   const refreshControl = useRefreshControl([queryKeys.coachSlots]);
+
+  // Before anything else: an account with no coach link has no schedule to load.
+  // Saying so beats a spinner that can never resolve (the query is gated on this id).
+  if (coachId == null) {
+    return (
+      <Screen scroll tabBar contentContainerStyle={styles.content}>
+        <ScreenHeader eyebrow="Your court time" title="Schedule" />
+        <CoachNotLinked />
+      </Screen>
+    );
+  }
 
   if (slotsQ.isPending || slotsQ.isError) {
     return (

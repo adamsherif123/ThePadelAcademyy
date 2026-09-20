@@ -9,6 +9,7 @@ import { useSession } from '../../../session/SessionProvider';
 import {
   Badge,
   Card,
+  CoachNotLinked,
   CapacityMeter,
   EmptyState,
   ErrorView,
@@ -42,6 +43,15 @@ export default function CoachSessionDetailScreen() {
   const slot = (slotsQ.data ?? []).find((s) => s.id === slotId);
 
   const header = <ScreenHeader eyebrow="Session" title="Who's coming" onBack={() => router.back()} />;
+
+  if (coachId == null) {
+    return (
+      <Screen scroll contentContainerStyle={styles.content}>
+        {header}
+        <CoachNotLinked />
+      </Screen>
+    );
+  }
 
   if (slotsQ.isPending || rosterQ.isPending || slotsQ.isError || rosterQ.isError) {
     return (
