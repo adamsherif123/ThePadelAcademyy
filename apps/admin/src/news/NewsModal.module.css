@@ -108,3 +108,16 @@
   border-radius: var(--radius-md);
   font-size: var(--font-size-caption);
 }
+
+/* The optional link pair: URL and button text side by side on desktop, stacked
+   below the mobile breakpoint like every other field grid in the admin. */
+.grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--space-md);
+}
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

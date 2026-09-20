@@ -8,7 +8,7 @@ import { newsImagePublicUrl } from '../lib/api';
 import { useMarkNewsSeen, useUnseenNews } from '../data/queries';
 import { useSession } from '../session/SessionProvider';
 import { useTheme } from '../theme/ThemeProvider';
-import { Button, Screen, Text } from '../ui';
+import { Button, NewsLinkButton, Screen, Text } from '../ui';
 
 /**
  * The unseen-news pop-up — the newest unseen item, presented first thing on a
@@ -87,6 +87,9 @@ export default function NewsPopupScreen() {
         <Text variant="label">The Padel Academy</Text>
         <Text variant="h1">{item.title}</Text>
         <Text variant="bodySecondary">{item.body}</Text>
+        {/* Same button as the feed, from the same component — the pop-up and the
+            feed can never disagree about whether a post has a link. */}
+        <NewsLinkButton news={item} />
       </View>
     </Screen>
   );

@@ -26,6 +26,7 @@ export { LinkRow } from './LinkRow';
 export { LoadMore } from './LoadMore';
 export { Money } from './Money';
 export { NavyScreen } from './NavyScreen';
+export { NewsLinkButton } from './NewsLinkButton';
 export { PackageCard } from './PackageCard';
 export { PackageRow } from './PackageRow';
 export { PillOnNavy } from './PillOnNavy';

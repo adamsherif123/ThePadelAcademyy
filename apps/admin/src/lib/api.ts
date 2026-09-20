@@ -109,7 +109,7 @@ export async function fetchNews(): Promise<News[]> {
   return (data ?? []).map(rowToNews);
 }
 
-export type CreateNewsReason = 'not_admin' | 'title_required' | 'body_required';
+export type CreateNewsReason = 'not_admin' | 'title_required' | 'body_required' | 'invalid_target' | 'invalid_link';
 export type CreateNewsResult = { ok: true; newsId: NewsId } | { ok: false; reason: CreateNewsReason };
 /**
  * Who a news item pushes to. A coach IS a player, so the two audiences partition
@@ -123,6 +123,7 @@ export async function createNewsRpc(
   body: string,
   imagePath: string | null,
   notifyTarget: NewsNotifyTarget,
+  link: { url: string | null; label: string | null },
 ): Promise<CreateNewsResult> {
   const d = await callRpc('create_news', {
     p_title: title,
@@ -133,11 +134,13 @@ export async function createNewsRpc(
     // rather than pushing to everyone.
     p_notify_players: false,
     p_notify_target: notifyTarget,
+    p_link_url: link.url,
+    p_link_label: link.label,
   });
   return d.ok ? { ok: true, newsId: d.news_id as NewsId } : { ok: false, reason: d.reason as CreateNewsReason };
 }
 
-export type UpdateNewsReason = 'not_admin' | 'title_required' | 'body_required' | 'news_missing';
+export type UpdateNewsReason = 'not_admin' | 'title_required' | 'body_required' | 'news_missing' | 'invalid_link';
 export type UpdateNewsResult = { ok: true } | { ok: false; reason: UpdateNewsReason };
 /** Edits title/body/image — never re-notifies (only create does). imagePath must always be
  *  passed explicitly (the current path if unchanged, a new one, or null to clear). */
@@ -146,8 +149,16 @@ export async function updateNewsRpc(
   title: string,
   body: string,
   imagePath: string | null,
+  link: { url: string | null; label: string | null },
 ): Promise<UpdateNewsResult> {
-  const d = await callRpc('update_news', { p_news_id: id, p_title: title, p_body: body, p_image_path: imagePath });
+  const d = await callRpc('update_news', {
+    p_news_id: id,
+    p_title: title,
+    p_body: body,
+    p_image_path: imagePath,
+    p_link_url: link.url,
+    p_link_label: link.label,
+  });
   return d.ok ? { ok: true } : { ok: false, reason: d.reason as UpdateNewsReason };
 }
 

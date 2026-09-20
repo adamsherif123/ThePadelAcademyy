@@ -11,7 +11,7 @@ import { useMarkNewsSeen, useNews, useNewsSeen } from '../data/queries';
 import { useSession } from '../session/SessionProvider';
 import { shadow } from '../theme/shadow';
 import { useTheme } from '../theme/ThemeProvider';
-import { EmptyState, ErrorView, LoadingView, Screen, ScreenHeader, Text } from '../ui';
+import { EmptyState, ErrorView, LoadingView, NewsLinkButton, Screen, ScreenHeader, Text } from '../ui';
 
 /**
  * The news feed — the academy's shopfront for announcements: every visible item
@@ -111,6 +111,8 @@ function NewsItemCard({ news }: { news: News }) {
       <View style={styles.body}>
         <Text variant="h2">{news.title}</Text>
         <Text variant="bodySecondary">{news.body}</Text>
+        {/* Only a post the admin gave a link to grows a button. */}
+        <NewsLinkButton news={news} />
         <Text variant="caption" tone="muted" style={styles.date}>
           {formatInstantDate(news.createdAt)}
         </Text>

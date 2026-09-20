@@ -185,6 +185,8 @@ export function rowToNews(r: Row): News {
     title: str(r.title),
     body: str(r.body),
     imagePath: nstr(r.image_path),
+    linkUrl: nstr(r.link_url),
+    linkLabel: nstr(r.link_label),
     createdBy: str(r.created_by),
     createdAt: iso(r.created_at),
   };

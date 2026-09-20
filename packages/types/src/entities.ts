@@ -327,6 +327,15 @@ export interface News {
   body: string;
   /** A news-images/ storage key (news/<uuid>.<ext>), not a URL — nullable: a news item may be text-only. */
   imagePath: string | null;
+  /**
+   * An optional call-to-action. `linkUrl` is http(s)-only, enforced by a CHECK on
+   * the table as well as by the RPCs. `linkLabel` is what the button says; null
+   * with a URL present is fine — the client falls back to a default rather than
+   * the migration baking one in. Optional on the type like `email`: the mappers
+   * always populate them, fixtures may omit them.
+   */
+  linkUrl?: string | null;
+  linkLabel?: string | null;
   createdBy: string;
   createdAt: IsoInstant;
 }

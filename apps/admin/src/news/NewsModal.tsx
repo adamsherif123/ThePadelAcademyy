@@ -12,6 +12,8 @@ const ERROR_TEXT: Record<string, string> = {
   title_required: 'News needs a title.',
   body_required: 'News needs some body text.',
   news_missing: 'That news item no longer exists.',
+  invalid_target: 'Pick who to notify.',
+  invalid_link: 'The link must start with http:// or https://',
   network: 'Something went wrong. Please try again.',
 };
 
@@ -45,6 +47,8 @@ export function NewsModal({ news, onClose }: { news?: NewsItem; onClose: () => v
   const [title, setTitle] = useState(news?.title ?? '');
   const [body, setBody] = useState(news?.body ?? '');
   const [notifyTarget, setNotifyTarget] = useState<NewsNotifyTarget>('none');
+  const [linkUrl, setLinkUrl] = useState(news?.linkUrl ?? '');
+  const [linkLabel, setLinkLabel] = useState(news?.linkLabel ?? '');
   const [image, setImage] = useState<File | 'remove' | null>(null);
   const [preview, setPreview] = useState<string | null>(
     news?.imagePath ? newsImagePublicUrl(news.imagePath) : null,
@@ -84,9 +88,15 @@ export function NewsModal({ news, onClose }: { news?: NewsItem; onClose: () => v
       else if (image instanceof File) imagePath = (await uploadNewsImage(image)).path;
       else imagePath = oldPath;
 
+      // Empty means "no link" rather than an empty string; a label with no URL is
+      // dropped server-side, so a leftover in the field cannot publish a dead button.
+      const link = {
+        url: linkUrl.trim() === '' ? null : linkUrl.trim(),
+        label: linkLabel.trim() === '' ? null : linkLabel.trim(),
+      };
       const res = editing
-        ? await updateNews(news.id, title, body, imagePath)
-        : await createNews(title, body, imagePath, notifyTarget);
+        ? await updateNews(news.id, title, body, imagePath, link)
+        : await createNews(title, body, imagePath, notifyTarget, link);
 
       if (!res.ok) {
         setError(ERROR_TEXT[res.reason] ?? 'Could not save the news item.');
@@ -169,6 +179,25 @@ export function NewsModal({ news, onClose }: { news?: NewsItem; onClose: () => v
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="Plain text — no rich formatting."
+          />
+        </div>
+
+        {/* Optional call-to-action. Empty URL = a plain post, exactly as before.
+            The label is what the button says; left blank, the apps fall back to a
+            default rather than showing the raw address. */}
+        <div className={styles.grid}>
+          <Input
+            label="Link (optional)"
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+            placeholder="https://…"
+          />
+          <Input
+            label="Button text"
+            value={linkLabel}
+            onChange={(e) => setLinkLabel(e.target.value)}
+            placeholder="Learn more"
+            disabled={linkUrl.trim() === ''}
           />
         </div>
 

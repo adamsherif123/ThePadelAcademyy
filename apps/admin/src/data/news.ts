@@ -25,18 +25,20 @@ export function createNews(
   body: string,
   imagePath: string | null,
   notifyTarget: NewsNotifyTarget,
+  link: { url: string | null; label: string | null },
 ): Promise<CreateNewsResult | { ok: false; reason: 'network' }> {
-  return runRpc(() => createNewsRpc(title, body, imagePath, notifyTarget), TOUCHED.news);
+  return runRpc(() => createNewsRpc(title, body, imagePath, notifyTarget, link), TOUCHED.news);
 }
 
-/** Edit title/body/image — never re-notifies (only create does). */
+/** Edit title/body/image/link — never re-notifies (only create does). */
 export function updateNews(
   id: NewsId,
   title: string,
   body: string,
   imagePath: string | null,
+  link: { url: string | null; label: string | null },
 ): Promise<UpdateNewsResult | { ok: false; reason: 'network' }> {
-  return runRpc(() => updateNewsRpc(id, title, body, imagePath), TOUCHED.news);
+  return runRpc(() => updateNewsRpc(id, title, body, imagePath, link), TOUCHED.news);
 }
 
 /** Hard-delete — cascades news_seen, sets notifications.news_id null. */
