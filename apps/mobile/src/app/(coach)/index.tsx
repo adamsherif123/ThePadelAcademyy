@@ -69,7 +69,7 @@ export default function CoachScheduleScreen() {
             <View style={styles.group}>
               <Text variant="label">Later today</Text>
               {restOfToday.map((s) => (
-                <CoachSessionCard key={s.id} slot={s} onPress={() => open(s.id)} />
+                <CoachSessionCard key={s.id} slot={s} showDate={false} onPress={() => open(s.id)} />
               ))}
             </View>
           ) : null}

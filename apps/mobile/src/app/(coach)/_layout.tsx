@@ -61,6 +61,10 @@ export default function CoachTabsLayout() {
           ),
         }}
       />
+      {/* A pushed detail screen, not a destination. Tabs registers every route in
+          the group, so without `href: null` the session detail shows up as a fourth
+          tab labelled "session/[id]". */}
+      <Tabs.Screen name="session/[id]" options={{ href: null }} />
     </Tabs>
   );
 }

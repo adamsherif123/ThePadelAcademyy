@@ -20,10 +20,18 @@ export function CapacityMeter({
   booked,
   capacity,
   muted = false,
+  showLabel = true,
 }: {
   booked: number;
   capacity: number;
   muted?: boolean;
+  /**
+   * The "N spots left" label is an invitation to BOOK, which is right on a player's
+   * card and wrong on a coach's — a coach reads occupancy as "who's coming", and
+   * their card states the booked count in words beside this. False renders the seat
+   * glyphs alone.
+   */
+  showLabel?: boolean;
 }) {
   const { color } = useTheme();
   const total = Math.min(capacity, 8);
@@ -46,9 +54,11 @@ export function CapacityMeter({
           />
         ))}
       </View>
-      <Text variant="micro" style={{ color: labelColor }}>
-        {label}
-      </Text>
+      {showLabel ? (
+        <Text variant="micro" style={{ color: labelColor }}>
+          {label}
+        </Text>
+      ) : null}
     </View>
   );
 }
