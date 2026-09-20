@@ -42,7 +42,12 @@ export default function CoachSessionDetailScreen() {
   const rosterQ = useCoachRoster(slotId);
   const slot = (slotsQ.data ?? []).find((s) => s.id === slotId);
 
-  const header = <ScreenHeader eyebrow="Session" title="Who's coming" onBack={() => router.back()} />;
+  // Compact: this is a pushed screen, and the card directly below already says
+  // which session it is. A full display heading here out-shouts the roster it is
+  // introducing — especially on a session with one player.
+  const header = (
+    <ScreenHeader eyebrow="Session" title="Who's coming" size="compact" onBack={() => router.back()} />
+  );
 
   if (coachId == null) {
     return (

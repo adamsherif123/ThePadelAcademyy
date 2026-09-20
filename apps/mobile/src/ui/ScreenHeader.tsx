@@ -9,7 +9,13 @@ import { Text } from './Text';
  * The brand's signature header, on every screen: a periwinkle uppercase tracked
  * eyebrow, then an extrabold UPPERCASE display heading. Optional circular back
  * chevron (inline-start) and an optional `trailing` slot (e.g. an Avatar). `tone`
- * controls title/back-button colors for light vs navy surfaces. RTL-safe.
+ * controls title/back-button colors for light vs navy surfaces.
+ *
+ * `size="compact"` drops the title to h1 — smaller, bold rather than extrabold,
+ * and sentence case. It is for a PUSHED detail screen, where you arrived from
+ * somewhere and the content below already says which thing you are looking at; a
+ * full display heading there out-shouts the content it is introducing. Top-level
+ * destinations keep the signature size, which is the default. RTL-safe.
  */
 export function ScreenHeader({
   eyebrow,
@@ -17,12 +23,14 @@ export function ScreenHeader({
   onBack,
   trailing,
   tone = 'light',
+  size = 'display',
 }: {
   eyebrow: string;
   title: string;
   onBack?: () => void;
   trailing?: ReactNode;
   tone?: 'light' | 'navy';
+  size?: 'display' | 'compact';
 }) {
   return (
     <View style={styles.container}>
@@ -34,7 +42,7 @@ export function ScreenHeader({
       <View style={styles.row}>
         <View style={styles.titleCol}>
           <Text variant="label">{eyebrow}</Text>
-          <Text variant="display" tone={tone === 'navy' ? 'inverse' : 'primary'}>
+          <Text variant={size === 'compact' ? 'h1' : 'display'} tone={tone === 'navy' ? 'inverse' : 'primary'}>
             {title}
           </Text>
         </View>
