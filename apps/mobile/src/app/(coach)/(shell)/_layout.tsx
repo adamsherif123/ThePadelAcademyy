@@ -9,7 +9,7 @@ import { useTheme } from '../../../theme/ThemeProvider';
  * The coach app shell — the route group a linked coach (players.coach_id != null)
  * lands in instead of (tabs), decided by `nextRoute` in session/authMachine.
  *
- * Three tabs where the player app has four, and deliberately the SAME tab bar:
+ * Four tabs, and deliberately the SAME tab bar as the player app:
  * identical screenOptions to (tabs)/_layout, so a coach is in the academy's app
  * rather than a different-looking one. What is missing is the point — there is no
  * Book tab, because a coach account cannot book (the server refuses it outright,
@@ -36,6 +36,15 @@ export default function CoachTabsLayout() {
     >
       <Tabs.Screen
         name="index"
+        options={{
+          title: 'Dashboard',
+          tabBarIcon: ({ color: c, size, focused }) => (
+            <Ionicons name={focused ? 'grid' : 'grid-outline'} color={c} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="schedule"
         options={{
           title: 'Schedule',
           tabBarIcon: ({ color: c, size, focused }) => (

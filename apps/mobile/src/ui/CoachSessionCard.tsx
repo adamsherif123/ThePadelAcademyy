@@ -34,14 +34,17 @@ export function CoachSessionCard({
   variant = 'row',
   eyebrow,
   showDate = true,
+  dimmed = false,
   onPress,
 }: {
   slot: SessionSlot;
   variant?: 'hero' | 'row';
   /** "On court now" / "Starts in 25 minutes" — supplied by the screen. */
   eyebrow?: string;
-  /** False inside a "Later today" group, where repeating the date is noise. */
+  /** False inside a day group, where repeating that day's date is noise. */
   showDate?: boolean;
+  /** A session that has already finished — still worth seeing, visibly past. */
+  dimmed?: boolean;
   onPress?: () => void;
 }) {
   const { color } = useTheme();
@@ -62,6 +65,7 @@ export function CoachSessionCard({
           borderColor: hero ? color.accent.default : color.border.subtle,
         },
         pressed: { opacity: 0.85 },
+        dimmed: { opacity: 0.6 },
         // The pill's row. `flex: 1` on the text and no shrink on the pill is what
         // keeps the pill inside the card when the left side runs long.
         metaRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
@@ -84,17 +88,15 @@ export function CoachSessionCard({
   );
 
   const body = (
-    <View style={styles.card}>
+    <View style={[styles.card, dimmed ? styles.dimmed : null]}>
       {/* Meta row: eyebrow (hero) or date (row), with the status pill pinned right. */}
       <View style={styles.metaRow}>
         <View style={styles.metaText}>
-          {hero ? (
-            eyebrow ? (
-              <Text variant="label" tone="accent">
-                {eyebrow}
-              </Text>
-            ) : null
-          ) : showDate ? (
+          {eyebrow ? (
+            <Text variant="label" tone={dimmed ? 'muted' : 'accent'}>
+              {eyebrow}
+            </Text>
+          ) : !hero && showDate ? (
             <Text variant="caption" tone="secondary">
               {formatInstantDate(slot.startsAt)}
             </Text>

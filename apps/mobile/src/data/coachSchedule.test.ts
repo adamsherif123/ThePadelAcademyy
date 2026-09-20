@@ -1,7 +1,7 @@
 import type { IsoInstant, SessionSlot } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
-import { coachSchedule, startsInLabel } from './coachSchedule';
+import { coachDays, coachSchedule, sessionState, startsInLabel, typeSlices, weekStrip } from './coachSchedule';
 
 // 2026-03-15 09:00Z is 11:00 Cairo (UTC+2 in March), so "today" in Cairo runs from
 // 22:00Z the previous day to 22:00Z this one — the offsets below stay well inside it
@@ -87,5 +87,76 @@ describe('startsInLabel', () => {
   it('says "now" once it has started, never a negative countdown', () => {
     expect(startsInLabel(at(0), NOW)).toBe('now');
     expect(startsInLabel(at(-1), NOW)).toBe('now');
+  });
+});
+
+describe('coachDays', () => {
+  it('groups by Cairo day, soonest first, and labels today and tomorrow', () => {
+    const days = coachDays([slot('a', 2), slot('b', 5), slot('c', 26)], NOW);
+    expect(days.map((d) => d.label)).toEqual(['Today', 'Tomorrow']);
+    expect(days[0]?.sessions.map((s) => s.id)).toEqual(['a', 'b']);
+    expect(days[1]?.sessions.map((s) => s.id)).toEqual(['c']);
+  });
+
+  it('KEEPS a session that already finished today — the day\'s work includes what is done', () => {
+    // This is the deliberate difference from `coachSchedule`, whose hero view is
+    // forward-looking. A coach reading the schedule mid-evening wants the whole day.
+    const days = coachDays([slot('done', -3), slot('next', 2)], NOW);
+    expect(days[0]?.sessions.map((s) => s.id)).toEqual(['done', 'next']);
+  });
+
+  it('leaves a later day unlabelled, for the screen to render its date', () => {
+    expect(coachDays([slot('later', 24 * 4)], NOW)[0]?.label).toBe('');
+  });
+});
+
+describe('sessionState', () => {
+  it('reads done / live / upcoming off the clock', () => {
+    expect(sessionState(slot('a', -3), NOW)).toBe('done');
+    expect(sessionState(slot('b', -0.5, 1.5), NOW)).toBe('live');
+    expect(sessionState(slot('c', 2), NOW)).toBe('upcoming');
+  });
+});
+
+describe('weekStrip', () => {
+  it('is seven Sunday-first days, with today flagged', () => {
+    const strip = weekStrip([], NOW);
+    expect(strip).toHaveLength(7);
+    expect(strip.map((d) => d.initial)).toEqual(['S', 'M', 'T', 'W', 'T', 'F', 'S']);
+    expect(strip.filter((d) => d.isToday)).toHaveLength(1);
+  });
+
+  it('counts each day\'s sessions', () => {
+    // NOW is Sunday 15 March 2026, 11:00 Cairo — index 0 of the strip.
+    const strip = weekStrip([slot('a', 1), slot('b', 3), slot('c', 25)], NOW);
+    const today = strip.findIndex((d) => d.isToday);
+    expect(strip[today]?.count).toBe(2);
+    expect(strip[today + 1]?.count).toBe(1);
+  });
+});
+
+describe('typeSlices', () => {
+  it('adds an "Other" row for sessions that are in no type bucket', () => {
+    // The whole point: an open block or a trial counts in the month total but is in
+    // none of the three buckets, so the three must never be presented as the total.
+    const slices = typeSlices({ group: 3, duo: 1, individual: 1 }, 7);
+    expect(slices.map((s) => s.label)).toEqual(['Group', 'Duo', 'Individual', 'Other']);
+    expect(slices.find((s) => s.label === 'Other')?.count).toBe(2);
+  });
+
+  it('takes every fraction over the REAL total, so the bars describe the whole month', () => {
+    const slices = typeSlices({ group: 3, duo: 1, individual: 1 }, 7);
+    expect(slices.reduce((sum, s) => sum + s.fraction, 0)).toBeCloseTo(1, 10);
+    expect(slices.find((s) => s.label === 'Group')?.fraction).toBeCloseTo(3 / 7, 10);
+  });
+
+  it('omits "Other" when the three buckets really are everything', () => {
+    const slices = typeSlices({ group: 2, duo: 1, individual: 1 }, 4);
+    expect(slices.map((s) => s.label)).toEqual(['Group', 'Duo', 'Individual']);
+  });
+
+  it('drops empty types, and survives a month with no sessions at all', () => {
+    expect(typeSlices({ group: 2, duo: 0, individual: 0 }, 2).map((s) => s.label)).toEqual(['Group']);
+    expect(typeSlices({ group: 0, duo: 0, individual: 0 }, 0)).toEqual([]);
   });
 });

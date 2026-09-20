@@ -9,6 +9,7 @@ import {
   fetchAppConfig,
   fetchBookings,
   fetchCoaches,
+  fetchCoachDashboard,
   fetchCoachRoster,
   fetchCoachSlots,
   fetchMyCoachHours,
@@ -31,6 +32,7 @@ import {
   markNotificationRead,
   type BookReason,
   type PastSessionRow,
+  type CoachDashboard,
   type RosterEntry,
   type CancelReason,
 } from '../lib/api';
@@ -338,6 +340,20 @@ export const useMyCoachHours = (enabled: boolean, monthOffset = 0): Resource<num
         d.setMonth(d.getMonth() + monthOffset);
         return fetchMyCoachHours(d);
       },
+      enabled,
+    }),
+    enabled,
+  );
+
+/**
+ * The Dashboard's numbers — one call, gated on the caller being a coach at all.
+ * `null` data with no error means "not linked", which the screen draws explicitly.
+ */
+export const useCoachDashboard = (enabled: boolean): Resource<CoachDashboard | null> =>
+  toGatedResource(
+    useQuery({
+      queryKey: queryKeys.coachDashboard,
+      queryFn: fetchCoachDashboard,
       enabled,
     }),
     enabled,

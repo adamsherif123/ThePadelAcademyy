@@ -346,6 +346,56 @@ export async function fetchMyCoachHours(month?: Date): Promise<number> {
   return rows.length > 0 ? Number(rows[0]?.hours ?? 0) : 0;
 }
 
+/** The coach Dashboard's numbers, all from one RPC (migration 052). */
+export interface CoachDashboard {
+  sessionsThisMonth: number;
+  sessionsThisWeek: number;
+  upcomingCount: number;
+  studentsThisMonth: number;
+  /** Whole percent, 0-100. Average occupancy per session this month. */
+  fillRate: number;
+  breakdown: { group: number; duo: number; individual: number };
+  hoursThisMonth: number;
+  hoursLastMonth: number;
+  /** Oldest first, four buckets, each starting on a Cairo Sunday. */
+  weeklyHours: { weekStart: string; hours: number }[];
+}
+
+/**
+ * The whole Dashboard in ONE call. The numbers span every session the coach has
+ * taught this month and the rosters on them, so they are aggregated server-side —
+ * the alternative was every session plus a roster call each, which is the
+ * over-fetching the bounded-fetch work removed everywhere else.
+ *
+ * Returns null for an account with no coach link (the RPC's own answer), which the
+ * screen renders as "not linked" rather than a page of zeros.
+ */
+export async function fetchCoachDashboard(): Promise<CoachDashboard | null> {
+  const { data, error } = await supabase.rpc('coach_dashboard_summary');
+  if (error) throw new ApiError(`Failed to load your dashboard: ${error.message}`, error);
+  if (data == null) return null;
+  const d = data as Record<string, unknown>;
+  const b = (d.breakdown ?? {}) as Record<string, unknown>;
+  return {
+    sessionsThisMonth: Number(d.sessions_this_month ?? 0),
+    sessionsThisWeek: Number(d.sessions_this_week ?? 0),
+    upcomingCount: Number(d.upcoming_count ?? 0),
+    studentsThisMonth: Number(d.students_this_month ?? 0),
+    fillRate: Number(d.fill_rate ?? 0),
+    breakdown: {
+      group: Number(b.group ?? 0),
+      duo: Number(b.duo ?? 0),
+      individual: Number(b.individual ?? 0),
+    },
+    hoursThisMonth: Number(d.hours_this_month ?? 0),
+    hoursLastMonth: Number(d.hours_last_month ?? 0),
+    weeklyHours: ((d.weekly_hours ?? []) as Record<string, unknown>[]).map((w) => ({
+      weekStart: String(w.week_start),
+      hours: Number(w.hours ?? 0),
+    })),
+  };
+}
+
 /** One booked player on a coach's own session. Name and level are ALL the RPC
  *  returns — no contact details reach the coach app (migration 050). */
 export interface RosterEntry {

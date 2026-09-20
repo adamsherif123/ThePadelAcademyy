@@ -66,6 +66,7 @@ export const queryKeys = {
   coachSlots: ['coachSlots'] as const,
   coachHours: ['coachHours'] as const,
   coachRoster: ['coachRoster'] as const,
+  coachDashboard: ['coachDashboard'] as const,
 };
 
 /** What a booking/cancellation changes: the wallet, the player's bookings, and seat counts. */
