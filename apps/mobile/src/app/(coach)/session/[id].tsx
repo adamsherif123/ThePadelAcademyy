@@ -1,16 +1,17 @@
-import { formatInstantDate, formatSessionTimeRange, isSessionConfirmed } from '@tpa/core';
+import { spotsUntilConfirmed } from '@tpa/core';
 import { space } from '@tpa/theme';
 import type { SlotId } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
+import { sessionState, startsInLabel } from '../../../data/coachSchedule';
 import { useCoachRoster, useCoachSlots } from '../../../data/queries';
 import { useSession } from '../../../session/SessionProvider';
 import {
   Badge,
   Card,
   CoachNotLinked,
-  CapacityMeter,
+  CoachSessionCard,
   EmptyState,
   ErrorView,
   LEVEL_LABEL,
@@ -18,7 +19,6 @@ import {
   Screen,
   ScreenHeader,
   Text,
-  trainingMetaFor,
 } from '../../../ui';
 
 /**
@@ -84,31 +84,37 @@ export default function CoachSessionDetailScreen() {
     );
   }
 
-  const meta = trainingMetaFor(slot.trainingType);
-  const confirmed = isSessionConfirmed(slot);
   const roster = rosterQ.data ?? [];
+  const state = sessionState(slot, now);
+  const needed = spotsUntilConfirmed(slot);
 
   return (
     <Screen scroll contentContainerStyle={styles.content}>
       {header}
 
-      <Card>
-        <View style={styles.summary}>
-          <Text variant="h1">{formatSessionTimeRange(slot.startsAt, slot.endsAt)}</Text>
-          <Text variant="bodySecondary">{formatInstantDate(slot.startsAt)}</Text>
-          <View style={styles.badges}>
-            <Badge label={meta.label} tone="neutral" icon={meta.icon} />
-            {slot.level ? <Badge label={LEVEL_LABEL[slot.level]} tone="neutral" /> : null}
-            <Badge label={confirmed ? 'Confirmed' : 'Pending'} tone={confirmed ? 'success' : 'warning'} />
-          </View>
-          <View style={styles.capacity}>
-            <Text variant="bodySecondary">
-              {slot.bookedCount} of {slot.capacity} booked
-            </Text>
-            <CapacityMeter booked={slot.bookedCount} capacity={slot.capacity} />
-          </View>
-        </View>
-      </Card>
+      {/* The SAME card the Schedule and Dashboard draw, so a session looks like
+          itself wherever a coach meets it. It also fixes what this screen used to
+          do by hand: the date was printed twice (once inside the full time range,
+          once beneath it) and the range ran at display size, wrapping to two lines.
+          The card states the date once and adds the countdown, which is the one
+          thing a coach opening a session actually wants to know. */}
+      <CoachSessionCard
+        slot={slot}
+        variant="hero"
+        dimmed={state === 'done'}
+        eyebrow={
+          state === 'done' ? 'Completed' : state === 'live' ? 'On court now' : `Starts ${startsInLabel(slot.startsAt, now)}`
+        }
+      />
+
+      {/* The one fact this screen can add that the card cannot: what it would take
+          for a pending session to go ahead. A statement of what fills it — never a
+          promise that anyone will be told. */}
+      {needed > 0 ? (
+        <Text variant="caption" tone="secondary">
+          Runs once {needed} more player{needed === 1 ? '' : 's'} {needed === 1 ? 'joins' : 'join'}.
+        </Text>
+      ) : null}
 
       {roster.length === 0 ? (
         <EmptyState
@@ -120,7 +126,7 @@ export default function CoachSessionDetailScreen() {
         <View style={styles.group}>
           <Text variant="label">{`On court (${roster.length})`}</Text>
           {roster.map((entry, i) => (
-            <Card key={`${entry.name}-${i}`}>
+            <Card key={`${entry.name}-${i}`} style={styles.playerCard}>
               <View style={styles.playerRow}>
                 <Text variant="body" weight="semibold">
                   {entry.name}
@@ -137,9 +143,9 @@ export default function CoachSessionDetailScreen() {
 
 const styles = StyleSheet.create({
   content: { gap: space.lg },
-  summary: { gap: space.sm },
-  badges: { flexDirection: 'row', alignItems: 'center', gap: space.xs, flexWrap: 'wrap' },
-  capacity: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
   group: { gap: space.sm },
+  // Card's own padding is sized for a block of content; a one-line name is not
+  // that, and at space.xl each player took the height of a paragraph.
+  playerCard: { padding: space.md },
   playerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
 });
