@@ -51,15 +51,20 @@ export function CoachSessionCard({
   const hero = variant === 'hero';
   const meta = trainingMetaFor(slot.trainingType);
   const confirmed = isSessionConfirmed(slot);
-  const time = `${formatInstantTime(slot.startsAt)} – ${formatInstantTime(slot.endsAt)}`;
+  // "5:00 – 6:00 PM", not "5:00 PM – 6:00 PM". Repeating the meridiem is noise
+  // when both ends share it, and dropping it buys back most of a line's width.
+  const from = formatInstantTime(slot.startsAt);
+  const to = formatInstantTime(slot.endsAt);
+  const suffix = from.slice(-2);
+  const time = to.endsWith(suffix) ? `${from.slice(0, -3)} – ${to}` : `${from} – ${to}`;
 
   const styles = useMemo(
     () =>
       StyleSheet.create({
         card: {
-          gap: hero ? space.sm : space.xs,
-          padding: hero ? space.lg : space.md,
-          borderRadius: hero ? radius.xl : radius.lg,
+          gap: space.xs,
+          padding: space.md,
+          borderRadius: radius.lg,
           backgroundColor: color.bg.surface,
           borderWidth: 1,
           borderColor: hero ? color.accent.default : color.border.subtle,
@@ -70,8 +75,6 @@ export function CoachSessionCard({
         // keeps the pill inside the card when the left side runs long.
         metaRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
         metaText: { flex: 1 },
-        tags: { flexDirection: 'row', alignItems: 'center', gap: space.xs, flexWrap: 'wrap' },
-        divider: { height: 1, backgroundColor: color.border.subtle, marginTop: space.xs },
         footRow: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -87,40 +90,44 @@ export function CoachSessionCard({
     <Badge label={confirmed ? 'Confirmed' : 'Pending'} tone={confirmed ? 'success' : 'warning'} />
   );
 
+  // Nothing to say on the left (an upcoming row inside a day group, where the date
+  // is already the group's heading) renders NOTHING — an empty Text would still
+  // take a line's height and leave a gap under the pill.
+  const metaLeft = eyebrow ?? (showDate ? formatInstantDate(slot.startsAt) : '');
+
   const body = (
     <View style={[styles.card, dimmed ? styles.dimmed : null]}>
-      {/* Meta row: eyebrow (hero) or date (row), with the status pill pinned right. */}
+      {/* 1 — the state of it: when, and whether it is going ahead. */}
       <View style={styles.metaRow}>
         <View style={styles.metaText}>
-          {eyebrow ? (
-            <Text variant="label" tone={dimmed ? 'muted' : 'accent'}>
-              {eyebrow}
-            </Text>
-          ) : !hero && showDate ? (
-            <Text variant="caption" tone="secondary">
-              {formatInstantDate(slot.startsAt)}
+          {metaLeft ? (
+            <Text variant="caption" weight="semibold" tone={dimmed ? 'muted' : hero ? 'accent' : 'secondary'}>
+              {metaLeft}
             </Text>
           ) : null}
         </View>
         {statusPill}
       </View>
 
-      {/* The time owns its own full-width line — it can wrap without displacing anything. */}
-      <Text variant={hero ? 'h1' : 'h2'}>{time}</Text>
+      {/* 2 — the time, the one thing a coach scans for. Still the largest text on
+          the card, but h2 rather than h1: at display size a range wrapped to two
+          lines and the card grew to six rows for a single session. */}
+      <Text variant={hero ? 'h2' : 'body'} weight="bold">
+        {time}
+      </Text>
 
-      {hero && showDate ? (
-        <Text variant="bodySecondary">{formatInstantDate(slot.startsAt)}</Text>
-      ) : null}
+      {/* 3 — everything else about it on ONE line. The type and level were a row of
+          chips each; as text beside the date they cost nothing and read faster. */}
+      <Text variant="caption" tone="muted">
+        {[eyebrow && showDate ? formatInstantDate(slot.startsAt) : null, meta.label, slot.level ? LEVEL_LABEL[slot.level] : null]
+          .filter(Boolean)
+          .join(' · ')}
+      </Text>
 
-      <View style={styles.tags}>
-        <Badge label={meta.label} tone="neutral" icon={meta.icon} />
-        {slot.level ? <Badge label={LEVEL_LABEL[slot.level]} tone="neutral" /> : null}
-      </View>
-
-      <View style={styles.divider} />
-
+      {/* 4 — occupancy. No divider above it: the line was drawing a box around four
+          short rows that already read as one block. */}
       <View style={styles.footRow}>
-        <Text variant="bodySecondary">
+        <Text variant="caption" tone="secondary">
           {slot.bookedCount} of {slot.capacity} booked
         </Text>
         {/* No "N spots left" — that is an invitation to book, which is a player's
