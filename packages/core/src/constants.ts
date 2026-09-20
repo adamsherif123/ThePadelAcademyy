@@ -59,7 +59,7 @@ export const SLOT_WINDOW_TRAILING_DAYS = 30;
  * because they are the same interaction: a bounded, server-side `.range()` page
  * fetched only when the player asks for it.
  */
-export const HISTORY_PAGE_SIZE = 20;
+export const HISTORY_PAGE_SIZE = 10;
 
 /**
  * Free trial credits granted once, on account creation. Single source of truth —
