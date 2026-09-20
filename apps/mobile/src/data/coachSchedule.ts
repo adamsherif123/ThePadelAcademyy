@@ -82,10 +82,14 @@ export interface CoachDay {
 /**
  * The coach's sessions grouped by Cairo day, soonest day first.
  *
- * Unlike the hero derivation above this keeps sessions that have already FINISHED
- * today: a coach glancing at the schedule mid-evening wants to see the whole day's
- * work, including what is already done. The fetch's twelve-hour tail is what makes
- * that possible, and it is also why nothing older than today can appear.
+ * A session DISAPPEARS the moment it ends. The schedule answers "what is left to
+ * teach", so a finished session is not schedule any more — it is history, and the
+ * Hours tab is where history lives. A day whose sessions have all finished drops
+ * out of the list entirely rather than lingering as a row of greyed-out cards.
+ *
+ * A session currently IN PROGRESS stays, which is the whole reason the fetch keeps
+ * a twelve-hour tail: `starts_at` is already in the past for it, so without the
+ * tail it would vanish the moment it began.
  */
 export function coachDays(slots: SessionSlot[], now: IsoInstant): CoachDay[] {
   const today = cairoCalendarDate(now);
@@ -94,7 +98,10 @@ export function coachDays(slots: SessionSlot[], now: IsoInstant): CoachDay[] {
   const tomorrowKey = `${tomorrow.year}-${tomorrow.month}-${tomorrow.day}`;
 
   const byKey = new Map<string, CoachDay>();
-  for (const s of [...slots].sort((a, b) => ms(a.startsAt) - ms(b.startsAt))) {
+  const live = slots
+    .filter((s) => ms(s.endsAt) > ms(now))
+    .sort((a, b) => ms(a.startsAt) - ms(b.startsAt));
+  for (const s of live) {
     const c = cairoCalendarDate(s.startsAt);
     const key = `${c.year}-${c.month}-${c.day}`;
     const existing = byKey.get(key);

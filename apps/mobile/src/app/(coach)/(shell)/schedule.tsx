@@ -22,10 +22,10 @@ import {
 /**
  * Every session the coach has, grouped by Cairo day.
  *
- * Unlike the Dashboard's single next-session card, this is the full picture — and
- * it deliberately keeps sessions that have already FINISHED today, because a coach
- * reading their schedule mid-evening wants the whole day's work, not just what is
- * left of it. Each row states which it is (done / live / upcoming).
+ * Unlike the Dashboard's single next-session card, this is everything still to
+ * come. A session leaves the list the moment it ends — the schedule is what is left
+ * to teach, and finished work belongs to the Hours tab — so the only row here that
+ * has already started is the one being taught right now, marked as such.
  *
  * Tapping a session pushes its roster over the tab bar, with the back gesture.
  */
@@ -79,19 +79,18 @@ export default function CoachScheduleScreen() {
                 {day.sessions.length} session{day.sessions.length === 1 ? '' : 's'}
               </Text>
             </View>
-            {day.sessions.map((s) => {
-              const state = sessionState(s, now);
-              return (
-                <CoachSessionCard
-                  key={s.id}
-                  slot={s}
-                  showDate={false}
-                  eyebrow={state === 'live' ? 'On court now' : state === 'done' ? 'Completed' : undefined}
-                  dimmed={state === 'done'}
-                  onPress={() => open(s.id)}
-                />
-              );
-            })}
+            {day.sessions.map((s) => (
+              // No 'done' state to render: `coachDays` drops a session the moment it
+              // ends, so the only session here that has already started is the one
+              // being taught right now.
+              <CoachSessionCard
+                key={s.id}
+                slot={s}
+                showDate={false}
+                eyebrow={sessionState(s, now) === 'live' ? 'On court now' : undefined}
+                onPress={() => open(s.id)}
+              />
+            ))}
           </View>
         ))
       )}

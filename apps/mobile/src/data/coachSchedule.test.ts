@@ -98,11 +98,21 @@ describe('coachDays', () => {
     expect(days[1]?.sessions.map((s) => s.id)).toEqual(['c']);
   });
 
-  it('KEEPS a session that already finished today — the day\'s work includes what is done', () => {
-    // This is the deliberate difference from `coachSchedule`, whose hero view is
-    // forward-looking. A coach reading the schedule mid-evening wants the whole day.
+  it('DROPS a session the moment it ends — the schedule is what is left to teach', () => {
     const days = coachDays([slot('done', -3), slot('next', 2)], NOW);
-    expect(days[0]?.sessions.map((s) => s.id)).toEqual(['done', 'next']);
+    expect(days[0]?.sessions.map((s) => s.id)).toEqual(['next']);
+  });
+
+  it('keeps a session that is in progress — it has started, but it is not done', () => {
+    // The reason the fetch holds a twelve-hour tail: startsAt is already past for a
+    // running session, so without it the card would vanish the moment it began.
+    const days = coachDays([slot('running', -0.5, 1.5)], NOW);
+    expect(days[0]?.sessions.map((s) => s.id)).toEqual(['running']);
+  });
+
+  it('drops a whole day once everything on it has finished', () => {
+    const days = coachDays([slot('done1', -4), slot('done2', -2), slot('tmrw', 26)], NOW);
+    expect(days.map((d) => d.label)).toEqual(['Tomorrow']);
   });
 
   it('leaves a later day unlabelled, for the screen to render its date', () => {
