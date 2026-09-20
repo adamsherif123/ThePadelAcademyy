@@ -61,6 +61,11 @@ export const queryKeys = {
   /** app_config — the latest-version value the update prompt compares against. */
   appConfig: ['appConfig'] as const,
   newsSeen: ['newsSeen'] as const,
+  /** Coach mode. The schedule is keyed by the coach's own id; hours by month, so
+   *  this month and last month are separate cache entries; the roster by slot. */
+  coachSlots: ['coachSlots'] as const,
+  coachHours: ['coachHours'] as const,
+  coachRoster: ['coachRoster'] as const,
 };
 
 /** What a booking/cancellation changes: the wallet, the player's bookings, and seat counts. */

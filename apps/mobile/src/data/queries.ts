@@ -1,4 +1,4 @@
-import type { BookingId, IsoInstant, News, NewsId, Notification, NotificationId, PlayerId, Purchase, SlotId, TrainingType } from '@tpa/types';
+import type { BookingId, CoachId, IsoInstant, News, NewsId, Notification, NotificationId, PlayerId, Purchase, SessionSlot, SlotId, TrainingType } from '@tpa/types';
 import { SLOT_WINDOW_TRAILING_DAYS } from '@tpa/core';
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -9,6 +9,9 @@ import {
   fetchAppConfig,
   fetchBookings,
   fetchCoaches,
+  fetchCoachRoster,
+  fetchCoachSlots,
+  fetchMyCoachHours,
   daysBefore,
   fetchCreditBatches,
   fetchMyCreditRequests,
@@ -28,6 +31,7 @@ import {
   markNotificationRead,
   type BookReason,
   type PastSessionRow,
+  type RosterEntry,
   type CancelReason,
 } from '../lib/api';
 import { BOOKING_TOUCHED_KEYS, queryClient, queryKeys } from '../lib/queryClient';
@@ -273,6 +277,52 @@ export function useMarkAllNotificationsRead() {
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.notifications }),
   });
 }
+
+// ── coach mode ────────────────────────────────────────────────────────
+
+/**
+ * The signed-in coach's own sessions. `enabled` on the id, so the hook is inert for
+ * a player who has no coach link — nothing is fetched and nothing 400s.
+ */
+export const useCoachSlots = (coachId: CoachId | null, now: IsoInstant): Resource<SessionSlot[]> =>
+  toResource(
+    useQuery({
+      queryKey: [...queryKeys.coachSlots, coachId],
+      queryFn: () => fetchCoachSlots(coachId as CoachId, now),
+      enabled: coachId != null,
+    }),
+  );
+
+/**
+ * Hours coached for one Cairo month. `monthOffset` 0 is this month, -1 last month —
+ * the offset is applied in calendar space (setMonth), so it never drifts on a 31st.
+ * Keyed by the offset, so the two months the Hours tab shows are separate entries
+ * rather than one racing the other.
+ */
+export const useMyCoachHours = (enabled: boolean, monthOffset = 0): Resource<number> =>
+  toResource(
+    useQuery({
+      queryKey: [...queryKeys.coachHours, monthOffset],
+      queryFn: () => {
+        if (monthOffset === 0) return fetchMyCoachHours();
+        const d = new Date();
+        d.setDate(1);
+        d.setMonth(d.getMonth() + monthOffset);
+        return fetchMyCoachHours(d);
+      },
+      enabled,
+    }),
+  );
+
+/** The roster for one of the coach's own sessions — name and level only. */
+export const useCoachRoster = (slotId: SlotId | null): Resource<RosterEntry[]> =>
+  toResource(
+    useQuery({
+      queryKey: [...queryKeys.coachRoster, slotId],
+      queryFn: () => fetchCoachRoster(slotId as SlotId),
+      enabled: slotId != null,
+    }),
+  );
 
 /** Collapse several resources into one loading / error / retry gate for a screen. */
 export function combine(...rs: Resource<unknown>[]): {

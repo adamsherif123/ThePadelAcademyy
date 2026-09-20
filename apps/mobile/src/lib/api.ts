@@ -20,6 +20,7 @@ import type {
   Booking,
   BookingId,
   Coach,
+  CoachId,
   CreditBatch,
   CreditRequest,
   Gender,
@@ -293,6 +294,77 @@ export async function markAllNotificationsRead(now: IsoInstant): Promise<void> {
     .update({ read_at: now })
     .is('read_at', null);
   if (error) throw new ApiError(`Failed to mark notifications read: ${error.message}`, error);
+}
+
+// ── coach mode (phase 3 reads) ─────────────────────────────────────────
+// All three are scoped server-side to the CALLING coach: the slot query filters by
+// their own coach id, and both RPCs resolve current_coach_id() themselves, so a
+// coach can only ever pull their own schedule, their own hours and their own
+// sessions' rosters (migration 050).
+
+/**
+ * How far BACK the coach's schedule reaches. The schedule answers "what am I
+ * teaching", so it is forward-looking — but not from this exact second: a session
+ * that started an hour ago is still today's work and should not vanish off the top
+ * of the screen mid-lesson. Twelve hours keeps the whole of the current day's
+ * teaching visible and nothing older. Everything after `now` is included, so a coach
+ * never has to ask for more.
+ */
+const COACH_SCHEDULE_TRAILING_HOURS = 12;
+
+/**
+ * The coach's own sessions, soonest first — bounded below, open-ended above, the
+ * same discipline every other client fetch follows. Published only, which is what
+ * the RLS policy exposes anyway: a cancelled session is not work.
+ */
+export async function fetchCoachSlots(coachId: CoachId, now: IsoInstant): Promise<SessionSlot[]> {
+  const cutoff = toInstant(new Date(parseInstant(now).getTime() - COACH_SCHEDULE_TRAILING_HOURS * 3_600_000));
+  const { data, error } = await supabase
+    .from('session_slots')
+    .select('*')
+    .eq('coach_id', coachId)
+    .eq('status', 'published')
+    .gte('starts_at', cutoff)
+    .order('starts_at', { ascending: true });
+  if (error) throw new ApiError(`Failed to load your schedule: ${error.message}`, error);
+  return (data ?? []).map(rowToSlot);
+}
+
+/**
+ * Hours coached in a Cairo calendar month — the caller's OWN row only (the RPC is
+ * scoped by current_coach_id()). `month` is any date inside the wanted month;
+ * omitted means the current one. Zero when nothing has been counted yet — an absent
+ * row and a genuine zero are the same answer to "what have I earned".
+ */
+export async function fetchMyCoachHours(month?: Date): Promise<number> {
+  const { data, error } = await supabase.rpc(
+    'coach_hours_coached',
+    month ? { p_month: month.toISOString().slice(0, 10) } : {},
+  );
+  if (error) throw new ApiError(`Failed to load your hours: ${error.message}`, error);
+  const rows = (data ?? []) as { coach_id: string; hours: number }[];
+  return rows.length > 0 ? Number(rows[0]?.hours ?? 0) : 0;
+}
+
+/** One booked player on a coach's own session. Name and level are ALL the RPC
+ *  returns — no contact details reach the coach app (migration 050). */
+export interface RosterEntry {
+  name: string;
+  level: Level;
+}
+
+/**
+ * Who is booked on one of the caller's own sessions, cancelled bookings excluded.
+ * Another coach's slot returns an empty list rather than an error, so the screen
+ * renders "nobody yet" instead of a failure it cannot explain.
+ */
+export async function fetchCoachRoster(slotId: SlotId): Promise<RosterEntry[]> {
+  const { data, error } = await supabase.rpc('coach_session_roster', { p_slot_id: slotId });
+  if (error) throw new ApiError(`Failed to load the roster: ${error.message}`, error);
+  return ((data ?? []) as { name: string; level: string }[]).map((r) => ({
+    name: r.name,
+    level: r.level as Level,
+  }));
 }
 
 // ── news (client session) ────────────────────────────────────────────────────

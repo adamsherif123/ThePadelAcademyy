@@ -9,6 +9,7 @@ export { BrandMark } from './BrandMark';
 export { Button, type ButtonProps, type ButtonVariant } from './Button';
 export { CapacityMeter } from './CapacityMeter';
 export { Card, type CardVariant } from './Card';
+export { CoachSessionCard } from './CoachSessionCard';
 export { CheckList } from './CheckList';
 export { CircleIconButton } from './CircleIconButton';
 export { CreditCallout } from './CreditCallout';

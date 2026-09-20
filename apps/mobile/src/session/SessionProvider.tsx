@@ -1,5 +1,5 @@
 import { toInstant } from '@tpa/core';
-import type { Gender, IsoInstant, Level, Player } from '@tpa/types';
+import type { CoachId, Gender, IsoInstant, Level, Player } from '@tpa/types';
 import type { Session } from '@supabase/supabase-js';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -66,7 +66,7 @@ interface SessionValue {
    * The coaches row this login IS, or null for an ordinary player — straight from the
    * player row the gate already fetches, so the fork costs no extra request.
    */
-  coachId: Player['coachId'];
+  coachId: CoachId | null;
   /** `coachId != null`. The one fact the routing fork reads (see authMachine). */
   isCoach: boolean;
   /** Sign in a RETURNING user. Returns {ok:false,error} on bad credentials — never throws. */
