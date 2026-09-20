@@ -2,6 +2,7 @@ import type { NewsId } from '@tpa/types';
 
 import {
   createNewsRpc,
+  type NewsNotifyTarget,
   deleteNewsRpc,
   updateNewsRpc,
   type CreateNewsResult,
@@ -15,7 +16,7 @@ import { runRpc } from './queries';
  *  orders newest-first, so there's no selector layer here beyond the writes. */
 
 /**
- * Create a news item; if notifyPlayers, the RPC fans out one news_published push
+ * Create a news item; the RPC fans out one news_published push to the chosen audience
  * to every active player. Title/body are required — validated server-side
  * (create_news), so a network-level rejection is the only client-side reason.
  */
@@ -23,9 +24,9 @@ export function createNews(
   title: string,
   body: string,
   imagePath: string | null,
-  notifyPlayers: boolean,
+  notifyTarget: NewsNotifyTarget,
 ): Promise<CreateNewsResult | { ok: false; reason: 'network' }> {
-  return runRpc(() => createNewsRpc(title, body, imagePath, notifyPlayers), TOUCHED.news);
+  return runRpc(() => createNewsRpc(title, body, imagePath, notifyTarget), TOUCHED.news);
 }
 
 /** Edit title/body/image — never re-notifies (only create does). */

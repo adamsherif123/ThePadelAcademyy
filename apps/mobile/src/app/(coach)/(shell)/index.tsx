@@ -6,9 +6,9 @@ import { StyleSheet, View } from 'react-native';
 import { cairoGreeting, coachSchedule, startsInLabel, typeSlices, weekStrip } from '../../../data/coachSchedule';
 import { useCoachDashboard, useCoachSlots } from '../../../data/queries';
 import { queryKeys } from '../../../lib/queryClient';
+import { NewsButton } from '../../../notifications/NewsButton';
 import { useSession } from '../../../session/SessionProvider';
 import {
-  Avatar,
   Card,
   CoachNotLinked,
   CoachSessionCard,
@@ -57,7 +57,11 @@ export default function CoachDashboardScreen() {
     <ScreenHeader
       eyebrow={cairoGreeting(now)}
       title={`Coach ${firstName}`}
-      trailing={player ? <Avatar name={player.name} size={44} /> : undefined}
+      // The corner was an inert initials circle. A coach reads the SAME news a
+      // player does (news is readable by any authenticated account), and the
+      // unseen-dot derivation is per-player, so the player app's own NewsButton
+      // works here unchanged — no parallel news anything.
+      trailing={<NewsButton />}
     />
   );
 

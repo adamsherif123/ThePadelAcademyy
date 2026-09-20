@@ -111,14 +111,29 @@ export async function fetchNews(): Promise<News[]> {
 
 export type CreateNewsReason = 'not_admin' | 'title_required' | 'body_required';
 export type CreateNewsResult = { ok: true; newsId: NewsId } | { ok: false; reason: CreateNewsReason };
-/** Creates a news item; if notifyPlayers, fans out one news_published push to every active player. */
+/**
+ * Who a news item pushes to. A coach IS a player, so the two audiences partition
+ * the same table on `coach_id` — see migration 053.
+ */
+export type NewsNotifyTarget = 'none' | 'players' | 'coaches' | 'both';
+
+/** Creates a news item and fans out one news_published push to the chosen audience. */
 export async function createNewsRpc(
   title: string,
   body: string,
   imagePath: string | null,
-  notifyPlayers: boolean,
+  notifyTarget: NewsNotifyTarget,
 ): Promise<CreateNewsResult> {
-  const d = await callRpc('create_news', { p_title: title, p_body: body, p_image_path: imagePath, p_notify_players: notifyPlayers });
+  const d = await callRpc('create_news', {
+    p_title: title,
+    p_body: body,
+    p_image_path: imagePath,
+    // The boolean is the legacy fourth parameter and is ignored whenever a target
+    // is supplied; sent as false so an older server (target unknown) stays silent
+    // rather than pushing to everyone.
+    p_notify_players: false,
+    p_notify_target: notifyTarget,
+  });
   return d.ok ? { ok: true, newsId: d.news_id as NewsId } : { ok: false, reason: d.reason as CreateNewsReason };
 }
 

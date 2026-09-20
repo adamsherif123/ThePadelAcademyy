@@ -3,8 +3,9 @@ import { AlertTriangle, ImagePlus } from 'lucide-react';
 import { useRef, useState } from 'react';
 
 import { createNews, updateNews } from '../data/news';
+import type { NewsNotifyTarget } from '../lib/api';
 import { newsImagePublicUrl, removeNewsImage, uploadNewsImage } from '../lib/api';
-import { Button, Input, Modal, Toggle } from '../ui';
+import { Button, Input, Modal, Select } from '../ui';
 import styles from './NewsModal.module.css';
 
 const ERROR_TEXT: Record<string, string> = {
@@ -21,11 +22,29 @@ const ERROR_TEXT: Record<string, string> = {
  * AFTER the save succeeds, so a failed save never orphans-deletes a still-in-use
  * image. "Notify all players" only appears on CREATE — editing never re-notifies.
  */
+/**
+ * Who the publish pushes to. Everyone still SEES every item in the feed — a coach
+ * reads the same news a player does. This chooses only who gets pinged about it.
+ */
+const NOTIFY_OPTIONS: readonly { value: NewsNotifyTarget; label: string }[] = [
+  { value: 'none', label: 'No one' },
+  { value: 'players', label: 'Players' },
+  { value: 'coaches', label: 'Coaches' },
+  { value: 'both', label: 'Players + coaches' },
+];
+
+const NOTIFY_HINT: Record<NewsNotifyTarget, string> = {
+  none: 'Published silently — visible in the feed, no push.',
+  players: 'Players get a push. Coaches do not.',
+  coaches: 'Coaches get a push. Players do not.',
+  both: 'Everyone with an account gets a push.',
+};
+
 export function NewsModal({ news, onClose }: { news?: NewsItem; onClose: () => void }) {
   const editing = news !== undefined;
   const [title, setTitle] = useState(news?.title ?? '');
   const [body, setBody] = useState(news?.body ?? '');
-  const [notifyPlayers, setNotifyPlayers] = useState(false);
+  const [notifyTarget, setNotifyTarget] = useState<NewsNotifyTarget>('none');
   const [image, setImage] = useState<File | 'remove' | null>(null);
   const [preview, setPreview] = useState<string | null>(
     news?.imagePath ? newsImagePublicUrl(news.imagePath) : null,
@@ -67,7 +86,7 @@ export function NewsModal({ news, onClose }: { news?: NewsItem; onClose: () => v
 
       const res = editing
         ? await updateNews(news.id, title, body, imagePath)
-        : await createNews(title, body, imagePath, notifyPlayers);
+        : await createNews(title, body, imagePath, notifyTarget);
 
       if (!res.ok) {
         setError(ERROR_TEXT[res.reason] ?? 'Could not save the news item.');
@@ -156,14 +175,15 @@ export function NewsModal({ news, onClose }: { news?: NewsItem; onClose: () => v
         {!editing ? (
           <div className={styles.notifyRow}>
             <div className={styles.notifyText}>
-              <span className={styles.notifyTitle}>Notify all players</span>
-              <span className={styles.notifySub}>
-                {notifyPlayers
-                  ? 'Every player gets a push notification when this is published.'
-                  : 'Published silently — visible in the feed, no push.'}
-              </span>
+              <span className={styles.notifyTitle}>Send a notification</span>
+              <span className={styles.notifySub}>{NOTIFY_HINT[notifyTarget]}</span>
             </div>
-            <Toggle checked={notifyPlayers} onChange={setNotifyPlayers} label="Notify all players" />
+            <Select
+              label="Who to notify"
+              value={notifyTarget}
+              onChange={(e) => setNotifyTarget(e.target.value as NewsNotifyTarget)}
+              options={NOTIFY_OPTIONS}
+            />
           </div>
         ) : (
           <p className={styles.editNote}>Editing never sends a notification — only the original publish does.</p>
