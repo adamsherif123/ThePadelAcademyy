@@ -29,6 +29,15 @@ export function notificationHref(n: { type: string; slotId: string | null; newsI
   ) {
     return '/notifications' as Href;
   }
+  // The COACH types go to a coach, who is running the coach app — so they must route
+  // inside it. Falling through to the player branch below would send them to
+  // /(tabs)/sessions, a shell their account is redirected out of, which would read as
+  // the tap doing nothing. Both carry their slot, so both open that session's detail.
+  if (n.type === 'coach_booking_alert' || n.type === 'coach_session_reminder') {
+    return n.slotId
+      ? ({ pathname: '/(coach)/session/[id]', params: { id: n.slotId } } as Href)
+      : ('/(coach)/(shell)' as Href);
+  }
   // session_reminder and booking_confirmation both carry their slot, so they fall
   // through to the Sessions branch below and focus that session — the destination the
   // player wants from either one. No branch of their own is needed.

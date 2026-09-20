@@ -76,7 +76,11 @@ export type NotificationType =
   // The booker's own confirmation, emitted by book_slot the moment their seat is
   // taken. Distinct from `session_confirmed`, which tells the OTHER players a slot
   // has filled.
-  | 'booking_confirmation';
+  | 'booking_confirmation'
+  // COACH-only (players.coach_id). These reach the account linked to the session's
+  // coach record, and route inside the coach app rather than the player one.
+  | 'coach_booking_alert'
+  | 'coach_session_reminder';
 
 /**
  * A credit request's lifecycle (A3). `pending` until an admin resolves it; `approved`

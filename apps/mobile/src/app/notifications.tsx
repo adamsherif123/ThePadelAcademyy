@@ -28,6 +28,8 @@ const ICON: Record<NotificationType, IoniconName> = {
   owner_cancellation: 'calendar-clear-outline',
   session_reminder: 'alarm-outline',
   booking_confirmation: 'checkmark-done-outline',
+  coach_booking_alert: 'person-add-outline',
+  coach_session_reminder: 'alarm-outline',
 };
 
 /**
