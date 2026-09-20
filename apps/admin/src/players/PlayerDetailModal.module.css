@@ -221,3 +221,23 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* The coach-link row: the select takes the width it needs, the save button sits
+   beside it and stays aligned to the field (not its label) on desktop. Wraps to
+   two lines below the mobile breakpoint, where the fields are single-column. */
+.coachRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+.coachRow > :first-child {
+  flex: 1 1 14rem;
+}
+/* Neutral explanatory copy. Deliberately NOT `.note`, which is the amber warning
+   treatment — nothing here is a warning. */
+.hint {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: 1.5;
+}

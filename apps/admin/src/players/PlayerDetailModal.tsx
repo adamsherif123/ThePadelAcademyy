@@ -22,11 +22,12 @@ import type {
   SessionSlot,
   TrainingType,
 } from '@tpa/types';
-import { AlertTriangle, ArrowLeft, Banknote, Gift, Pencil } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Banknote, Gift, Medal, Pencil } from 'lucide-react';
 import { useState } from 'react';
 
 import { recordCashPurchase } from '../data/cashPurchase';
 import { grantCredits } from '../data/grant';
+import { setPlayerCoach } from '../data/playerCoach';
 import { sessionRetailValue, SELLABLE_TYPES } from '../data/packages';
 import {
   batchesForPlayerSorted,
@@ -158,6 +159,9 @@ export function PlayerDetailModal({
             Edit
           </Button>
         </div>
+
+        {/* Coach link */}
+        <CoachLinkSection player={player} coaches={coaches} />
 
         {/* Wallet */}
         <div className={styles.section}>
@@ -344,6 +348,74 @@ function EditView({
         ) : null}
       </div>
     </Modal>
+  );
+}
+
+const COACH_LINK_ERROR: Record<string, string> = {
+  not_admin: 'Only an admin can change the coach link.',
+  player_missing: 'That player no longer exists.',
+  coach_missing: 'That coach no longer exists — reload and try again.',
+  coach_taken: 'That coach is already linked to another account. Clear the other one first.',
+  network: 'Could not reach the server. Try again.',
+};
+
+const NOT_A_COACH = '';
+
+/**
+ * Links this player's LOGIN to a coaches record — what turns an ordinary account
+ * into a coach account (migration 049). Non-null `coach_id` is the coach flag; there
+ * is no separate boolean, so this one control is the whole switch.
+ *
+ * Options are the ACTIVE coaches, plus whichever coach is currently linked even if
+ * they have since been deactivated — otherwise editing a coach on leave would
+ * silently show "Not a coach" and the next save would unlink them. Saving goes
+ * through the admin-gated set_player_coach RPC; a coaches record can only be linked
+ * to one account (a partial unique index), which comes back as `coach_taken`.
+ */
+function CoachLinkSection({ player, coaches }: { player: Player; coaches: Coach[] }) {
+  const linked = player.coachId ?? null;
+  const [value, setValue] = useState<string>(linked ?? NOT_A_COACH);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const options = [
+    { value: NOT_A_COACH, label: 'Not a coach' },
+    ...coaches
+      .filter((c) => c.isActive || c.id === linked)
+      .map((c) => ({ value: c.id as string, label: c.isActive ? c.name : `${c.name} (inactive)` })),
+  ];
+
+  const changed = (value === NOT_A_COACH ? null : value) !== linked;
+
+  const onSave = async () => {
+    setError(null);
+    setSaving(true);
+    const res = await setPlayerCoach(player.id, value === NOT_A_COACH ? null : (value as Coach['id']));
+    setSaving(false);
+    if (!res.ok) setError(COACH_LINK_ERROR[res.reason] ?? 'Something went wrong.');
+  };
+
+  return (
+    <div className={styles.section}>
+      <span className={styles.sectionTitle}>Coach</span>
+      <p className={styles.hint}>
+        Linking this account to a coach gives it the coach app — their schedule and hours —
+        instead of the player app. Each coach can be linked to one account.
+      </p>
+      <div className={styles.coachRow}>
+        <Select
+          label="Coach record"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          options={options}
+          disabled={saving}
+        />
+        <Button size="sm" icon={Medal} onClick={() => void onSave()} disabled={!changed || saving}>
+          {saving ? 'Saving…' : 'Save link'}
+        </Button>
+      </div>
+      {error ? <p className={styles.error}>{error}</p> : null}
+    </div>
   );
 }
 

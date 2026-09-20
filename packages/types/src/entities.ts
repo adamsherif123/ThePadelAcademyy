@@ -48,6 +48,12 @@ export interface Player {
    * approving a trial (a "new" member who isn't). Optional — most paths don't read it.
    */
   trainedBefore?: boolean | null;
+  /**
+   * The coaches row this login IS, or null for an ordinary player (migration 049).
+   * Non-null is the coach flag — there is no separate is_coach. Optional like
+   * `email`: the row mappers always populate it, fixtures may omit it.
+   */
+  coachId?: CoachId | null;
   name: string;
   gender: Gender;
   level: Level;

@@ -497,6 +497,18 @@ export async function grantCreditsRpc(playerId: PlayerId, trainingType: Training
   return d.ok ? { ok: true, creditBatchId: d.credit_batch_id as string } : { ok: false, reason: d.reason as GrantReason };
 }
 
+export type SetPlayerCoachReason = 'not_admin' | 'player_missing' | 'coach_missing' | 'coach_taken';
+export type SetPlayerCoachResult = { ok: true; coachId: CoachId | null } | { ok: false; reason: SetPlayerCoachReason };
+/**
+ * Link a player account to a coaches record, or clear the link (`coachId` null).
+ * A SECURITY DEFINER RPC because there is no admin UPDATE policy on players — this
+ * writes exactly one column and nothing wider (migration 049).
+ */
+export async function setPlayerCoachRpc(playerId: PlayerId, coachId: CoachId | null): Promise<SetPlayerCoachResult> {
+  const d = await callRpc('set_player_coach', { p_player_id: playerId, p_coach_id: coachId });
+  return d.ok ? { ok: true, coachId: (d.coach_id as CoachId | null) ?? null } : { ok: false, reason: d.reason as SetPlayerCoachReason };
+}
+
 export type CashReason =
   | 'not_admin' | 'player_missing' | 'package_missing' | 'trial_not_sellable' | 'package_inactive' | 'amount_below_one';
 export type CashResult = { ok: true; purchaseId: string; creditBatchId: string } | { ok: false; reason: CashReason };

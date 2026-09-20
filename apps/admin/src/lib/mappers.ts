@@ -37,6 +37,7 @@ export function rowToPlayer(r: Row): Player {
     createdAt: iso(r.created_at),
     deletedAt: nstr(r.deleted_at) as Player['deletedAt'],
     trainedBefore: r.trained_before == null ? null : (r.trained_before as boolean),
+    coachId: nstr(r.coach_id) as Player['coachId'],
   };
 }
 

@@ -76,6 +76,10 @@ export const TOUCHED = {
   templates: [queryKeys.templates] as const,
   slots: [queryKeys.slots] as const,
   players: [queryKeys.players, queryKeys.playersPage] as const,
+  // set_player_coach writes players.coach_id. The modal renders from the monolith
+  // `players`, the roster behind it from the paginated read — both must refetch or
+  // the dropdown snaps back to the old value on reopen.
+  playerCoach: [queryKeys.players, queryKeys.playersPage] as const,
   news: [queryKeys.news] as const,
   // set_purchase_paid flips whether a purchase counts as revenue. The Dashboard's
   // revenue and PlayerDetailModal read the monolith `purchases`; the Credit Requests

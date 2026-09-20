@@ -163,3 +163,48 @@ describe('nextRoute — the trap is escapable', () => {
     expect(nextRoute('signed_out', '(auth)', 'not-a-player')).toBeNull(); // free to reach sign-in
   });
 });
+
+describe('nextRoute — the coach fork (phase 1)', () => {
+  // `isCoach` is players.coach_id != null, resolved from the player row the gate
+  // already fetches. The whole fork lives here, so it is provable with no UI.
+  it('sends a ready COACH into the coach shell, and a ready player into the tabs', () => {
+    expect(nextRoute('ready', '(auth)', 'sign-in', true)).toBe('/(coach)');
+    expect(nextRoute('ready', '(auth)', 'sign-in', false)).toBe('/(tabs)');
+  });
+
+  it('defaults to the player shell when isCoach is not supplied at all', () => {
+    // Every existing call site passes three arguments; none of them may change meaning.
+    expect(nextRoute('ready', '(auth)', 'sign-in')).toBe('/(tabs)');
+  });
+
+  it('leaves each of them alone once they are in their own shell', () => {
+    expect(nextRoute('ready', '(coach)', 'index', true)).toBeNull();
+    expect(nextRoute('ready', '(tabs)', 'index', false)).toBeNull();
+  });
+
+  it('moves anyone standing in the wrong shell to theirs', () => {
+    // A link granted or revoked mid-session, or a stale deep link.
+    expect(nextRoute('ready', '(tabs)', 'index', true)).toBe('/(coach)');
+    expect(nextRoute('ready', '(coach)', 'index', false)).toBe('/(tabs)');
+  });
+
+  it('does not bounce a coach out of the onboarding steps', () => {
+    // The S9 exemption must survive the fork: trial-grant and profile-setup are
+    // post-session steps under (auth), and a coach is still a player who signed up.
+    expect(nextRoute('ready', '(auth)', 'trial-grant', true)).toBeNull();
+    expect(nextRoute('ready', '(auth)', 'profile-setup', true)).toBeNull();
+  });
+
+  it('routes an offline coach to the coach shell only when stuck on an auth screen', () => {
+    expect(nextRoute('offline', '(auth)', 'sign-in', true)).toBe('/(coach)');
+    expect(nextRoute('offline', '(coach)', 'index', true)).toBeNull();
+    expect(nextRoute('offline', '(tabs)', 'index', false)).toBeNull();
+  });
+
+  it('is irrelevant before a session exists — the coach flag never overrides the gates', () => {
+    expect(nextRoute('loading', '(tabs)', 'index', true)).toBeNull();
+    expect(nextRoute('signed_out', '(coach)', 'index', true)).toBe('/(auth)/sign-in');
+    expect(nextRoute('needs_profile', '(coach)', 'index', true)).toBe('/(auth)/profile-setup');
+    expect(nextRoute('not_a_player', '(coach)', 'index', true)).toBe('/(auth)/not-a-player');
+  });
+});

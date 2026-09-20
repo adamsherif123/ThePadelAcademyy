@@ -75,6 +75,8 @@ export function deriveStatus(args: {
 
 /** Route groups/steps the guard reasons about (from expo-router segments). */
 const AUTH_GROUP = '(auth)';
+const TABS_GROUP = '(tabs)';
+const COACH_GROUP = '(coach)';
 
 /**
  * Where the guard should `router.replace` to, or null to stay put. Encodes exactly
@@ -95,15 +97,23 @@ export function nextRoute(
   status: SessionStatus,
   segment0: string | undefined,
   step: string | undefined,
+  isCoach = false,
 ): string | null {
   const inAuth = segment0 === AUTH_GROUP;
+  // A linked coach's app shell is a DIFFERENT route group, not a variation of the
+  // player tabs. Same seam, one extra fact — so the fork is decided by the same pure
+  // function the guard already trusts, and is provable without rendering anything.
+  const shell = isCoach ? '/(coach)' : '/(tabs)';
   switch (status) {
     case 'loading':
       return null;
     case 'signed_out':
       return inAuth ? null : '/(auth)/sign-in';
     case 'offline':
-      return inAuth ? '/(tabs)' : null;
+      // `isCoach` here comes from the CACHED player row, so an offline coach still
+      // lands in the coach shell; an unverifiable one falls back to the player
+      // shell, exactly as before this branch existed.
+      return inAuth ? shell : null;
     case 'not_a_player':
       // Hold an admin credential on the refusal screen (which carries sign-out). Never
       // profile-setup — attempting the bounce there was bug #2.
@@ -113,7 +123,13 @@ export function nextRoute(
       // trap). This is also what carries a freshly-verified user off the password screen.
       return step === 'profile-setup' ? null : '/(auth)/profile-setup';
     case 'ready':
-      if (inAuth && step !== 'trial-grant' && step !== 'profile-setup') return '/(tabs)';
+      if (inAuth && step !== 'trial-grant' && step !== 'profile-setup') return shell;
+      // Already inside the app: send anyone standing in the wrong shell to theirs.
+      // This is what makes the fork hold for a link changed mid-session, and what
+      // stops a stale deep link dropping a coach into the booking app (or a player
+      // into the coach app) and leaving them there.
+      if (segment0 === COACH_GROUP && !isCoach) return '/(tabs)';
+      if (segment0 === TABS_GROUP && isCoach) return '/(coach)';
       return null;
   }
 }

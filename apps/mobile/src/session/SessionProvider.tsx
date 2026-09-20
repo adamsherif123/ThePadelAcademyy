@@ -62,6 +62,13 @@ interface SessionValue {
   /** The signed-in email (for the profile screen + the refusal message). null if none. */
   email: string | null;
   player: Player | null;
+  /**
+   * The coaches row this login IS, or null for an ordinary player — straight from the
+   * player row the gate already fetches, so the fork costs no extra request.
+   */
+  coachId: Player['coachId'];
+  /** `coachId != null`. The one fact the routing fork reads (see authMachine). */
+  isCoach: boolean;
   /** Sign in a RETURNING user. Returns {ok:false,error} on bad credentials — never throws. */
   signInWithEmail: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   /** Create the auth user (GoTrue owns the password). `taken` when the email already exists. */
@@ -300,6 +307,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       now,
       email: session?.user.email ?? null,
       player,
+      coachId: player?.coachId ?? null,
+      isCoach: player?.coachId != null,
       signInWithEmail,
       signUpWithEmail,
       completeProfile,

@@ -62,14 +62,14 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
  * device.
  */
 function useAuthGuard() {
-  const { status } = useSession();
+  const { status, isCoach } = useSession();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
-    const target = nextRoute(status, segments[0], segments[1]);
+    const target = nextRoute(status, segments[0], segments[1], isCoach);
     if (target) router.replace(target as never);
-  }, [status, segments, router]);
+  }, [status, segments, router, isCoach]);
 }
 
 /**
@@ -130,6 +130,9 @@ function RootNavigator() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
+        {/* Phase 1 stub — a linked coach routes here instead of (tabs). The real
+            coach screens (schedule / hours / roster) are phase 3. */}
+        <Stack.Screen name="(coach)" />
         <Stack.Screen name="wallet" />
         <Stack.Screen name="buy-credits" />
         <Stack.Screen name="package/[id]" />

@@ -36,6 +36,7 @@ export function rowToPlayer(r: Row): Player {
     phone: nstr(r.phone),
     email: nstr(r.email),
     trainedBefore: r.trained_before == null ? null : (r.trained_before as boolean),
+    coachId: nstr(r.coach_id) as Player['coachId'],
     name: str(r.name),
     gender: str(r.gender) as Player['gender'],
     level: str(r.level) as Player['level'],
