@@ -206,13 +206,18 @@ reset role;
 -- `from … credit_batches … for update` lock, this set_eq FAILS — forcing the author
 -- to confirm it uses the same ordered discipline (or it reopens the deadlock).
 -- (Single-row `update credit_batches` in book_slot etc. locks one row and is fine.)
+-- delete_credit_batch is admitted on exactly that ground: it locks ONE row, BY
+-- PRIMARY KEY, so it cannot take two batch locks and therefore cannot be either
+-- half of an ABBA cycle between batches. It holds the lock to stop a booking
+-- being inserted against the batch it is about to delete. A future RPC that locks
+-- more than one batch still has to order by credit_batch_id, and still trips this.
 select set_eq(
   $$ select p.proname
        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
       where n.nspname = 'public'
         and p.prosrc ~* 'from\s+public\.credit_batches[^;]*for\s+update' $$,
-  $$ values ('cancel_session') $$,
-  'cancel_session is the ONLY function locking credit_batches FOR UPDATE (S7b.1 ordered-lock invariant)'
+  $$ values ('cancel_session'), ('delete_credit_batch') $$,
+  'only cancel_session and delete_credit_batch lock credit_batches FOR UPDATE (S7b.1 ordered-lock invariant)'
 );
 
 select * from finish();

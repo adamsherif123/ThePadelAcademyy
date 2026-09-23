@@ -710,6 +710,28 @@ export async function deletePackageRpc(id: PackageId): Promise<DeletePackageResu
     : { ok: false, reason: d.reason as DeletePackageReason };
 }
 
+export type DeleteCreditBatchReason = 'not_admin' | 'batch_missing' | 'batch_has_bookings' | 'batch_in_use';
+export type DeleteCreditBatchResult =
+  | { ok: true; deletedRequests: number; deletedPurchases: number }
+  | { ok: false; reason: DeleteCreditBatchReason; bookings: number };
+/**
+ * Removes a credit batch and the purchase / credit request behind it, via the
+ * delete_credit_batch RPC — the undo for a payment recorded against the wrong
+ * player. Refuses (`batch_has_bookings`, with the count) if the batch was ever
+ * booked against, because those bookings are the attendance history coach hours
+ * are computed from.
+ */
+export async function deleteCreditBatchRpc(batchId: string): Promise<DeleteCreditBatchResult> {
+  const d = await callRpc('delete_credit_batch', { p_batch_id: batchId });
+  return d.ok
+    ? {
+        ok: true,
+        deletedRequests: Number(d.deleted_requests ?? 0),
+        deletedPurchases: Number(d.deleted_purchases ?? 0),
+      }
+    : { ok: false, reason: d.reason as DeleteCreditBatchReason, bookings: Number(d.bookings ?? 0) };
+}
+
 export type RescheduleReason =
   | 'not_admin' | 'slot_missing' | 'slot_cancelled'
   | 'capacity_below_booked' | 'end_before_start' | 'in_past' | 'coach_conflict';

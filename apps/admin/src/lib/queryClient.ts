@@ -81,6 +81,18 @@ export const TOUCHED = {
   // the dropdown snaps back to the old value on reopen.
   playerCoach: [queryKeys.players, queryKeys.playersPage] as const,
   news: [queryKeys.news] as const,
+  // delete_credit_batch removes a batch AND (usually) its purchase and credit
+  // request, so it touches every surface those three appear on: the wallet, the
+  // Dashboard's revenue, the requests queue and its counts, and the player rows
+  // that show a credit total.
+  creditBatchDelete: [
+    queryKeys.batches,
+    queryKeys.purchases,
+    queryKeys.creditRequests,
+    queryKeys.creditRequestsPage,
+    queryKeys.creditRequestStatusCounts,
+    queryKeys.playersPage,
+  ] as const,
   // set_purchase_paid flips whether a purchase counts as revenue. The Dashboard's
   // revenue and PlayerDetailModal read the monolith `purchases`; the Credit Requests
   // page reads the purchase EMBEDDED in its paginated rows — so both must refetch, or

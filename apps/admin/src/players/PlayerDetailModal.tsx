@@ -22,10 +22,11 @@ import type {
   SessionSlot,
   TrainingType,
 } from '@tpa/types';
-import { AlertTriangle, ArrowLeft, Banknote, Gift, Medal, Pencil } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Banknote, Gift, Medal, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { recordCashPurchase } from '../data/cashPurchase';
+import { deleteCreditBatch } from '../data/creditBatch';
 import { grantCredits } from '../data/grant';
 import { setPlayerCoach } from '../data/playerCoach';
 import { sessionRetailValue, SELLABLE_TYPES } from '../data/packages';
@@ -73,6 +74,13 @@ const GRANT_ERROR: Record<string, string> = {
   network: GENERIC_ERROR,
 };
 
+const DELETE_BATCH_ERROR: Record<string, string> = {
+  batch_missing: 'That batch is already gone. Close and reopen to refresh.',
+  batch_in_use: 'Something still references this batch, so nothing was removed.',
+  not_admin: 'You don’t have permission.',
+  network: GENERIC_ERROR,
+};
+
 const CASH_ERROR: Record<string, string> = {
   amount_below_one: 'The amount received must be above zero.',
   package_missing: 'Pick a package.',
@@ -115,6 +123,9 @@ export function PlayerDetailModal({
 }: PlayerDetailProps) {
   const { now } = useSession();
   const [view, setView] = useState<View>('main');
+  // Which batch the owner is about to remove. Its own state rather than a View,
+  // because the confirm has to carry WHICH batch — a bare mode string cannot.
+  const [deleting, setDeleting] = useState<CreditBatch | null>(null);
 
   if (view === 'edit')
     return <EditView player={player} bookings={bookings} slots={slots} onBack={() => setView('main')} onClose={onClose} />;
@@ -122,6 +133,15 @@ export function PlayerDetailModal({
     return <GrantView player={player} packages={packages} onBack={() => setView('main')} onClose={onClose} />;
   if (view === 'cash')
     return <CashView player={player} now={now} packages={packages} onBack={() => setView('main')} onClose={onClose} />;
+  if (deleting)
+    return (
+      <BatchDeleteConfirm
+        batch={deleting}
+        purchase={deleting.purchaseId ? purchases.find((p) => p.id === deleting.purchaseId) ?? null : null}
+        bookingCount={bookings.filter((b) => b.creditBatchId === deleting.id).length}
+        onBack={() => setDeleting(null)}
+      />
+    );
 
   const walletBatches = batchesForPlayerSorted(batches, player.id);
   const bookingRows = bookingsForPlayer(bookings, player.id)
@@ -198,6 +218,13 @@ export function PlayerDetailModal({
                       <span className={styles.expiry} data-state={state}>
                         {formatExpiry(b.expiresAt, now)}
                       </span>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        icon={Trash2}
+                        aria-label={`Delete this ${TRAINING_LABEL[b.trainingType].toLowerCase()} batch`}
+                        onClick={() => setDeleting(b)}
+                      />
                     </div>
                   </div>
                 );
@@ -630,6 +657,113 @@ function CashView({
             {error}
           </p>
         ) : null}
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * Remove a credit batch, and the purchase / credit request behind it.
+ *
+ * The undo for a payment recorded against the wrong player, or a request
+ * approved twice. It is the only destructive money action in the admin, so the
+ * confirm spells out every row that will disappear rather than asking "are you
+ * sure?" about an unnamed thing.
+ *
+ * A batch that has been booked against cannot be removed at all, and the dialog
+ * says so BEFORE the owner commits to the click — the server refuses it either
+ * way (batch_has_bookings), but finding that out from an error message after
+ * pressing a red button is a worse way to learn it. Those bookings are the
+ * attendance history coach hours are paid from; deleting the batch would rewrite
+ * what somebody is owed.
+ */
+function BatchDeleteConfirm({
+  batch,
+  purchase,
+  bookingCount,
+  onBack,
+}: {
+  batch: CreditBatch;
+  purchase: Purchase | null;
+  bookingCount: number;
+  onBack: () => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const blocked = bookingCount > 0;
+  const typeLabel = TRAINING_LABEL[batch.trainingType].toLowerCase();
+
+  const onDelete = async () => {
+    setError(null);
+    setBusy(true);
+    const res = await deleteCreditBatch(batch.id);
+    setBusy(false);
+    if (res.ok) {
+      onBack();
+      return;
+    }
+    // The server is the authority on bookings, not the count this dialog was
+    // opened with: one could have landed in between.
+    if (res.reason === 'batch_has_bookings') {
+      setError('Someone has booked with these credits since you opened this. Nothing was removed.');
+      return;
+    }
+    setError(DELETE_BATCH_ERROR[res.reason] ?? 'Could not remove the batch.');
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onBack}
+      eyebrow="Wallet"
+      title={blocked ? 'Can’t remove these credits' : 'Remove these credits?'}
+      footer={
+        <>
+          <Button variant="secondary" icon={ArrowLeft} onClick={onBack} disabled={busy}>
+            Back
+          </Button>
+          {!blocked ? (
+            <Button variant="destructive" icon={Trash2} onClick={() => void onDelete()} disabled={busy}>
+              {busy ? 'Removing…' : 'Remove'}
+            </Button>
+          ) : null}
+        </>
+      }
+    >
+      <div className={styles.confirm}>
+        <p className={styles.confirmBatch}>
+          {batch.quantityRemaining} of {batch.quantityTotal} {typeLabel} credit
+          {batch.quantityTotal === 1 ? '' : 's'} · {SOURCE_LABEL[batch.source]}
+          {batch.source === 'admin_grant' && batch.note ? ` · ${batch.note}` : ''}
+        </p>
+
+        {blocked ? (
+          <p className={styles.confirmWarn}>
+            {bookingCount} booking{bookingCount === 1 ? ' has' : 's have'} already been made against this
+            batch, so it can’t be removed — those bookings are what coach hours are counted from. Cancel
+            the booking{bookingCount === 1 ? '' : 's'} first if this really was a mistake.
+          </p>
+        ) : (
+          <>
+            <p className={styles.confirmLead}>This permanently removes:</p>
+            <ul className={styles.confirmList}>
+              <li>
+                the {batch.quantityRemaining} unused {typeLabel} credit
+                {batch.quantityRemaining === 1 ? '' : 's'} in this batch
+              </li>
+              {purchase ? (
+                <li>
+                  its {METHOD_LABEL[purchase.paymentMethod].toLowerCase()} purchase of{' '}
+                  {formatPiastres(purchase.amount)} — which also takes it out of revenue
+                </li>
+              ) : null}
+              {purchase ? <li>the credit request behind it, if it came from one</li> : null}
+            </ul>
+            <p className={styles.confirmWarn}>This can’t be undone.</p>
+          </>
+        )}
+
+        {error ? <p className={styles.error}>{error}</p> : null}
       </div>
     </Modal>
   );
