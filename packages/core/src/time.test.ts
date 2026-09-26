@@ -1,4 +1,4 @@
-import type { AvailabilityTemplate, IsoInstant, LocalTime } from '@tpa/types';
+import type { AvailabilityTemplate, IsoInstant, LocalTime, LocationId } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -37,6 +37,7 @@ const groupTemplate: AvailabilityTemplate = {
   gender: 'men',
   level: 'beginner',
   isActive: true,
+  locationId: 'loc_oro_plaza' as LocationId,
 };
 
 describe('materializeTemplateSlot across the Cairo DST boundary', () => {

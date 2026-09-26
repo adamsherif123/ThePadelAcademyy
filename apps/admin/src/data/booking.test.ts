@@ -108,6 +108,14 @@ describe('classifyAdminBooking (a preview over canBookSlot)', () => {
     expect(v).toEqual({ kind: 'blocked', reason: 'no_usable_credit' });
   });
 
+  // 065/066: the admin needs to be told WHICH branch, or the chip reads
+  // "Not bookable" next to a visible credit count and looks like a bug.
+  it('a credit at another branch blocks, and the verdict carries that branch', () => {
+    const elsewhere = { ...groupBatch, locationId: 'loc_branch_b' as CreditBatch['locationId'] };
+    const v = classifyAdminBooking(mkSlot(), mkPlayer(), [elsewhere], now, false, 'group');
+    expect(v).toEqual({ kind: 'blocked', reason: 'credit_wrong_location', locationId: 'loc_branch_b' });
+  });
+
   it('an expired credit is not usable → blocked', () => {
     const expired = { ...groupBatch, expiresAt: daysFrom(-1) };
     const v = classifyAdminBooking(mkSlot(), mkPlayer(), [expired], now, false, 'group');

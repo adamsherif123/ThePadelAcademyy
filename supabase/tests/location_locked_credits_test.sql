@@ -10,7 +10,7 @@
 -- Run with: supabase test db
 -- ============================================================================
 begin;
-select plan(38);
+select plan(43);
 
 insert into auth.users (id) values
   ('0c1c1c01-0000-0000-0000-0000000c1c01'),   -- admin
@@ -80,11 +80,20 @@ select is((select location_id from public.purchases where id = 'pu_llc_legacy'),
 -- ════════════════════════════════════════════════════════════════════════════
 -- credit_requests: derived, and one pending PER BRANCH
 -- ════════════════════════════════════════════════════════════════════════════
-insert into public.credit_requests (id, player_id, package_id, payment_method, status, created_at)
-  values ('cr_llc_1', 'pl_llc_p1', 'pk_llc_def', 'instapay', 'pending', now());
-select is((select location_id from public.credit_requests where id = 'cr_llc_1'), 'loc_oro_plaza',
-  'a credit_request derives its branch from the package');
+-- AS THE PLAYER (066): a direct credit_requests insert is a path clients hold
+-- INSERT on, so it is asserted as `authenticated`, not as postgres. Run as
+-- postgres these three passed while proving nothing about a user — the same gap
+-- that let the unscoped already_pending guard in request_credits survive 065.
+-- The 1.4 header is set because pk_llc_b is at a non-default branch and 063's
+-- policy hides it from a legacy client.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"0c1c1c02-0000-0000-0000-0000000c1c02"}', true);
+select set_config('request.headers', '{"x-tpa-client":"mobile/1.4.0"}', true);
 
+select lives_ok(
+  $$ insert into public.credit_requests (id, player_id, package_id, payment_method, status, created_at)
+     values ('cr_llc_1', 'pl_llc_p1', 'pk_llc_def', 'instapay', 'pending', now()) $$,
+  'a player may lodge a request at the default branch');
 select lives_ok(
   $$ insert into public.credit_requests (id, player_id, package_id, payment_method, status, created_at)
      values ('cr_llc_2', 'pl_llc_p1', 'pk_llc_b', 'instapay', 'pending', now()) $$,
@@ -93,6 +102,37 @@ select throws_ok(
   $$ insert into public.credit_requests (id, player_id, package_id, payment_method, status, created_at)
      values ('cr_llc_3', 'pl_llc_p1', 'pk_llc_def', 'instapay', 'pending', now()) $$,
   '23505', null, 'but a second pending request at the SAME branch is still refused');
+reset role;
+
+select is((select location_id from public.credit_requests where id = 'cr_llc_1'), 'loc_oro_plaza',
+  'a credit_request derives its branch from the package');
+
+-- ── and the same rule through the RPC, which is what the app actually calls ──
+-- 066: request_credits enforced one pending per player GLOBALLY while the index
+-- allowed one per branch. Shape assertions (has_index above) could not see that;
+-- only calling the RPC twice at two branches can.
+delete from public.credit_requests where id in ('cr_llc_1', 'cr_llc_2');
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"0c1c1c02-0000-0000-0000-0000000c1c02"}', true);
+select set_config('request.headers', '{"x-tpa-client":"mobile/1.4.0"}', true);
+select is(public.request_credits('pk_llc_def', 'instapay', null)->>'ok', 'true',
+  'request_credits at the default branch succeeds');
+select is(public.request_credits('pk_llc_b', 'instapay', null)->>'ok', 'true',
+  'and at a SECOND branch it also succeeds — one pending PER BRANCH, not globally');
+select is(public.request_credits('pk_llc_def', 'instapay', null)->>'reason', 'already_pending',
+  'but a second request at the SAME branch is already_pending');
+reset role;
+
+-- A LEGACY client with a pending default-branch request asking for a non-default
+-- package gets update_required, not already_pending. Before 066 the unscoped
+-- pre-check ran first and masked it.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"0c1c1c02-0000-0000-0000-0000000c1c02"}', true);
+select set_config('request.headers', '{}', true);
+select is(public.request_credits('pk_llc_b', 'instapay', null)->>'reason', 'update_required',
+  'a legacy client is told to update, not that it already has something pending');
+reset role;
+delete from public.credit_requests where player_id = 'pl_llc_p1';
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- credit_batches + the composite FKs

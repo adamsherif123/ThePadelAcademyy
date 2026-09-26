@@ -1,7 +1,9 @@
-import type { AvailabilityTemplate, IsoInstant, LocalTime, SessionSlot } from '@tpa/types';
+import type { AvailabilityTemplate, IsoInstant, LocalTime, LocationId, SessionSlot } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
 import { isDayOpen, templateCoveredWeekdays } from './availability';
+
+const LOC = 'loc_oro_plaza' as LocationId;
 
 const sunTemplate: AvailabilityTemplate = {
   id: 'at_sun' as AvailabilityTemplate['id'],
@@ -14,6 +16,7 @@ const sunTemplate: AvailabilityTemplate = {
   gender: 'men',
   level: 'beginner',
   isActive: true,
+  locationId: LOC,
 };
 
 const pausedMonTemplate: AvailabilityTemplate = { ...sunTemplate, id: 'at_mon' as AvailabilityTemplate['id'], weekday: 1, isActive: false };
@@ -33,6 +36,7 @@ function slotOn(dateIso: string, status: SessionSlot['status'] = 'published'): S
     templateId: null,
     manuallyConfirmedAt: null,
     setByBookingAt: null,
+    locationId: LOC,
   };
 }
 

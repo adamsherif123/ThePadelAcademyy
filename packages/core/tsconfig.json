@@ -9,11 +9,18 @@
     "noImplicitOverride": true,
     "noEmit": true,
     "skipLibCheck": true,
+    // Needed now that tests are in the program: sql-parity.test.ts and
+    // route-groups.test.ts read the repo off disk. Without this, `moduleResolution:
+    // "Bundler"` treats `node:fs` as an absolute URI and skips it, so readdirSync
+    // is `any` and every callback parameter becomes an implicit any.
+    "types": ["node"],
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src"],
-  "exclude": ["src/**/*.test.ts"]
+  // Tests are INCLUDED on purpose. They were excluded, which meant `tsc --noEmit`
+  // never saw them — a Session 4 arity change to buildSignupGrant compiled clean
+  // and only surfaced at runtime as "Invalid time value".
+  "include": ["src"]
 }

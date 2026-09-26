@@ -725,6 +725,9 @@ O_B_NOCRED=$(grep -lFx no_usable_credit "$TMP"/ob_*.txt 2>/dev/null | wc -l | tr
 # commits first the credit is already spent, and "no usable credit" is then the
 # honest answer. What must never appear is a WIN, a spent credit, or any OTHER
 # reason — a slot_full or a raw error would mean the mismatch reached the seat.
+# O_A_WINS was computed and never asserted, so "the A booking always wins" was
+# implied by the credit count rather than stated. State it.
+check "O: the A-branch booking wins every time"                              "$O_A_WINS" "$O_K"
 check "O: every B attempt is credit_wrong_location OR no_usable_credit — nothing else" "$((O_B_WRONG + O_B_NOCRED))" "$O_K"
 echo "  info — O: $O_B_WRONG/$O_K refused as wrong-branch; $O_B_NOCRED/$O_K as no-credit (A had already committed) — both orderings are legitimate"
 check "O: exactly one credit spent per player (never double-spent)"          "$(sql "select coalesce(sum(quantity_total-quantity_remaining),0) from public.credit_batches where id like 'cbr_o%'")" "$O_K"
@@ -756,8 +759,18 @@ wait
 
 P_V=$(grep -lFx WIN "$TMP"/pv_*.txt 2>/dev/null | wc -l | tr -d ' ')
 P_X=$(grep -lFx WIN "$TMP"/px_*.txt 2>/dev/null | wc -l | tr -d ' ')
+# COUNT THE REFUSAL REASONS, not just the absence of wins. "never wins" and
+# "credit untouched" are both satisfied by a racer that never ran at all — a
+# mistyped uuid, a crashed connection — so on their own they prove nothing.
+# Requiring K files whose contents are exactly credit_wrong_location proves the
+# racer reached the location check and was turned away by it. Unlike O, there is
+# no legitimate second reason here: the valid racer takes the seat, so the
+# mismatch can never see no_usable_credit (its own credit is untouched) and
+# never slot_full (the location check answers first).
+P_X_WRONG=$(grep -lFx credit_wrong_location "$TMP"/px_*.txt 2>/dev/null | wc -l | tr -d ' ')
 check "P: the VALID racer wins every seat — the mismatch never blocks them"   "$P_V" "$P_K"
 check "P: the mismatched racer never wins"                                    "$P_X" "0"
+check "P: and every mismatched racer actually RAN and said credit_wrong_location" "$P_X_WRONG" "$P_K"
 check "P: the mismatched player's credit is untouched"                        "$(sql "select coalesce(sum(quantity_total-quantity_remaining),0) from public.credit_batches where id like 'cbr_px%'")" "0"
 check "P: every slot ends at exactly 1/1"                                     "$(sql "select count(*) from public.session_slots where id like 'slr_p%' and booked_count <> 1")" "0"
 

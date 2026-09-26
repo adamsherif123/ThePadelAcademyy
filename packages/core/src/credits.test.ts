@@ -32,6 +32,7 @@ const pkg = (over: Partial<Package> = {}): Package => ({
   price: 280000 as Package['price'],
   name: 'Group · 8 Sessions',
   isActive: true,
+  locationId: LOC,
   ...over,
 });
 
@@ -169,6 +170,7 @@ describe('unusedCreditValue', () => {
     expiresAt: daysFrom(30),
     createdAt: NOW,
     note: null,
+    locationId: LOC,
     ...over,
   });
   const purchase = (over: Partial<Purchase> = {}): Purchase => ({
@@ -182,6 +184,7 @@ describe('unusedCreditValue', () => {
     gatewayOrderId: null,
     gatewayTransactionId: null,
     paid: true,
+    locationId: LOC,
     ...over,
   });
   const iPkg = pkg({ id: 'pk_i4' as PackageId, trainingType: 'individual', sessionCount: 4, price: 600000 as Package['price'] });

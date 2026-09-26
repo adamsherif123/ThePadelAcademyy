@@ -43,7 +43,12 @@ import { runRpc } from './queries';
 // --- Add-player classification: a thin preview over canBookSlot (pure) ---
 export type AdminBookVerdict =
   | { kind: 'ok'; creditBatchId: CreditBatch['id']; trainingType: TrainingType }
-  | { kind: 'blocked'; reason: BookBlockReason | 'already_booked' };
+  /**
+   * `locationId` rides along only for credit_wrong_location — it is the branch the
+   * player's credits ARE for, so the admin can be told which one rather than just
+   * "not bookable". Every other reason leaves it undefined.
+   */
+  | { kind: 'blocked'; reason: BookBlockReason | 'already_booked'; locationId?: CreditBatch['locationId'] };
 
 export function classifyAdminBooking(
   slot: SessionSlot,
@@ -56,7 +61,7 @@ export function classifyAdminBooking(
   if (alreadyBooked) return { kind: 'blocked', reason: 'already_booked' };
   const raw = canBookSlot(slot, player, batches, now, chosenType);
   if (raw.ok) return { kind: 'ok', creditBatchId: raw.creditBatchId, trainingType: raw.trainingType };
-  return { kind: 'blocked', reason: raw.reason };
+  return { kind: 'blocked', reason: raw.reason, locationId: raw.locationId };
 }
 
 /** Does the player already hold a NON-CANCELLED booking on this slot? (Pure.) */

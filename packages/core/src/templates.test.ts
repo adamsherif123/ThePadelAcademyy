@@ -1,4 +1,4 @@
-import type { AvailabilityTemplateId, LocalTime } from '@tpa/types';
+import type { AvailabilityTemplateId, LocalTime, LocationId } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
 import { buildAvailabilityTemplate, templateRequiresGenderLevel, type TemplateDraft } from './templates';
@@ -14,6 +14,7 @@ const baseDraft: TemplateDraft = {
   capacity: 4,
   gender: 'men',
   level: 'beginner',
+  locationId: 'loc_oro_plaza' as LocationId,
   isActive: true,
 };
 

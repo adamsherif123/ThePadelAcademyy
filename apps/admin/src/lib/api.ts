@@ -499,6 +499,9 @@ export async function removeBookingRpc(bookingId: Booking['id'], refund: boolean
 export type AdminBookReason =
   | 'not_admin' | 'slot_missing' | 'player_missing' | 'slot_cancelled' | 'slot_in_past'
   | 'no_usable_credit' | 'slot_full' | 'already_booked'
+  // 065: the credit is for another branch. The RPC returns location_id and
+  // location_name alongside it; the admin resolves the name from `locations`.
+  | 'credit_wrong_location'
   | 'type_required' | 'invalid_type' | 'type_mismatch';
 export type AdminBookResult =
   | { ok: true; bookingId: string; creditBatchId: string; overridden: boolean }

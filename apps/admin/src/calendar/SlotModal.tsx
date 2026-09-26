@@ -39,6 +39,7 @@ import {
   classifyAdminBooking,
   isActivelyBooked,
   removeBooking,
+  type AdminBookVerdict,
 } from '../data/booking';
 import { cancelSession } from '../data/cancelSession';
 import { confirmSession } from '../data/confirm';
@@ -82,6 +83,9 @@ import styles from './SlotModal.module.css';
 const BLOCK_TEXT: Record<string, string> = {
   slot_full: 'Session full',
   no_usable_credit: 'No usable credit',
+  // Overridden by blockLabel() when the branch is known — this is the fallback
+  // for the case where it is not (a batch whose location has since been removed).
+  credit_wrong_location: 'Credits are for another location',
   already_booked: 'Already booked',
   slot_in_past: 'Session started',
   slot_cancelled: 'Session cancelled',
@@ -108,6 +112,9 @@ const REASON_COPY: Record<string, string> = {
   slot_full: 'This session is full.',
   already_booked: 'That player is already booked on this session.',
   no_usable_credit: 'That player has no usable credit for this session.',
+  // 065: credits are spendable only at the branch they were bought for, and an
+  // admin cannot override that — p_override only ever waived gender.
+  credit_wrong_location: 'That player’s credits are for a different location, so they can’t pay for this session.',
   type_mismatch: 'Someone just started a different session type here — refresh and try again.',
   type_required: 'Choose a session type first.',
   invalid_type: 'That session type isn’t valid — please try again.',
@@ -120,6 +127,21 @@ const REASON_COPY: Record<string, string> = {
   network: 'Something went wrong. Please try again.',
 };
 const copyFor = (reason: string): string => REASON_COPY[reason] ?? 'Something went wrong. Please try again.';
+
+/**
+ * The short chip beside a player in the add-player list. Only
+ * credit_wrong_location is branch-specific: naming the branch turns "not
+ * bookable" into something the admin can act on ("grant them credit here", or
+ * "book them at Oro Plaza instead"). Falls back to the generic BLOCK_TEXT line
+ * when the branch can't be resolved.
+ */
+function blockLabel(verdict: AdminBookVerdict & { kind: 'blocked' }, locations: Location[]): string {
+  if (verdict.reason === 'credit_wrong_location' && verdict.locationId) {
+    const name = locations.find((l) => l.id === verdict.locationId)?.name;
+    if (name) return `Credits are for ${name}`;
+  }
+  return BLOCK_TEXT[verdict.reason] ?? 'Not bookable';
+}
 
 const pad = (n: number) => String(n).padStart(2, '0');
 /** Sane session durations (a padel session isn't 12 hours — the select IS the guard). */
@@ -326,7 +348,7 @@ export function SlotModal({
         ) : (
           <span className={styles.blocked}>
             <Ban size={13} aria-hidden />
-            {BLOCK_TEXT[verdict.reason] ?? 'Not bookable'}
+            {blockLabel(verdict, locations)}
           </span>
         )}
       </>
