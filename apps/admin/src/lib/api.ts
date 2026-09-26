@@ -692,11 +692,24 @@ export function updateCoach(id: CoachId, fields: Partial<CoachFields>): Promise<
   return writeRow(supabase.from('coaches').update(patch).eq('id', id).select().single(), rowToCoach, 'Update coach');
 }
 
-export interface PackageFields { trainingType: TrainingType; sessionCount: number; price: number; name: string; isActive: boolean }
+export interface PackageFields { locationId: LocationId; trainingType: TrainingType; sessionCount: number; price: number; name: string; isActive: boolean }
+/**
+ * location_id is sent EXPLICITLY, like insertSlots and templateRow.
+ *
+ * Omitting it does not quietly default: the row hits the fill-default trigger,
+ * whose body resolves `tpa.` names at run time, and no client role holds USAGE
+ * on schema tpa — so the insert fails with 42501 permission denied for schema
+ * tpa. That is what package creation has been doing in the live admin since
+ * migration 062 shipped.
+ *
+ * updatePackage below deliberately has no location_id in its patch: a package's
+ * branch is immutable (062's trigger), and credits already sold against it would
+ * otherwise change where they work.
+ */
 export function insertPackage(f: PackageFields): Promise<Package> {
   const id = newId(ID_PREFIXES.package);
   return writeRow(
-    supabase.from('packages').insert({ id, training_type: f.trainingType, session_count: f.sessionCount, price: f.price, name: f.name, is_active: f.isActive }).select().single(),
+    supabase.from('packages').insert({ id, location_id: f.locationId, training_type: f.trainingType, session_count: f.sessionCount, price: f.price, name: f.name, is_active: f.isActive }).select().single(),
     rowToPackage, 'Save package');
 }
 export function updatePackage(id: PackageId, f: Partial<PackageFields>): Promise<Package> {

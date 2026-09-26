@@ -17,7 +17,7 @@
 -- Run with: supabase test db
 -- ============================================================================
 begin;
-select plan(52);
+select plan(55);
 
 insert into auth.users (id) values
   ('0e0e0e01-0000-0000-0000-00000000e001'),   -- admin
@@ -143,6 +143,14 @@ select has_index('public', 'session_slots', 'session_slots_starts_at_idx',
   'the date-only index is KEPT — the admin still scans across branches');
 
 -- The temporary stale-bundle fallback: a NULL insert lands at the default.
+--
+-- AS THE ADMIN, not as postgres. The original version of this ran as postgres,
+-- which holds USAGE on schema tpa and so could never see that the trigger's body
+-- could not resolve `tpa.default_location_id()` for a client role. It passed
+-- while package/slot/template creation was failing in the live admin with
+-- 42501. The role is the test.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"0e0e0e01-0000-0000-0000-00000000e001"}', true);
 insert into public.session_slots (id, coach_id, starts_at, ends_at, training_type, capacity, status, gender, level)
   values ('sl_nullloc', 'co_loc', now() + interval '2 days', now() + interval '2 days 1 hour', 'group', 4, 'published', 'men', 'beginner');
 select is((select location_id from public.session_slots where id = 'sl_nullloc'), 'loc_oro_plaza',
@@ -155,6 +163,7 @@ select is((select location_id from public.availability_templates where id = 'at_
 
 insert into public.packages (id, training_type, session_count, price, name, is_active)
   values ('pk_nullloc', 'group', 4, 100000, 'Four group', true);
+reset role;
 select is((select location_id from public.packages where id = 'pk_nullloc'), 'loc_oro_plaza',
   'a package inserted WITHOUT location_id lands at the default');
 
@@ -173,6 +182,25 @@ select throws_ok(
 select lives_ok(
   $$ update public.session_slots set capacity = 3 where id = 'sl_nullloc' $$,
   'an ordinary update on the same row is unaffected');
+
+-- ── the same three, AS AN ADMIN — and they do not all fail the same way ──
+-- session_slots is column-granted, so the refusal comes from the PRIVILEGE layer
+-- (42501) before the trigger is reached. availability_templates and packages
+-- hold table-level grants that cover every column, so there the trigger is the
+-- only thing standing in the way and the refusal is its P0001. Proving only the
+-- postgres path would have shown one mechanism and missed the other entirely.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"0e0e0e01-0000-0000-0000-00000000e001"}', true);
+select throws_ok(
+  $$ update public.session_slots set location_id = 'loc_test_b' where id = 'sl_nullloc' $$,
+  '42501', null, 'an ADMIN is refused at the privilege layer on session_slots.location_id');
+select throws_ok(
+  $$ update public.availability_templates set location_id = 'loc_test_b' where id = 'at_nullloc' $$,
+  'P0001', null, 'an ADMIN is refused by the TRIGGER on availability_templates (table-level grant covers the column)');
+select throws_ok(
+  $$ update public.packages set location_id = 'loc_test_b' where id = 'pk_nullloc' $$,
+  'P0001', null, 'an ADMIN is refused by the TRIGGER on packages (same reason)');
+reset role;
 
 -- reschedule_session moves the time; it must not be able to move the branch.
 select is(

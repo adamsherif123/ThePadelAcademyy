@@ -1,5 +1,5 @@
 import { PIASTRES_PER_EGP, formatPiastres } from '@tpa/core';
-import type { Package, Piastres, TrainingType } from '@tpa/types';
+import type { Package, Piastres, TrainingType, LocationId } from '@tpa/types';
 import { AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 
@@ -30,7 +30,19 @@ const suggestName = (type: TrainingType, sessions: number): string =>
  * only price / name / sellability change, and a price edit affects future purchases
  * only. Trial is not offered as a type at all — the app has no concept of selling one.
  */
-export function PackageModal({ pkg, onClose }: { pkg?: Package; onClose: () => void }) {
+export function PackageModal({
+  pkg,
+  locationId,
+  onClose,
+}: {
+  pkg?: Package;
+  /**
+   * The branch a NEW package is sold for. No picker here yet — per-location
+   * pricing is its own session — so the Packages page passes the default.
+   */
+  locationId: LocationId;
+  onClose: () => void;
+}) {
   const editing = pkg !== undefined;
   const [trainingType, setTrainingType] = useState<TrainingType>(pkg?.trainingType ?? 'group');
   const [sessionCount, setSessionCount] = useState<number>(pkg?.sessionCount ?? 4);
@@ -54,7 +66,9 @@ export function PackageModal({ pkg, onClose }: { pkg?: Package; onClose: () => v
   const onSubmit = async () => {
     setSaving(true);
     setError(null);
-    const draft = { trainingType, sessionCount, price, name, isActive };
+    // An edit keeps the package's own branch — it is immutable (062), and
+    // updatePackage's patch does not carry location_id anyway.
+    const draft = { locationId: pkg?.locationId ?? locationId, trainingType, sessionCount, price, name, isActive };
     const res: SavePackageResult = editing ? await updatePackage(pkg.id, draft) : await createPackage(draft);
     if (res.ok) {
       onClose();

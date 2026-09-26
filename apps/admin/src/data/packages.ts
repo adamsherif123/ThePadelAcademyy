@@ -1,5 +1,5 @@
 import { TRAINING_TYPES } from '@tpa/core';
-import type { CreditRequest, Package, PackageId, Piastres, Purchase, TrainingType } from '@tpa/types';
+import type { CreditRequest, Package, PackageId, Piastres, Purchase, TrainingType, LocationId } from '@tpa/types';
 
 import { deletePackageRpc, insertPackage, updatePackage as updatePackageApi, type DeletePackageResult } from '../lib/api';
 import { TOUCHED } from '../lib/queryClient';
@@ -91,6 +91,12 @@ export function packagesForType(packages: Package[], type: TrainingType): Packag
 // --- CRUD seam ---
 
 export interface PackageDraft {
+  /**
+   * The branch this package is sold for. There is no picker on the Packages page
+   * yet — per-location pricing is its own session — so the page passes the
+   * default branch, which is where every existing package was backfilled.
+   */
+  locationId: LocationId;
   trainingType: TrainingType;
   sessionCount: number;
   price: Piastres;
@@ -120,6 +126,7 @@ export async function createPackage(draft: PackageDraft): Promise<SavePackageRes
   if (invalid) return invalid;
   const res = await runWrite(
     () => insertPackage({
+      locationId: draft.locationId,
       trainingType: draft.trainingType, sessionCount: Math.floor(draft.sessionCount),
       price: draft.price, name: draft.name.trim(), isActive: draft.isActive,
     }),

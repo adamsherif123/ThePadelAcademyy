@@ -52,3 +52,11 @@ $$;
 
 comment on function tpa.fill_default_location() is
   'TEMPORARY (062, repaired in 064): lets a pre-1.4 client insert without location_id. SECURITY DEFINER because client roles hold no USAGE on schema tpa. Drop when 1.4 ships.';
+
+-- A trigger function needs no EXECUTE grant: the trigger fires it by OID, with
+-- no privilege check. Postgres grants EXECUTE to PUBLIC on every new function,
+-- so 062 left this one callable by anon and authenticated — harmless while it
+-- was an invoker (calling it outside a trigger just raises), but it is SECURITY
+-- DEFINER now, and a definer function reachable by PUBLIC is surface with no
+-- purpose. Taken back.
+revoke all on function tpa.fill_default_location() from public, anon, authenticated;

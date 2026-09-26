@@ -12,6 +12,7 @@ import {
   perSessionPrice,
   setPackageSellable,
 } from '../data/packages';
+import { creationLocationId } from '../data/locations';
 import { combine, useAdminData, useCreditRequests } from '../data/queries';
 import { PackageModal } from '../packages/PackageModal';
 import { Button, ErrorView, LoadingView, Modal, PageHeader, Toggle, TRAINING_LABEL, TYPE_PLAYERS } from '../ui';
@@ -34,6 +35,12 @@ export function Packages() {
 
   if (data.isPending || gate.isPending) return <LoadingView />;
   if (data.isError || gate.isError) return <ErrorView onRetry={() => { data.refetch(); gate.refetch(); }} />;
+
+  // Packages have no branch picker yet (per-location pricing is its own
+  // session), so a new one is sold for the default branch — which is where every
+  // existing package was backfilled. It is sent explicitly rather than left to
+  // the DB's fill-default trigger, whose body cannot run as a client role.
+  const createAt = creationLocationId(data.locations);
 
   const creditRequests = reqsQ.data ?? [];
 
@@ -101,8 +108,8 @@ export function Packages() {
         </Button>
       </div>
 
-      {editing ? (
-        <PackageModal pkg={editing === 'new' ? undefined : editing} onClose={() => setEditing(null)} />
+      {editing && createAt ? (
+        <PackageModal pkg={editing === 'new' ? undefined : editing} locationId={createAt} onClose={() => setEditing(null)} />
       ) : null}
 
       {deleting ? (
