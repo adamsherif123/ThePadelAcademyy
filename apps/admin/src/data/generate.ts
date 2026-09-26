@@ -76,6 +76,13 @@ export interface SkippedSlot {
   reason: SkipReason;
   /** For coach_conflict: the start of the slot it clashes with. */
   conflictWith?: IsoInstant;
+  /**
+   * For coach_conflict: the BRANCH of the slot it clashes with. Usually the one
+   * being generated into, and then not worth saying — but a coach can be booked
+   * at another branch at the same hour, and "Wika is busy" is useless if the
+   * session you are looking at is somewhere else entirely.
+   */
+  conflictLocationId?: LocationId;
 }
 
 export interface GenerationPlan {
@@ -138,6 +145,18 @@ function eachDate(range: GenerateRange): { date: CairoDate; weekday: Weekday }[]
  *    can't be in two places), checked against BOTH existing published slots AND
  *    slots already planned earlier in THIS run — so the conflict is surfaced in the
  *    preview rather than exploding the whole batch.
+ *
+ * ── locations: templates are SCOPED, existing slots are GLOBAL ──
+ * `allTemplates` is expected to be filtered to the branch being generated into —
+ * a rule only ever produces sessions at its own branch. `existing` must NOT be:
+ * a coach cannot be in two places at once, so a session at ANOTHER branch is
+ * still a conflict, and filtering `existing` by location would hide exactly the
+ * clash the DB exclusion constraint will then reject on commit. The two
+ * arguments are deliberately scoped differently; see the report.
+ *
+ * Slot IDENTITY needs no location term: identityKey is (templateId, date), and a
+ * template belongs to exactly one branch, so two branches' rules can never
+ * produce the same key.
  * Only active templates are considered, and a weekday only has active templates on
  * "open" days, so "open days only" falls out for free.
  */
@@ -176,7 +195,12 @@ export function generateSlots(
           )?.slot;
       const clash = clashExisting ?? clashPlanned;
       if (clash) {
-        skipped.push({ ...base, reason: 'coach_conflict', conflictWith: clash.startsAt });
+        skipped.push({
+          ...base,
+          reason: 'coach_conflict',
+          conflictWith: clash.startsAt,
+          conflictLocationId: clash.locationId,
+        });
         continue;
       }
 

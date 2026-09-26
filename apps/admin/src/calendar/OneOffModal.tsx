@@ -3,13 +3,14 @@ import type {
   AvailabilityTemplate,
   Coach,
   CoachId,
+  Location,
   LocationId,
   SessionSlot,
   SlotId,
   TrainingType,
   Weekday,
 } from '@tpa/types';
-import { AlertTriangle, CalendarClock } from 'lucide-react';
+import { AlertTriangle, CalendarClock, MapPin } from 'lucide-react';
 import { useState } from 'react';
 
 import { createOneOffSlot } from '../data/generate';
@@ -48,13 +49,19 @@ export function OneOffModal({
   coaches,
   slots,
   templates,
+  locations,
   locationId,
+  locationName,
   defaultDate,
   onClose,
 }: {
   coaches: Coach[];
-  /** The branch the one-off is created at — the default until Session 3 adds a picker. */
+  /** Every branch — only to name the one a cross-branch coach clash is at. */
+  locations: Location[];
+  /** The branch the one-off is created at: whatever the Schedule page is showing. */
   locationId: LocationId;
+  /** Shown read-only; a slot's branch is immutable after insert. */
+  locationName: string;
   slots: SessionSlot[];
   templates: AvailabilityTemplate[];
   /** Prefill the date field. The mobile day view passes the day you're looking at;
@@ -98,6 +105,12 @@ export function OneOffModal({
     ? findCoachConflict(slots, draft.coachId, startsAt, endsAt, 'sl_oneoff_probe' as SlotId)
     : undefined;
   const conflictCoach = coachById(coaches, draft.coachId)?.name ?? 'this coach';
+  // A clash at ANOTHER branch is the confusing one: the session you are looking
+  // at is not on this calendar at all, so the message has to say where it is.
+  const conflictAt =
+    conflict && conflict.locationId !== locationId
+      ? (locations.find((l) => l.id === conflict.locationId)?.name ?? 'another location')
+      : null;
 
   const canSave = timeValid && !inPast && draft.capacity >= 1;
 
@@ -137,6 +150,12 @@ export function OneOffModal({
       }
     >
       <div className={styles.body}>
+        {/* Read-only: a slot's branch is immutable after insert (migration 062),
+            and `authenticated` holds INSERT but not UPDATE on the column. */}
+        <p className={styles.note}>
+          <MapPin size={15} aria-hidden />
+          Creating at: <strong>{locationName}</strong>
+        </p>
         <div className={styles.grid}>
           <div className={styles.span2}>
             <Select
@@ -215,8 +234,9 @@ export function OneOffModal({
         {conflict && !inPast ? (
           <p className={styles.warn}>
             <AlertTriangle size={15} aria-hidden />
-            {conflictCoach} already coaches {formatInstantTime(conflict.startsAt)} –{' '}
-            {formatInstantTime(conflict.endsAt)} — that overlaps, and they can’t be in two places.
+            {conflictCoach} is {conflictAt ? `at ${conflictAt}, ` : 'already coaching '}
+            {formatInstantTime(conflict.startsAt)} – {formatInstantTime(conflict.endsAt)} — that overlaps, and
+            they can’t be in two places.
           </p>
         ) : null}
         {closedDay && !inPast ? (

@@ -28,6 +28,9 @@ export type SaveTemplateResult =
 
 function fields(t: AvailabilityTemplate) {
   return {
+    // Carried for the INSERT; updateTemplate's patch ignores it, which is what
+    // keeps a rule's branch immutable from the client side too.
+    locationId: t.locationId,
     coachId: t.coachId, weekday: t.weekday, startTime: t.startTime, endTime: t.endTime,
     trainingType: t.trainingType, capacity: t.capacity, gender: t.gender, level: t.level, isActive: t.isActive,
   };

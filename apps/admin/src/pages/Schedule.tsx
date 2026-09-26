@@ -11,10 +11,10 @@ import { TemplateModal } from '../calendar/TemplateModal';
 import { TemplatesPanel } from '../calendar/TemplatesPanel';
 import { WeekCalendar } from '../calendar/WeekCalendar';
 import { weekColumns } from '../data/schedule';
-import { creationLocationId } from '../data/locations';
 import { useAdminData } from '../data/queries';
+import { useSelectedLocation } from '../data/useSelectedLocation';
 import { useSession } from '../session/SessionProvider';
-import { ErrorView, LoadingView, PageHeader, SegmentedTabs, useIsMobile } from '../ui';
+import { ErrorView, LoadingView, PageHeader, SegmentedTabs, Select, useIsMobile } from '../ui';
 import styles from './Schedule.module.css';
 
 /** Availability-template modal target: create (new) or edit an existing rule. */
@@ -35,6 +35,9 @@ export function Schedule() {
   const [templateTarget, setTemplateTarget] = useState<TemplateTarget | null>(null);
   const [generating, setGenerating] = useState(false);
   const [oneOff, setOneOff] = useState<{ date?: CairoDate } | null>(null);
+  // Before the early returns: hooks cannot be conditional. It reads an empty
+  // list while the query is pending and simply resolves to null.
+  const loc = useSelectedLocation(data.locations);
 
   if (data.isPending) return <LoadingView />;
   if (data.isError) return <ErrorView onRetry={data.refetch} />;
@@ -45,19 +48,41 @@ export function Schedule() {
   const cursor = cairoCalendarDate(now).weekday + dayOffset;
   const weekOffset = Math.floor(cursor / 7);
   const selectedIndex = ((cursor % 7) + 7) % 7;
-  const columns = weekColumns(data.templates, data.slots, now, weekOffset);
-  // The branch new sessions and rules are created at. No picker yet (Session 3
-  // adds the toggle); until then everything is created at the original branch,
-  // which is also where every existing row was backfilled.
-  const createAt = creationLocationId(data.locations);
+  // ── everything below the calendar is scoped to the selected branch ──
+  // Filter the INPUTS, not @tpa/core's rule: isDayOpen keeps one signature and
+  // one meaning, and the caller decides what "the schedule" is. A branch with no
+  // templates and no slots on a date is CLOSED there even if the other branch is
+  // wide open, which is the whole point.
+  const locTemplates = data.templates.filter((t) => t.locationId === loc.id);
+  const locSlots = data.slots.filter((s) => s.locationId === loc.id);
+  const columns = weekColumns(locTemplates, locSlots, now, weekOffset);
+  const createAt = loc.id;
 
   return (
     <div>
       <PageHeader
         eyebrow="Operations"
         title="Schedule"
-        subtitle="Manage the training calendar and the recurring weekly sessions that generate bookable slots. The academy runs Sunday–Wednesday, 5–11 PM."
+        subtitle={
+          loc.location
+            ? `Manage the training calendar and the recurring weekly sessions that generate bookable slots. ${loc.location.name} runs ${loc.location.hoursText}.`
+            : 'Manage the training calendar and the recurring weekly sessions that generate bookable slots.'
+        }
       />
+
+      {/* Above the tabs, not inside WeekCalendar's nav row: the Recurring
+          sessions tab has to follow the same branch, and a picker living in the
+          week header would vanish when the admin switched tabs. Always rendered,
+          even with one branch, so "which branch am I scheduling?" is never a
+          question the admin has to hold in their head. */}
+      <div className={styles.locationBar}>
+        <Select
+          label="Location"
+          value={loc.id ?? ''}
+          onChange={(e) => loc.select(e.target.value as typeof loc.id & string)}
+          options={loc.options.map((l) => ({ value: l.id, label: l.name }))}
+        />
+      </div>
 
       <div className={styles.tabs}>
         <SegmentedTabs
@@ -75,7 +100,7 @@ export function Schedule() {
           <DayCalendar
             columns={columns}
             selectedIndex={selectedIndex}
-            slots={data.slots}
+            slots={locSlots}
             coaches={data.coaches}
             onPrevDay={() => setDayOffset((d) => d - 1)}
             onNextDay={() => setDayOffset((d) => d + 1)}
@@ -87,8 +112,8 @@ export function Schedule() {
           <WeekCalendar
             now={now}
             weekOffset={weekOffset}
-            templates={data.templates}
-            slots={data.slots}
+            templates={locTemplates}
+            slots={locSlots}
             coaches={data.coaches}
             onPrevWeek={() => setDayOffset((d) => d - 7)}
             onNextWeek={() => setDayOffset((d) => d + 7)}
@@ -99,9 +124,11 @@ export function Schedule() {
       ) : (
         <TemplatesPanel
           coaches={data.coaches}
-          templates={data.templates}
-          slots={data.slots}
+          templates={locTemplates}
+          slots={locSlots}
           now={now}
+          locationName={loc.location?.name ?? ''}
+          locationHours={loc.location?.hoursText ?? ''}
           onNew={() => setTemplateTarget({ mode: 'new' })}
           onEdit={(template) => setTemplateTarget({ mode: 'edit', template })}
           onGenerate={() => setGenerating(true)}
@@ -117,6 +144,7 @@ export function Schedule() {
           batches={data.batches}
           coaches={data.coaches}
           templates={data.templates}
+          locations={data.locations}
           onClose={() => setSelected(null)}
         />
       ) : null}
@@ -125,23 +153,32 @@ export function Schedule() {
           template={templateTarget.mode === 'edit' ? templateTarget.template : undefined}
           coaches={data.coaches}
           locationId={createAt}
+          locationName={loc.location?.name ?? ''}
           onClose={() => setTemplateTarget(null)}
         />
       ) : null}
+      {/* templates SCOPED to the branch; slots GLOBAL — a coach booked at
+          another branch is still a clash, and hiding it would only move the
+          failure to the DB's exclusion constraint on commit. */}
       {generating ? (
         <GenerateModal
-          templates={data.templates}
+          templates={locTemplates}
           slots={data.slots}
           coaches={data.coaches}
+          locations={data.locations}
+          locationName={loc.location?.name ?? ''}
           onClose={() => setGenerating(false)}
         />
       ) : null}
+      {/* Same split as GenerateModal: global slots, scoped templates. */}
       {oneOff && createAt ? (
         <OneOffModal
           coaches={data.coaches}
           slots={data.slots}
-          templates={data.templates}
+          templates={locTemplates}
+          locations={data.locations}
           locationId={createAt}
+          locationName={loc.location?.name ?? ''}
           defaultDate={oneOff.date}
           onClose={() => setOneOff(null)}
         />

@@ -133,3 +133,13 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* The read-only "Generating at: <branch>" line. Mirrors sessionForm's .note so
+   the three creation modals state their branch identically. */
+.note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}

@@ -1,6 +1,6 @@
 import { cairoCalendarDate } from '@tpa/core';
 import { MOCK_NOW, mockBookings, mockSlots, mockTemplates, MOCK_LOCATION_ID } from '@tpa/mocks';
-import type { AvailabilityTemplate, AvailabilityTemplateId, CoachId, IsoInstant, LocalTime } from '@tpa/types';
+import type { AvailabilityTemplate, AvailabilityTemplateId, CoachId, IsoInstant, LocalTime, LocationId } from '@tpa/types';
 import { describe, expect, it, vi } from 'vitest';
 
 // generate.ts imports lib/api → lib/supabase, whose module-load env guard throws
@@ -228,5 +228,64 @@ describe('createOneOffSlot — validation rejections (return before any network 
       now,
     );
     expect(res.ok ? null : res.reason).not.toBe('group_requires_gender_level');
+  });
+});
+
+describe('generateSlots across locations', () => {
+  const BRANCH_B = 'loc_branch_b' as LocationId;
+  const WINDOW = { fromDate: '2026-08-01', toDate: '2026-08-31' };
+  const oroRule = mockTemplates.find((t) => t.id === 'at_grp_men_beg_wed_a')!;
+  /** The SAME rule shape — same coach, same weekday, same hours — at Branch B. */
+  const twinAtB: AvailabilityTemplate = {
+    ...oroRule,
+    id: 'at_twin_at_b' as AvailabilityTemplateId,
+    locationId: BRANCH_B,
+  };
+  /** What Oro Plaza's own rule would produce in that window — the "existing" world. */
+  const oroSlots = generateSlots([oroRule], [], WINDOW, now).toCreate.map((p) => p.slot);
+
+  it('the Oro rule really does produce slots in this window (fixture sanity)', () => {
+    expect(oroSlots.length).toBeGreaterThan(0);
+    expect(oroSlots.every((s) => s.locationId === MOCK_LOCATION_ID)).toBe(true);
+  });
+
+  it('identity does NOT collide across branches — it is keyed on (template, date)', () => {
+    // Branch B's rule must not read as "already exists" merely because Oro Plaza
+    // has an identical-looking session that day. A template belongs to exactly
+    // one branch, so its id already carries the location.
+    const plan = generateSlots([twinAtB], oroSlots, WINDOW, now);
+    expect(plan.skipped.filter((s) => s.reason === 'already_exists')).toHaveLength(0);
+  });
+
+  it('a coach busy at ANOTHER branch blocks generation — conflicts are global', () => {
+    // Same coach, same hour, different branch. The DB exclusion constraint has no
+    // location term, so the preview must agree with it rather than promise slots
+    // the commit would reject.
+    const plan = generateSlots([twinAtB], oroSlots, WINDOW, now);
+    const clashes = plan.skipped.filter((s) => s.reason === 'coach_conflict');
+    expect(clashes.length).toBe(oroSlots.length);
+    expect(plan.toCreate).toHaveLength(0);
+  });
+
+  it('the conflict names the OTHER branch, so the admin can go and find it', () => {
+    const plan = generateSlots([twinAtB], oroSlots, WINDOW, now);
+    const clash = plan.skipped.find((s) => s.reason === 'coach_conflict')!;
+    expect(clash.conflictLocationId).toBe(MOCK_LOCATION_ID);
+    expect(clash.conflictLocationId).not.toBe(clash.template.locationId);
+  });
+
+  it('a clash at the SAME branch reports that branch, so the UI can stay quiet', () => {
+    const plan = generateSlots([oroRule], oroSlots, WINDOW, now);
+    const clash = plan.skipped.find((s) => s.reason === 'coach_conflict');
+    // Same-rule regeneration is already_exists, not a conflict — so assert the
+    // shape only if a conflict is what came back.
+    if (clash) expect(clash.conflictLocationId).toBe(clash.template.locationId);
+    expect(plan.skipped.every((s) => s.reason === 'already_exists' || s.reason === 'coach_conflict')).toBe(true);
+  });
+
+  it('a generated slot inherits its template branch, never the other one', () => {
+    const plan = generateSlots([twinAtB], [], WINDOW, now);
+    expect(plan.toCreate.length).toBeGreaterThan(0);
+    expect(plan.toCreate.every((p) => p.slot.locationId === BRANCH_B)).toBe(true);
   });
 });

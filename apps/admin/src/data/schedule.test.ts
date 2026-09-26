@@ -1,5 +1,5 @@
 import { MOCK_NOW, mockSlots, mockTemplates, MOCK_LOCATION_ID } from '@tpa/mocks';
-import type { SessionSlot } from '@tpa/types';
+import type { SessionSlot, LocationId } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -135,5 +135,43 @@ describe('layoutDay', () => {
       }
     }
     expect(total).toBeGreaterThan(0); // the week actually has slots to lay out
+  });
+});
+
+describe('weekColumns — CLOSED is per location, because its INPUTS are', () => {
+  const BRANCH_B = 'loc_branch_b' as LocationId;
+
+  it('a weekday open at one branch is closed at the other', () => {
+    // The whole per-location CLOSED behaviour is "filter the inputs, don't change
+    // the rule": @tpa/core's isDayOpen keeps one signature and one meaning, and
+    // the caller decides what "the schedule" is. Proving it here means proving
+    // the same function gives opposite answers for two different input sets.
+    const oroTemplates = mockTemplates.filter((t) => t.locationId === MOCK_LOCATION_ID && t.isActive);
+    expect(oroTemplates.length).toBeGreaterThan(0);
+
+    const oroCols = weekColumns(oroTemplates, [], MOCK_NOW, 0);
+    const bCols = weekColumns([], [], MOCK_NOW, 0); // Branch B has no rules yet
+
+    // Oro has at least one open day; Branch B, with no templates and no slots,
+    // is closed every day.
+    expect(oroCols.some((c) => !c.isClosed)).toBe(true);
+    expect(bCols.every((c) => c.isClosed)).toBe(true);
+  });
+
+  it('a one-off at branch B opens that date at B only', () => {
+    const bTemplates: never[] = [];
+    // A published one-off on a Branch-B-only date.
+    const target = weekColumns([], [], MOCK_NOW, 0)[3]!;
+    const bSlot = oneOffSlot({
+      startsAt: addHours(target.dayStart, 18),
+      endsAt: addHours(target.dayStart, 19),
+      locationId: BRANCH_B,
+    });
+
+    const bCols = weekColumns(bTemplates, [bSlot], MOCK_NOW, 0);
+    const oroCols = weekColumns([], [], MOCK_NOW, 0); // Oro sees neither the rule nor the slot
+
+    expect(bCols[3]!.isClosed).toBe(false); // opened by the one-off
+    expect(oroCols[3]!.isClosed).toBe(true); // unaffected — different branch
   });
 });

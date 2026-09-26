@@ -1,10 +1,12 @@
 import { cairoCalendarDate, formatInstantTime, formatMonthDay } from '@tpa/core';
-import type { AvailabilityTemplate, Coach, CoachId, IsoInstant, SessionSlot } from '@tpa/types';
+import type { AvailabilityTemplate, Coach, CoachId, IsoInstant, Location, SessionSlot } from '@tpa/types';
 import { useState } from 'react';
 
 import { commitGeneration, generateSlots, type SkipReason } from '../data/generate';
 import { coachById } from '../data/selectors';
 import { useSession } from '../session/SessionProvider';
+import { MapPin } from 'lucide-react';
+
 import { Button, Input, Modal } from '../ui';
 import styles from './GenerateModal.module.css';
 
@@ -37,11 +39,17 @@ export function GenerateModal({
   templates,
   slots,
   coaches,
+  locations,
+  locationName,
   onClose,
 }: {
   templates: AvailabilityTemplate[];
   slots: SessionSlot[];
   coaches: Coach[];
+  /** Every branch — only to name the one a cross-branch coach clash sits at. */
+  locations: Location[];
+  /** The branch being generated into, shown read-only. */
+  locationName: string;
   onClose: () => void;
 }) {
   const { now } = useSession();
@@ -131,6 +139,13 @@ export function GenerateModal({
       }
     >
       <div className={styles.body}>
+        {/* Generation only ever produces sessions at the branch whose rules are
+            being run; a template's location is fixed and immutable. Stated here
+            so a preview can never be read as "everywhere". */}
+        <p className={styles.note}>
+          <MapPin size={15} aria-hidden />
+          Generating at: <strong>{locationName}</strong>
+        </p>
         <p className={styles.intro}>
           Materialize bookable slots from active recurring sessions across a date range. Nothing is created
           until you confirm — and a session that already exists, is booked, or clashes is skipped, so
@@ -190,9 +205,18 @@ export function GenerateModal({
                   {skipsByReason.map(({ reason, items }) => {
                     const eg = items[0]!;
                     const egCoach = coachById(coaches, eg.template.coachId)?.name ?? 'Coach';
+                    const egConflictAt =
+                      eg.conflictLocationId && eg.conflictLocationId !== eg.template.locationId
+                        ? (locations.find((l) => l.id === eg.conflictLocationId)?.name ?? 'another location')
+                        : null;
                     const example =
                       reason === 'coach_conflict'
-                        ? `${egCoach}, ${formatMonthDay(eg.startsAt)} ${formatInstantTime(eg.startsAt)}${eg.conflictWith ? ` overlaps ${formatInstantTime(eg.conflictWith)}` : ''}`
+                        ? // A clash at ANOTHER branch is the one that looks like a bug
+                          // to the admin — the session is not on the calendar in front
+                          // of them — so the branch is named only when it differs.
+                          `${egCoach}${
+                            egConflictAt ? ` is at ${egConflictAt}` : ''
+                          }, ${formatMonthDay(eg.startsAt)} ${formatInstantTime(eg.startsAt)}${eg.conflictWith ? ` overlaps ${formatInstantTime(eg.conflictWith)}` : ''}`
                         : `e.g. ${egCoach}, ${formatMonthDay(eg.startsAt)} ${formatInstantTime(eg.startsAt)}`;
                     return (
                       <div key={reason} className={styles.skipRow}>

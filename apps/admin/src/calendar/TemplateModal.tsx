@@ -1,5 +1,5 @@
 import type { AvailabilityTemplate, Coach, CoachId, LocalTime, LocationId, TrainingType, Weekday } from '@tpa/types';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, MapPin } from 'lucide-react';
 import { useState } from 'react';
 
 import { createTemplate, updateTemplate, type SaveTemplateResult } from '../data/templates';
@@ -37,6 +37,7 @@ export function TemplateModal({
   template,
   coaches,
   locationId,
+  locationName,
   onClose,
 }: {
   template?: AvailabilityTemplate;
@@ -47,6 +48,8 @@ export function TemplateModal({
    * template's location is immutable, enforced by a trigger in migration 062.
    */
   locationId: LocationId;
+  /** Shown read-only. A rule's branch is fixed at creation and immutable after. */
+  locationName: string;
   onClose: () => void;
 }) {
   const editing = template !== undefined;
@@ -112,6 +115,13 @@ export function TemplateModal({
       }
     >
       <div className={styles.body}>
+        {/* Read-only on purpose: a rule's branch is fixed when it is created and
+            immutable afterwards (migration 062). Showing it as an editable field
+            would offer a change the database will refuse. */}
+        <p className={styles.note}>
+          <MapPin size={15} aria-hidden />
+          {editing ? 'Recurring at' : 'Creating at'}: <strong>{locationName}</strong>
+        </p>
         <div className={styles.grid}>
           <div className={styles.span2}>
             <Select

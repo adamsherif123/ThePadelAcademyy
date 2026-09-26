@@ -710,11 +710,22 @@ export function updatePackage(id: PackageId, f: Partial<PackageFields>): Promise
 }
 
 export interface TemplateFields {
+  locationId: LocationId;
   coachId: CoachId; weekday: Weekday; startTime: string; endTime: string;
   trainingType: TrainingType | null; capacity: number; gender: Gender | null; level: Level | null; isActive: boolean;
 }
+/**
+ * INSERT columns. location_id is here and deliberately NOT in updateTemplate's
+ * patch below: a rule's branch is fixed at creation (migration 062's immutability
+ * trigger would reject a change anyway).
+ *
+ * Sending it explicitly rather than letting the temporary fill-default trigger
+ * supply it matters — that trigger lands the row at the DEFAULT branch, so
+ * omitting the column silently created every new rule at Oro Plaza however the
+ * admin had the picker set. It is also due to be dropped when 1.4 ships.
+ */
 function templateRow(f: TemplateFields): Record<string, unknown> {
-  return { coach_id: f.coachId, weekday: f.weekday, start_time: f.startTime, end_time: f.endTime, training_type: f.trainingType, capacity: f.capacity, gender: f.gender, level: f.level, is_active: f.isActive };
+  return { location_id: f.locationId, coach_id: f.coachId, weekday: f.weekday, start_time: f.startTime, end_time: f.endTime, training_type: f.trainingType, capacity: f.capacity, gender: f.gender, level: f.level, is_active: f.isActive };
 }
 export function insertTemplate(f: TemplateFields): Promise<AvailabilityTemplate> {
   const id = newId(ID_PREFIXES.availabilityTemplate);
@@ -824,11 +835,22 @@ export function updateSlot(id: SlotId, p: SlotPatch): Promise<SessionSlot> {
   return writeRow(supabase.from('session_slots').update(patch).eq('id', id).select().single(), rowToSlot, 'Update slot');
 }
 
-/** Bulk-insert generated slots. booked_count is omitted (not in the insert grant; defaults 0). */
+/**
+ * Bulk-insert generated slots (and the single-row one-off path). booked_count is
+ * omitted (not in the insert grant; defaults 0).
+ *
+ * location_id is sent EXPLICITLY. `authenticated` holds INSERT on that column and
+ * not UPDATE (migration 062), so this is the only moment a slot's branch can be
+ * set — and omitting it would silently hand the row to the temporary
+ * fill-default trigger, which puts it at the DEFAULT branch no matter which one
+ * the admin was scheduling. That trigger is a crutch for stale bundles, not a
+ * default for new code, and it is due to be removed when 1.4 ships.
+ */
 export async function insertSlots(slots: SessionSlot[]): Promise<number> {
   if (slots.length === 0) return 0;
   const rows = slots.map((s) => ({
-    id: s.id, coach_id: s.coachId, starts_at: s.startsAt, ends_at: s.endsAt, training_type: s.trainingType,
+    id: s.id, location_id: s.locationId, coach_id: s.coachId, starts_at: s.startsAt, ends_at: s.endsAt,
+    training_type: s.trainingType,
     capacity: s.capacity, gender: s.gender, level: s.level, status: s.status, template_id: s.templateId,
   }));
   const { error } = await supabase.from('session_slots').insert(rows);

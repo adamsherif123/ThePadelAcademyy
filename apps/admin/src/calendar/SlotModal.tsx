@@ -12,6 +12,7 @@ import type {
   Coach,
   CoachId,
   CreditBatch,
+  Location,
   Player,
   SessionSlot,
   TrainingType,
@@ -153,6 +154,7 @@ export function SlotModal({
   batches,
   coaches,
   templates,
+  locations,
   onClose,
 }: {
   slot: SessionSlot;
@@ -162,6 +164,8 @@ export function SlotModal({
   batches: CreditBatch[];
   coaches: Coach[];
   templates: AvailabilityTemplate[];
+  /** Every branch — to name the one this session is at. */
+  locations: Location[];
   onClose: () => void;
 }) {
   const { now } = useSession();
@@ -232,7 +236,12 @@ export function SlotModal({
   // attended/no_show ones live in the roster on a past session.
   const history = bookingsForSlot(bookings, slot.id).filter((b) => b.status === 'cancelled');
 
-  const eyebrow = `${formatInstantDate(slot.startsAt)} · ${formatInstantTime(slot.startsAt)} – ${formatInstantTime(slot.endsAt)}`;
+  // The branch rides the eyebrow rather than getting a field of its own: it is
+  // read-only fact (a slot's location is immutable — migration 062), and the
+  // admin needs it most when they have arrived here from a cross-branch search
+  // and the date/time alone would not tell them which calendar this belongs to.
+  const slotLocation = locations.find((l) => l.id === slot.locationId)?.name ?? null;
+  const eyebrow = `${formatInstantDate(slot.startsAt)} · ${formatInstantTime(slot.startsAt)} – ${formatInstantTime(slot.endsAt)}${slotLocation ? ` · ${slotLocation}` : ''}`;
   const title = slot.trainingType === null ? 'Open block' : `${trainingLabelFor(slot.trainingType)} session`;
 
   // New wall time → UTC instants (all conversion via @tpa/core, DST-correct).

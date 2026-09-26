@@ -31,6 +31,8 @@ export function TemplatesPanel({
   templates,
   slots,
   now,
+  locationName,
+  locationHours,
   onNew,
   onEdit,
   onGenerate,
@@ -39,6 +41,10 @@ export function TemplatesPanel({
   templates: AvailabilityTemplate[];
   slots: SessionSlot[];
   now: IsoInstant;
+  /** The branch these rules belong to — the panel is already filtered to it. */
+  locationName: string;
+  /** Its free-text opening hours, replacing what used to be a hardcoded sentence. */
+  locationHours: string;
   onNew: () => void;
   onEdit: (template: AvailabilityTemplate) => void;
   onGenerate: () => void;
@@ -55,7 +61,8 @@ export function TemplatesPanel({
         <p className={styles.explainer}>
           Each rule is ONE repeating session at a set time — a 6–8 PM rule makes a single two-hour
           session, not a window that gets divided up. A slot is generated per open day
-          (Sunday–Wednesday, 5–11 PM). Editing a rule never changes sessions that are already booked.
+          {locationName !== '' ? ` (${locationName}: ${locationHours})` : ''}. Editing a rule never
+          changes sessions that are already booked.
         </p>
         <div className={styles.headActions}>
           <Button variant="secondary" icon={CalendarPlus} onClick={onGenerate}>
