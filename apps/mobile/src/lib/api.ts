@@ -222,6 +222,33 @@ export async function fetchAppConfig(): Promise<AppConfig | null> {
   return data ? rowToAppConfig(data) : null;
 }
 
+/**
+ * The minimum supported version, for the hard update gate — and NOTHING else.
+ *
+ * Separate from fetchAppConfig for two reasons that both matter:
+ *
+ *  1. It must work SIGNED OUT. anon holds a COLUMN-level grant on exactly
+ *     (latest_ios_version, min_supported_ios_version) (migration 058), so
+ *     `select *` — which is what fetchAppConfig does — is a permission error for
+ *     an anon caller. The columns are named here deliberately; widening this
+ *     select would break the gate on the sign-in screen, which is the one place
+ *     it most has to work.
+ *  2. It returns the bare string rather than an AppConfig, because the gate must
+ *     not depend on a shape whose other fields anon cannot read.
+ *
+ * Throws like every other reader here; the gate treats any throw as "unknown" and
+ * lets the app through.
+ */
+export async function fetchVersionFloor(): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('app_config')
+    .select('min_supported_ios_version')
+    .maybeSingle();
+  if (error) throw new ApiError(`Failed to load the version floor: ${error.message}`, error);
+  const value = data?.min_supported_ios_version;
+  return typeof value === 'string' && value.trim() !== '' ? value : null;
+}
+
 export async function fetchPurchaseById(id: string): Promise<Purchase | null> {
   const { data, error } = await supabase.from('purchases').select('*').eq('id', id).maybeSingle();
   if (error) throw new ApiError(`Failed to load purchase: ${error.message}`, error);

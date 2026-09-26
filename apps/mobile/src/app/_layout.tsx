@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { queryClient } from '../lib/queryClient';
 import { captureException, initReporting } from '../lib/reporting';
 import { NewsPopupBridge } from '../notifications/NewsPopupBridge';
+import { HardUpdateGate } from '../update/HardUpdateGate';
 import { UpdatePromptBridge } from '../update/UpdatePromptBridge';
 import { NotificationsBridge } from '../notifications/NotificationsBridge';
 import { nextRoute } from '../session/authMachine';
@@ -184,9 +185,16 @@ export default function RootLayout() {
     <ThemeProvider>
       <ThemedStatusBar />
       <QueryClientProvider client={queryClient}>
-        <SessionProvider>
-          <RootNavigator />
-        </SessionProvider>
+        {/* OUTSIDE SessionProvider and above the router, so a build below the
+            supported floor is blocked on every route — signed out, mid-auth, and
+            in the coach shell alike. Renders children untouched in every case but
+            a confirmed "too old", so it cannot delay first paint or brick the app
+            when the lookup fails. */}
+        <HardUpdateGate>
+          <SessionProvider>
+            <RootNavigator />
+          </SessionProvider>
+        </HardUpdateGate>
       </QueryClientProvider>
     </ThemeProvider>
   );

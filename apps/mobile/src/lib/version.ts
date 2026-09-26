@@ -52,3 +52,50 @@ export function isOutdated(installed: string | null | undefined, latest: string 
   if (!installed || !latest) return false;
   return compareVersions(installed, latest) === -1;
 }
+
+/**
+ * Is the installed app BELOW the minimum this backend still supports?
+ *
+ * The hard gate's predicate — the counterpart to isOutdated, and deliberately a
+ * separate function rather than a flag on it. They answer different questions and
+ * have different consequences: isOutdated drives a once-a-day nudge the user can
+ * dismiss, this one locks the app. Sharing one function would mean one edit could
+ * silently turn a nudge into a wall.
+ *
+ * FAIL OPEN, for the same reason isOutdated fails safe but harder: a missed gate
+ * is a user on an old build for another day, while a false gate is an app nobody
+ * can open and no way to take it back except an App Store review cycle. So a null,
+ * empty or unparseable value on EITHER side returns false. `min` null is the
+ * normal state — it means "no floor set", which is how this ships.
+ *
+ * Strictly below: installed === min is supported, not blocked. The floor names the
+ * OLDEST version that still works.
+ */
+export function isBelowMinimum(installed: string | null | undefined, min: string | null | undefined): boolean {
+  if (!installed || !min) return false;
+  return compareVersions(installed, min) === -1;
+}
+
+/**
+ * The hard gate's whole decision, as a pure function: should THIS build, on THIS
+ * platform, against THIS floor, be locked out?
+ *
+ * Extracted from the component deliberately. There is no component-test harness in
+ * this repo (vitest runs under `node`, and screens are rendering-proofs only), so
+ * anything left inside HardUpdateGate is untested by construction. Everything that
+ * can be decided from three values is decided here instead, where the fail-open
+ * matrix is covered exhaustively — leaving the component with only what genuinely
+ * needs a runtime: the fetch, its timeout, and the AppState subscription.
+ *
+ * `platform` is passed in rather than read from react-native so this file stays
+ * importable under the node test environment.
+ */
+export function shouldHardBlock(
+  platform: string,
+  installed: string | null | undefined,
+  floor: string | null | undefined,
+): boolean {
+  // Only iOS ships this app, and the floor is an iOS version string.
+  if (platform !== 'ios') return false;
+  return isBelowMinimum(installed, floor);
+}
