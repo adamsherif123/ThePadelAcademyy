@@ -53,12 +53,27 @@ release session. Production stays at `20260926000064`.
 pre-location admin and the 1.2/1.3 mobile clients — they stay. `065` and anything after
 it wait on `multi-location`.
 
-**Never run `supabase db push` from `main`.** `main`'s `supabase/migrations` folder stops
-at `060`, while production's database has `061`–`064` applied. That gap is expected and
-harmless — a push only sends local migrations the remote is missing, and `main` has
-none — but the branch is not a truthful picture of prod's schema, so do not use it to
-reason about, repair, or pull migration state. All migration work happens on
-`multi-location`, which has the full history.
+**Never run any Supabase CLI write from `main`.** `main`'s `supabase/migrations` folder
+stops at `060`, while production's database has `061`–`064` applied. Nothing breaks from
+that gap on its own — `main` has no migration the remote is missing, so there is nothing
+to push — but the CLI does not treat it as a no-op. It refuses:
+
+```
+$ supabase db push --dry-run --linked        # from main
+Remote migration versions not found in local migrations directory.
+...try repairing the migration history table:
+supabase migration repair --status reverted 20260926000061 ... 20260926000065
+```
+
+It fails safe — nothing is written — but **do not run the repair it suggests.** Against
+prod that would mark `061`–`064` as reverted in the migration history while the schema
+still has them, and the next real push would try to apply them again. The suggestion is
+correct for a branch that is genuinely behind; it is wrong for this one, which is behind
+*by design*.
+
+So: `main` is not a truthful picture of prod's schema, and must never be used to push,
+repair, or pull migration state. All migration work happens on `multi-location`, which
+has the full history.
 
 Always `cat supabase/.temp/project-ref` before any Supabase CLI command.
 
