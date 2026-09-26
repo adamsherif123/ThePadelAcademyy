@@ -27,6 +27,10 @@ const STATUS_META: Record<PurchaseStatus, { label: string; tone: BadgeTone }> = 
   succeeded: { label: 'Succeeded', tone: 'success' },
   pending: { label: 'Pending', tone: 'warning' },
   failed: { label: 'Failed', tone: 'danger' },
+  // 067: paid, but the credits could not be issued (today only a second free
+  // trial). 'warning', not 'danger' — nothing went wrong for the player and the
+  // money is coming back; saying "Failed" would read as "you lost it".
+  refund_required: { label: 'Refund on the way', tone: 'warning' },
 };
 
 /** How the player paid — cash at the desk, InstaPay transfer, or cards through Paymob. */

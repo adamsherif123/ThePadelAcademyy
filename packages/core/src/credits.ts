@@ -94,6 +94,7 @@ export function buildSignupGrant(playerId: PlayerId, locationId: LocationId, now
     playerId,
     source: 'signup_grant',
     purchaseId: null,
+    transferredFrom: null,
     locationId,
     trainingType: 'trial',
     quantityTotal: SIGNUP_TRIAL_CREDITS,
@@ -129,6 +130,7 @@ export function buildAdminGrant(
     playerId,
     source: 'admin_grant',
     purchaseId: null,
+    transferredFrom: null,
     locationId,
     trainingType,
     quantityTotal: quantity,
@@ -160,6 +162,7 @@ export function buildPurchaseCredits(
     playerId,
     source: 'purchase',
     purchaseId,
+    transferredFrom: null,
     // The branch comes from the PACKAGE — mirrors tpa.mint_credits_for_purchase.
     locationId: pkg.locationId,
     trainingType: pkg.trainingType,

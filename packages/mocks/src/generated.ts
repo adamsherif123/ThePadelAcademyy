@@ -166,6 +166,7 @@ for (let dayOffset = WINDOW_DAYS; dayOffset >= 1; dayOffset -= 1) {
       id: batchId,
       playerId: player.id,
       source: 'purchase',
+      transferredFrom: null,
       purchaseId,
       trainingType: pkg.trainingType,
       quantityTotal: pkg.sessionCount,

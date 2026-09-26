@@ -59,6 +59,9 @@ const SOURCE_LABEL: Record<CreditSource, string> = {
   purchase: 'Purchased',
   admin_grant: 'Granted',
   signup_grant: 'Signup trial',
+  // 067: moved here from another branch. Not revenue — the quantity came out of
+  // another batch of this same player's.
+  transfer: 'Moved branch',
 };
 
 const METHOD_LABEL: Record<PaymentMethod, string> = { paymob: 'Card', cash: 'Cash', instapay: 'InstaPay' };

@@ -208,6 +208,8 @@ export interface CreditBatch {
   source: CreditSource;
   /** Non-null iff `source === 'purchase'`; null for signup grants. */
   purchaseId: PurchaseId | null;
+  /** The batch these credits were moved out of. Non-null iff `source === 'transfer'` (067). */
+  transferredFrom: CreditBatchId | null;
   trainingType: TrainingType;
   quantityTotal: number;
   quantityRemaining: number;

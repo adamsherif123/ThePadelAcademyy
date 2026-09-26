@@ -106,6 +106,7 @@ export function rowToCreditBatch(r: Row): CreditBatch {
     playerId: str(r.player_id) as CreditBatch['playerId'],
     source: str(r.source) as CreditBatch['source'],
     purchaseId: (nstr(r.purchase_id) as CreditBatch['purchaseId']) ?? null,
+    transferredFrom: nstr(r.transferred_from) as CreditBatch['transferredFrom'],
     trainingType: str(r.training_type) as CreditBatch['trainingType'],
     quantityTotal: num(r.quantity_total),
     quantityRemaining: num(r.quantity_remaining),

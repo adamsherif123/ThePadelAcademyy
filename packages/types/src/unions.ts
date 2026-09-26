@@ -16,7 +16,12 @@ export type Level = 'beginner' | 'adv_beginner' | 'intermediate';
 export type Gender = 'men' | 'ladies';
 
 /** Client may only ever create `pending`; only a verified webhook advances it. */
-export type PurchaseStatus = 'pending' | 'succeeded' | 'failed';
+/**
+ * `refund_required` (067): the gateway captured the money but the credits could
+ * not be minted — today only a second trial. It is deliberately NOT 'succeeded',
+ * so money owed back never lands in collected revenue.
+ */
+export type PurchaseStatus = 'pending' | 'succeeded' | 'failed' | 'refund_required';
 
 /**
  * How the money reached the academy. `paymob` = the online card gateway (S7, mothballed).
@@ -39,7 +44,7 @@ export type SlotStatus = 'published' | 'cancelled';
  * involve money, so only they carry a `purchaseId` and count as credit liability;
  * both grants have a null purchaseId. See the invariant documented on CreditBatch.
  */
-export type CreditSource = 'purchase' | 'signup_grant' | 'admin_grant';
+export type CreditSource = 'purchase' | 'signup_grant' | 'admin_grant' | 'transfer';
 
 /**
  * The server-side events that mint a notification (S12). Each is emitted inside the

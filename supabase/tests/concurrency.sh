@@ -142,6 +142,26 @@ racer_reason() { # $1=uuid $2=slot $3=target_iso $4=outfile
     > "$4" 2>&1 &
 }
 
+# A racer that TRANSFERS credits to another branch, as the admin (067). Reports
+# the RPC's reason so a loser can be told apart from a crash.
+racer_transfer() { # $1=admin_uuid $2=batch $3=to_location $4=qty $5=target_iso $6=outfile
+  "${PSQL[@]}" \
+    -c "set role authenticated" \
+    -c "select set_config('request.jwt.claims', '{\"sub\":\"$1\",\"role\":\"authenticated\"}', false)" \
+    -c "select pg_sleep(greatest(0, extract(epoch from (timestamptz '$5' - clock_timestamp()))))" \
+    -c "with r as (select public.transfer_credit_batch('$2','$3',$4,'race') j) select case when (j->>'ok')='true' then 'WIN' else coalesce(j->>'reason','?') end from r" \
+    > "$6" 2>&1 &
+}
+
+# A racer that SETTLES a Paymob purchase. settle_purchase is service_role-only,
+# so this one runs as the superuser the webhook's service client stands in for.
+racer_settle() { # $1=purchase $2=txn $3=target_iso $4=outfile
+  "${PSQL[@]}" \
+    -c "select pg_sleep(greatest(0, extract(epoch from (timestamptz '$3' - clock_timestamp()))))" \
+    -c "with r as (select public.settle_purchase('$1','$2') j) select case when (j->>'refund_required')='true' then 'REFUND' when (j->>'ok')='true' then 'MINTED' else coalesce(j->>'reason','?') end from r" \
+    > "$4" 2>&1 &
+}
+
 cleanup_rows() {
   # book_slot mints bookings with 'bk_<uuid>' ids, so delete bookings by their
   # slot/player, not by an id prefix (FK-safe order: bookings → batches → slots → players → coaches).
@@ -806,6 +826,118 @@ check "Q: each booking spent ITS OWN branch's batch (never the sooner-expiring f
   "$(sql "select count(*) from public.bookings b join public.credit_batches cb on cb.id=b.credit_batch_id join public.session_slots s on s.id=b.slot_id where cb.location_id <> s.location_id")" "0"
 check "Q: exactly two credits spent per player"                               "$(sql "select coalesce(sum(quantity_total-quantity_remaining),0) from public.credit_batches where id like 'cbr_q%'")" "$((Q_K*2))"
 
+
+# ── Scenario R: a TRANSFER racing a BOOKING on a one-credit batch ───────────
+# The two money paths that decrement the same row, fired together. Exactly one
+# may take the credit. Both take the credit_batches row lock FIRST (book_slot's
+# guarded decrement; transfer_credit_batch's SELECT ... FOR UPDATE, stated in
+# 067), so they queue rather than deadlock, and whichever arrives second
+# re-reads under the lock and finds nothing left.
+echo "Scenario R — a transfer racing a booking on a 1-credit batch (K=20):"
+R_K=20
+RSETUP="insert into public.locations (id,name,address,maps_url,hours_text,sort_order,is_active,is_default) values ('loc_qa_r','QA R','x','https://a.b','h',10,true,false);
+insert into public.coaches (id,name,bio,is_active) values ('cor_r','C','b',true);
+insert into auth.users (id) values ('$(uuid 3800)');
+insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_radm','+20100radm','Adm','men','beginner',now(),'$(uuid 3800)');
+insert into public.admins (id,auth_user_id,display_name,created_at) values ('adr_r','$(uuid 3800)','Adm',now());"
+for k in $(seq 1 $R_K); do
+  RSETUP+="insert into auth.users (id) values ('$(uuid $((3800+k)))');"
+  RSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_r$k','+20100r$k','R','men','beginner',now(),'$(uuid $((3800+k)))');"
+  RSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_r$k','plr_r$k','signup_grant',null,'trial',1,1,now()+interval '30 day',now(),'loc_oro_plaza');"
+  RSETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status,location_id) values ('slr_r$k','cor_r', now()+interval '$((60+k)) hour', now()+interval '$((61+k)) hour','trial',1,0,'published','loc_oro_plaza');"
+done
+sql "$RSETUP" >/dev/null
+
+T=$(target 4)
+for k in $(seq 1 $R_K); do
+  racer_reason   "$(uuid $((3800+k)))" "slr_r$k" "$T" "$TMP/rb_$k.txt"
+  racer_transfer "$(uuid 3800)" "cbr_r$k" loc_qa_r 1 "$T" "$TMP/rt_$k.txt"
+done
+wait
+
+R_BOOK=$(grep -lFx WIN "$TMP"/rb_*.txt 2>/dev/null | wc -l | tr -d ' ')
+R_XFER=$(grep -lFx WIN "$TMP"/rt_*.txt 2>/dev/null | wc -l | tr -d ' ')
+# Every racer must have produced a verdict — a crashed racer would otherwise read
+# as a clean loss (the gap scenario P had until 4.5).
+R_SPOKE=$(cat "$TMP"/rb_*.txt "$TMP"/rt_*.txt 2>/dev/null | grep -cE '^(WIN|no_usable_credit|credit_wrong_location|quantity_above_remaining)$' | tr -d ' ')
+check "R: exactly one of {booking, transfer} wins each batch"                 "$((R_BOOK + R_XFER))" "$R_K"
+echo "  info — R: $R_BOOK/$R_K bookings won, $R_XFER/$R_K transfers won — both orderings are legitimate"
+check "R: every racer produced a verdict (none crashed into a silent loss)"   "$R_SPOKE" "$((R_K*2))"
+# Conservation: the source batch plus any child it spawned must still total one
+# credit, spent or not. total-remaining across the pair = exactly the one credit.
+check "R: credits are conserved — one per player across source and child"     "$(sql "select count(*) from (select p.id, sum(cb.quantity_remaining) + coalesce((select count(*) from public.bookings b where b.player_id=p.id),0) tot from public.players p join public.credit_batches cb on cb.player_id=p.id where p.id like 'plr_r%' group by p.id) t where tot <> 1")" "0"
+check "R: the source batch never went negative"                               "$(sql "select count(*) from public.credit_batches where id like 'cbr_r%' and quantity_remaining < 0")" "0"
+check "R: zero deadlocks"                                                     "$(cat "$TMP"/rb_*.txt "$TMP"/rt_*.txt 2>/dev/null | grep -ci deadlock | tr -d ' ')" "0"
+
+# ── Scenario S: two TRANSFERS racing on the same batch ──────────────────────
+# A batch of 3, two admins each moving 2. Only one can succeed: the guarded
+# decrement repeats the quantity test under the row lock, so the loser sees 1
+# remaining and refuses rather than driving the row to -1.
+echo "Scenario S — two transfers racing on one batch of 3, 2 each (K=20):"
+S_K=20
+SSETUP="insert into public.locations (id,name,address,maps_url,hours_text,sort_order,is_active,is_default) values ('loc_qa_s1','QA S1','x','https://a.b','h',11,true,false),('loc_qa_s2','QA S2','x','https://a.b','h',12,true,false);"
+for k in $(seq 1 $S_K); do
+  SSETUP+="insert into auth.users (id) values ('$(uuid $((4000+k)))');"
+  SSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_s$k','+20100s$k','S','men','beginner',now(),'$(uuid $((4000+k)))');"
+  SSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_s$k','plr_s$k','signup_grant',null,'trial',3,3,now()+interval '30 day',now(),'loc_oro_plaza');"
+done
+sql "$SSETUP" >/dev/null
+
+T=$(target 4)
+for k in $(seq 1 $S_K); do
+  racer_transfer "$(uuid 3800)" "cbr_s$k" loc_qa_s1 2 "$T" "$TMP/s1_$k.txt"
+  racer_transfer "$(uuid 3800)" "cbr_s$k" loc_qa_s2 2 "$T" "$TMP/s2_$k.txt"
+done
+wait
+
+S_WINS=$(grep -lFx WIN "$TMP"/s1_*.txt "$TMP"/s2_*.txt 2>/dev/null | wc -l | tr -d ' ')
+S_REFUSED=$(cat "$TMP"/s1_*.txt "$TMP"/s2_*.txt 2>/dev/null | grep -cFx quantity_above_remaining | tr -d ' ')
+check "S: exactly one transfer of the two wins each batch"                    "$S_WINS" "$S_K"
+check "S: and the loser refused as quantity_above_remaining — it RAN"         "$S_REFUSED" "$S_K"
+check "S: never over-subtracted — every source batch still has 1 left"        "$(sql "select count(*) from public.credit_batches where id like 'cbr_s%' and quantity_remaining <> 1")" "0"
+check "S: exactly one child batch per source"                                 "$(sql "select count(*) from public.credit_batches where transferred_from like 'cbr_s%'")" "$S_K"
+check "S: credits conserved — 3 per player across source and child"           "$(sql "select count(*) from (select player_id, sum(quantity_remaining) tot from public.credit_batches where player_id like 'plr_s%' group by player_id) t where tot <> 3")" "0"
+check "S: zero deadlocks"                                                     "$(cat "$TMP"/s1_*.txt "$TMP"/s2_*.txt 2>/dev/null | grep -ci deadlock | tr -d ' ')" "0"
+
+# ── Scenario T: two TRIAL purchases settled simultaneously ──────────────────
+# 066 stops a second trial checkout being OPENED once the trial is used, but two
+# can be opened before either is paid. Both then settle together. Exactly one
+# mints; the other must be recorded as refund_required rather than raising 23505
+# out of the webhook (which is what happened before 067 — money taken, purchase
+# left pending, nothing but a log line).
+echo "Scenario T — two trial purchases settled simultaneously (K=20):"
+T_K=20
+TSETUP="insert into public.locations (id,name,address,maps_url,hours_text,sort_order,is_active,is_default) values ('loc_qa_t','QA T','x','https://a.b','h',13,true,false);
+insert into public.packages (id,training_type,session_count,price,name,is_active,location_id) values
+  ('pkr_t_def','trial',1,5000,'Trial Oro',true,'loc_oro_plaza'),
+  ('pkr_t_qa','trial',1,5000,'Trial QA',true,'loc_qa_t');
+insert into auth.users (id) values ('$(uuid 4199)');
+insert into public.players (id,phone,name,gender,level,created_at,auth_user_id,is_owner) values ('plr_towner','+20100towner','Owner','men','beginner',now(),'$(uuid 4199)',true);"
+for k in $(seq 1 $T_K); do
+  TSETUP+="insert into auth.users (id) values ('$(uuid $((4200+k)))');"
+  TSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_t$k','+20100t$k','T','men','beginner',now(),'$(uuid $((4200+k)))');"
+  TSETUP+="insert into public.purchases (id,player_id,package_id,status,amount,created_at,payment_method,paid) values ('pur_t${k}a','plr_t$k','pkr_t_def','pending',5000,now(),'paymob',false),('pur_t${k}b','plr_t$k','pkr_t_qa','pending',5000,now(),'paymob',false);"
+done
+sql "$TSETUP" >/dev/null
+
+T=$(target 4)
+for k in $(seq 1 $T_K); do
+  racer_settle "pur_t${k}a" "txr_t${k}a" "$T" "$TMP/ta_$k.txt"
+  racer_settle "pur_t${k}b" "txr_t${k}b" "$T" "$TMP/tb_$k.txt"
+done
+wait
+
+T_MINTED=$(grep -lFx MINTED "$TMP"/ta_*.txt "$TMP"/tb_*.txt 2>/dev/null | wc -l | tr -d ' ')
+T_REFUND=$(grep -lFx REFUND "$TMP"/ta_*.txt "$TMP"/tb_*.txt 2>/dev/null | wc -l | tr -d ' ')
+T_RAISED=$(cat "$TMP"/ta_*.txt "$TMP"/tb_*.txt 2>/dev/null | grep -ci "ERROR\|duplicate key" | tr -d ' ')
+check "T: exactly one settle per player MINTED the trial"                     "$T_MINTED" "$T_K"
+check "T: and the other was recorded refund_required — it RAN"                "$T_REFUND" "$T_K"
+check "T: zero raised errors — the webhook never sees an exception"           "$T_RAISED" "0"
+check "T: exactly one trial batch per player"                                 "$(sql "select count(*) from public.credit_batches where player_id like 'plr_t%' and training_type='trial'")" "$T_K"
+check "T: every captured payment is recorded paid — none left pending"        "$(sql "select count(*) from public.purchases where id like 'pur_t%' and status = 'pending'")" "0"
+check "T: the refund-required rows are queryable and paid"                    "$(sql "select count(*) from public.purchases where id like 'pur_t%' and status='refund_required' and paid")" "$T_K"
+# One owner is seeded above, so one notification per stranded payment.
+check "T: the owners were told once per stranded payment"                     "$(sql "select count(*) from public.notifications where type='owner_refund_required'")" "$T_K"
 
 # ── teardown ─────────────────────────────────────────────────────────────────
 cleanup_rows

@@ -65,6 +65,7 @@ function batch(over: Partial<CreditBatch> = {}): CreditBatch {
     expiresAt: '2026-08-01T00:00:00.000Z' as IsoInstant,
     createdAt: NOW,
     note: null,
+    transferredFrom: null,
     ...over,
   };
 }

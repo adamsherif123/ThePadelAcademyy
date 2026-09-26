@@ -8,11 +8,17 @@
     "noUncheckedIndexedAccess": true,
     "noEmit": true,
     "skipLibCheck": true,
+    // Needed because index.notruntime.test.ts reads this package off disk to
+    // prove it emits no runtime code. Without it, `moduleResolution: "Bundler"`
+    // treats `node:fs` as an absolute URI and skips it. (Same as @tpa/core, 066.)
+    "types": ["node"],
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts", ".emitcheck"]
+  // Tests are INCLUDED (067, matching @tpa/core). Excluding them meant
+  // `tsc --noEmit` never saw them. `.emitcheck` stays out — scratch, not source.
+  "exclude": [".emitcheck"]
 }

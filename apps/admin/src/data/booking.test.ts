@@ -64,6 +64,7 @@ const groupBatch: CreditBatch = {
   playerId: 'pl_x' as PlayerId,
   source: 'purchase',
   purchaseId: 'pu_x' as PurchaseId,
+  transferredFrom: null,
   trainingType: 'group',
   quantityTotal: 4,
   quantityRemaining: 2,

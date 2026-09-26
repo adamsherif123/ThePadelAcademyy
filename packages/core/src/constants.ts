@@ -159,6 +159,9 @@ export const PURCHASE_STATUSES = [
   'pending',
   'succeeded',
   'failed',
+  // 067: captured, undeliverable, owed back. Kept out of 'succeeded' so revenue
+  // sums never include it.
+  'refund_required',
 ] as const satisfies readonly PurchaseStatus[];
 
 export const BOOKING_STATUSES = [
@@ -176,6 +179,9 @@ export const CREDIT_SOURCES = [
   'purchase',
   'signup_grant',
   'admin_grant',
+  // 067: credits an owner moved to another branch. Not revenue — the quantity
+  // came out of another batch of the same player's.
+  'transfer',
 ] as const satisfies readonly CreditSource[];
 
 export const PAYMENT_METHODS = ['paymob', 'cash', 'instapay'] as const satisfies readonly PaymentMethod[];

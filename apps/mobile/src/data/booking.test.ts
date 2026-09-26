@@ -87,6 +87,7 @@ function batch(over: Partial<CreditBatch> & Pick<CreditBatch, 'id'>): CreditBatc
     playerId: player.id,
     source: 'purchase',
     purchaseId: null,
+    transferredFrom: null,
     trainingType: 'group',
     quantityTotal: 4,
     quantityRemaining: 4,

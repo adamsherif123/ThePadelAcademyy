@@ -171,6 +171,7 @@ describe('unusedCreditValue', () => {
     createdAt: NOW,
     note: null,
     locationId: LOC,
+    transferredFrom: null,
     ...over,
   });
   const purchase = (over: Partial<Purchase> = {}): Purchase => ({

@@ -211,12 +211,19 @@ reset role;
 -- half of an ABBA cycle between batches. It holds the lock to stop a booking
 -- being inserted against the batch it is about to delete. A future RPC that locks
 -- more than one batch still has to order by credit_batch_id, and still trips this.
+--
+-- transfer_credit_batch (067) is admitted on the SAME ground, and this guard is
+-- how it got looked at: it locks one row by primary key — the SOURCE batch — and
+-- then INSERTS the child, which takes no second batch lock. Its order matches
+-- book_slot's (batch row first, dependent row after), so a transfer racing a
+-- booking queues instead of cycling. Concurrency R holds that, and S holds that
+-- two transfers on one batch cannot over-subtract.
 select set_eq(
   $$ select p.proname
        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
       where n.nspname = 'public'
         and p.prosrc ~* 'from\s+public\.credit_batches[^;]*for\s+update' $$,
-  $$ values ('cancel_session'), ('delete_credit_batch') $$,
+  $$ values ('cancel_session'), ('delete_credit_batch'), ('transfer_credit_batch') $$,
   'only cancel_session and delete_credit_batch lock credit_batches FOR UPDATE (S7b.1 ordered-lock invariant)'
 );
 
