@@ -103,4 +103,12 @@ SDK — never `pnpm add` them directly:
 ```bash
 pnpm --filter mobile exec expo install <package>
 ```
+
+## Environments & releases
+
+`main` is exactly what production serves. Work happens on `multi-location` and is tested
+locally against the dev project (`pnpm --filter admin dev`) — preview builds carry no
+Supabase config on purpose. Migrations go to dev only until a release session merges
+`multi-location` into `main` and pushes them to prod together. See
+[RELEASE.md](RELEASE.md).
 # ThePadelAcademyy
