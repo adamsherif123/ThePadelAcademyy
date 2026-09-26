@@ -1,4 +1,5 @@
-import type { IsoInstant, Piastres, PackageId, PlayerId, Purchase, PurchaseId } from '@tpa/types';
+import type { IsoInstant, Piastres, LocationId,
+  PackageId, PlayerId, Purchase, PurchaseId } from '@tpa/types';
 
 import { ID_PREFIXES, newId } from './ids';
 
@@ -14,6 +15,7 @@ import { ID_PREFIXES, newId } from './ids';
  */
 export function buildCashPurchase(
   playerId: PlayerId,
+  locationId: LocationId,
   packageId: PackageId,
   amount: Piastres,
   now: IsoInstant,
@@ -21,6 +23,9 @@ export function buildCashPurchase(
   return {
     id: newId(ID_PREFIXES.purchase) as PurchaseId,
     playerId,
+    // Advisory here: the DB forces purchases.location_id from the package on
+    // insert, so this value can never disagree with the truth.
+    locationId,
     packageId,
     status: 'succeeded',
     amount,

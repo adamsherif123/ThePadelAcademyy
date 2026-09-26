@@ -87,6 +87,10 @@ function slotDisplay(av: SlotAvailability): {
       return { state: 'unavailable', note: 'Credits expired', cta: 'Renew credits to book' };
     case 'no_credit':
       return { state: 'unavailable', note: 'No credits', cta: 'Add credits to book' };
+    // 065: they hold credits, just for another branch. Deliberately NO cta —
+    // buying more would not help; the fix is to switch branch, not to spend.
+    case 'wrong_location':
+      return { state: 'unavailable', note: 'Credits are for another location' };
     case 'past':
       return { state: 'unavailable', note: 'Started' };
     case 'cancelled':

@@ -56,8 +56,8 @@ insert into public.players (id, phone, name, gender, level, created_at, auth_use
          ('c2000000-c200-c200-c200-c2000000000' || i)::uuid
   from generate_series(1, 9) as i;
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at)
-  select 'cb_ch_' || i, 'pl_ch_' || i, 'signup_grant', null, 'trial', 1, 0, now()+interval '30 day', now()-interval '10 day'
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id)
+  select 'cb_ch_' || i, 'pl_ch_' || i, 'signup_grant', null, 'trial', 1, 0, now()+interval '30 day', now()-interval '10 day', 'loc_oro_plaza'
   from generate_series(1, 9) as i;
 
 -- One dedicated coach per scenario, so each coach's total isolates exactly one
@@ -147,30 +147,30 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
   -- H) IN PROGRESS right now (started, not yet ended) -> 0 (ends_at > now()).
   ('sl_ch_h1', 'co_ch_h', now()-interval '30 minutes', now()+interval '30 minutes', 'individual', 1, 1, null, null, 'published');
 
-insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at) values
-  ('bk_ch_a1', 'sl_ch_a1', 'pl_ch_1', 'cb_ch_1', 'attended', now()-interval '200 day'),
-  ('bk_ch_a2', 'sl_ch_a2', 'pl_ch_2', 'cb_ch_2', 'attended', now()-interval '200 day'),
-  ('bk_ch_b1', 'sl_ch_b1', 'pl_ch_3', 'cb_ch_3', 'attended', now()-interval '200 day'),
-  ('bk_ch_b2', 'sl_ch_b1', 'pl_ch_4', 'cb_ch_4', 'attended', now()-interval '200 day'),
-  ('bk_ch_b3', 'sl_ch_b1', 'pl_ch_5', 'cb_ch_5', 'attended', now()-interval '200 day'),
-  ('bk_ch_c1', 'sl_ch_c1', 'pl_ch_6', 'cb_ch_6', 'attended', now()-interval '200 day'),
-  ('bk_ch_c2', 'sl_ch_c1', 'pl_ch_7', 'cb_ch_7', 'no_show', now()-interval '200 day'),
-  ('bk_ch_c3', 'sl_ch_c1', 'pl_ch_8', 'cb_ch_8', 'no_show', now()-interval '200 day'),
-  ('bk_ch_d1', 'sl_ch_d1', 'pl_ch_9', 'cb_ch_9', 'attended', now()-interval '200 day'),
-  ('bk_ch_e1', 'sl_ch_e1', 'pl_ch_1', 'cb_ch_1', 'no_show', now()-interval '200 day'),
-  ('bk_ch_j1', 'sl_ch_j1', 'pl_ch_2', 'cb_ch_2', 'attended', now()-interval '200 day'),
-  ('bk_ch_lo1', 'sl_ch_lo1', 'pl_ch_3', 'cb_ch_3', 'attended', now()-interval '200 day'),
-  ('bk_ch_pre1', 'sl_ch_pre1', 'pl_ch_4', 'cb_ch_4', 'attended', now()-interval '200 day'),
-  ('bk_ch_cross1', 'sl_ch_cross1', 'pl_ch_5', 'cb_ch_5', 'attended', now()-interval '200 day'),
-  ('bk_ch_dstin1', 'sl_ch_dstin1', 'pl_ch_6', 'cb_ch_6', 'attended', now()-interval '150 day'),
-  ('bk_ch_dstout1', 'sl_ch_dstout1', 'pl_ch_7', 'cb_ch_7', 'attended', now()-interval '150 day'),
-  ('bk_ch_pay_mar', 'sl_ch_pay_mar', 'pl_ch_8', 'cb_ch_8', 'attended', now()-interval '200 day'),
-  ('bk_ch_pay_apr', 'sl_ch_pay_apr', 'pl_ch_9', 'cb_ch_9', 'attended', now()-interval '150 day'),
-  ('bk_ch_now1', 'sl_ch_now1', 'pl_ch_1', 'cb_ch_1', 'attended', now()-interval '2 hour'),
-  ('bk_ch_last1', 'sl_ch_last1', 'pl_ch_2', 'cb_ch_2', 'attended', now()-interval '2 hour'),
-  ('bk_ch_first1', 'sl_ch_first1', 'pl_ch_3', 'cb_ch_3', 'attended', now()-interval '2 hour'),
-  ('bk_ch_f1', 'sl_ch_f1', 'pl_ch_4', 'cb_ch_4', 'attended', now()-interval '1 hour'),
-  ('bk_ch_h1', 'sl_ch_h1', 'pl_ch_5', 'cb_ch_5', 'attended', now()-interval '20 minutes');
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, location_id) values
+  ('bk_ch_a1', 'sl_ch_a1', 'pl_ch_1', 'cb_ch_1', 'attended', now()-interval '200 day', 'loc_oro_plaza'),
+  ('bk_ch_a2', 'sl_ch_a2', 'pl_ch_2', 'cb_ch_2', 'attended', now()-interval '200 day', 'loc_oro_plaza'),
+  ('bk_ch_b1', 'sl_ch_b1', 'pl_ch_3', 'cb_ch_3', 'attended', now()-interval '200 day', 'loc_oro_plaza'),
+  ('bk_ch_b2', 'sl_ch_b1', 'pl_ch_4', 'cb_ch_4', 'attended', now()-interval '200 day', 'loc_oro_plaza'),
+  ('bk_ch_b3', 'sl_ch_b1', 'pl_ch_5', 'cb_ch_5', 'attended', now()-interval '200 day', 'loc_oro_plaza'),
+  ('bk_ch_c1', 'sl_ch_c1', 'pl_ch_6', 'cb_ch_6', 'attended', now()-interval '200 day', 'loc_oro_plaza'),
+  ('bk_ch_c2', 'sl_ch_c1', 'pl_ch_7', 'cb_ch_7', 'no_show', now()-interval '200 day', 'loc_oro_plaza'),
+  ('bk_ch_c3', 'sl_ch_c1', 'pl_ch_8', 'cb_ch_8', 'no_show', now()-interval '200 day', 'loc_oro_plaza'),
+  ('bk_ch_d1', 'sl_ch_d1', 'pl_ch_9', 'cb_ch_9', 'attended', now()-interval '200 day', 'loc_oro_plaza'),
+  ('bk_ch_e1', 'sl_ch_e1', 'pl_ch_1', 'cb_ch_1', 'no_show', now()-interval '200 day', 'loc_oro_plaza'),
+  ('bk_ch_j1', 'sl_ch_j1', 'pl_ch_2', 'cb_ch_2', 'attended', now()-interval '200 day', 'loc_oro_plaza'),
+  ('bk_ch_lo1', 'sl_ch_lo1', 'pl_ch_3', 'cb_ch_3', 'attended', now()-interval '200 day', 'loc_oro_plaza'),
+  ('bk_ch_pre1', 'sl_ch_pre1', 'pl_ch_4', 'cb_ch_4', 'attended', now()-interval '200 day', 'loc_oro_plaza'),
+  ('bk_ch_cross1', 'sl_ch_cross1', 'pl_ch_5', 'cb_ch_5', 'attended', now()-interval '200 day', 'loc_oro_plaza'),
+  ('bk_ch_dstin1', 'sl_ch_dstin1', 'pl_ch_6', 'cb_ch_6', 'attended', now()-interval '150 day', 'loc_oro_plaza'),
+  ('bk_ch_dstout1', 'sl_ch_dstout1', 'pl_ch_7', 'cb_ch_7', 'attended', now()-interval '150 day', 'loc_oro_plaza'),
+  ('bk_ch_pay_mar', 'sl_ch_pay_mar', 'pl_ch_8', 'cb_ch_8', 'attended', now()-interval '200 day', 'loc_oro_plaza'),
+  ('bk_ch_pay_apr', 'sl_ch_pay_apr', 'pl_ch_9', 'cb_ch_9', 'attended', now()-interval '150 day', 'loc_oro_plaza'),
+  ('bk_ch_now1', 'sl_ch_now1', 'pl_ch_1', 'cb_ch_1', 'attended', now()-interval '2 hour', 'loc_oro_plaza'),
+  ('bk_ch_last1', 'sl_ch_last1', 'pl_ch_2', 'cb_ch_2', 'attended', now()-interval '2 hour', 'loc_oro_plaza'),
+  ('bk_ch_first1', 'sl_ch_first1', 'pl_ch_3', 'cb_ch_3', 'attended', now()-interval '2 hour', 'loc_oro_plaza'),
+  ('bk_ch_f1', 'sl_ch_f1', 'pl_ch_4', 'cb_ch_4', 'attended', now()-interval '1 hour', 'loc_oro_plaza'),
+  ('bk_ch_h1', 'sl_ch_h1', 'pl_ch_5', 'cb_ch_5', 'attended', now()-interval '20 minutes', 'loc_oro_plaza');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- AS ADMIN

@@ -1,4 +1,4 @@
-import type { CreditBatch, IsoInstant, Player, SessionSlot, TrainingType } from '@tpa/types';
+import type { CreditBatch, IsoInstant, Player, SessionSlot, TrainingType, LocationId } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
 import { TRAINING_TYPES } from './constants';
@@ -15,6 +15,7 @@ import {
   spotsUntilConfirmed,
 } from './rules';
 
+const LOC = 'loc_oro_plaza' as LocationId;
 const NOW = '2026-07-14T12:00:00.000Z' as IsoInstant;
 
 const player: Player = {
@@ -29,6 +30,7 @@ const player: Player = {
 function slot(over: Partial<SessionSlot> = {}): SessionSlot {
   return {
     id: 'sl_1' as SessionSlot['id'],
+    locationId: LOC,
     coachId: 'co_1' as SessionSlot['coachId'],
     startsAt: '2026-07-14T18:00:00.000Z' as IsoInstant,
     endsAt: '2026-07-14T19:00:00.000Z' as IsoInstant,
@@ -53,6 +55,7 @@ function openSlot(over: Partial<SessionSlot> = {}): SessionSlot {
 function batch(over: Partial<CreditBatch> = {}): CreditBatch {
   return {
     id: 'cb_1' as CreditBatch['id'],
+    locationId: LOC,
     playerId: player.id,
     source: 'purchase',
     purchaseId: 'pu_1' as CreditBatch['purchaseId'],
@@ -191,7 +194,7 @@ describe('canBookSlot — TYPED slot (regression: unchanged from before the book
   });
 
   it('a granted trial credit books a trial slot but no other format', () => {
-    const grant = buildSignupGrant(player.id, NOW);
+    const grant = buildSignupGrant(player.id, LOC, NOW);
     const trialSlot = slot({ trainingType: 'trial', gender: null, level: null });
     expect(canBookSlot(trialSlot, player, [grant], NOW, 'trial')).toEqual({
       ok: true,
@@ -303,3 +306,61 @@ describe('bookableTypesFor', () => {
 /** Every TrainingType member is exercised somewhere above — a compile-time nudge, not a runtime one. */
 const _exhaustive: readonly TrainingType[] = TRAINING_TYPES;
 void _exhaustive;
+
+describe('canBookSlot — credits are location-locked (mirrors migration 065)', () => {
+  const OTHER = 'loc_branch_b' as CreditBatch['locationId'];
+
+  it('a credit at the slot’s branch pays for it', () => {
+    const b = batch();
+    expect(canBookSlot(slot(), player, [b], NOW, 'group')).toEqual({
+      ok: true,
+      creditBatchId: b.id,
+      trainingType: 'group',
+    });
+  });
+
+  it('a credit at ANOTHER branch is credit_wrong_location, not no_usable_credit', () => {
+    // The distinction is the whole point: "you have none" sends the player to
+    // buy; "yours are elsewhere" sends them to the other branch. Collapsing the
+    // two would tell someone to pay twice for credits they already own.
+    const elsewhere = batch({ locationId: OTHER });
+    expect(canBookSlot(slot(), player, [elsewhere], NOW, 'group')).toEqual({
+      ok: false,
+      reason: 'credit_wrong_location',
+      locationId: OTHER,
+    });
+  });
+
+  it('names the branch the player actually holds credits at', () => {
+    const res = canBookSlot(slot(), player, [batch({ locationId: OTHER })], NOW, 'group');
+    expect(res.ok ? null : res.locationId).toBe(OTHER);
+  });
+
+  it('no credit anywhere is still no_usable_credit', () => {
+    expect(canBookSlot(slot(), player, [], NOW, 'group')).toEqual({ ok: false, reason: 'no_usable_credit' });
+  });
+
+  it('an EXPIRED credit at the right branch does not become credit_wrong_location', () => {
+    // isBatchUsable runs first, so an unusable batch is not "a credit elsewhere"
+    // — it is no credit at all, and the copy must not send them to another branch.
+    const dead = batch({ expiresAt: '2020-01-01T00:00:00.000Z' as CreditBatch['expiresAt'] });
+    expect(canBookSlot(slot(), player, [dead], NOW, 'group')).toEqual({ ok: false, reason: 'no_usable_credit' });
+  });
+
+  it('prefers the right branch even when a wrong-branch batch expires sooner', () => {
+    // The sort is by expiry, so a sooner-expiring foreign batch sits first in
+    // `usable`; the location filter must still pick the payable one.
+    const soonElsewhere = batch({ id: 'cb_soon' as CreditBatch['id'], locationId: OTHER, expiresAt: NOW });
+    const mine = batch({ id: 'cb_mine' as CreditBatch['id'] });
+    const res = canBookSlot(slot(), player, [soonElsewhere, mine], NOW, 'group');
+    expect(res.ok ? res.creditBatchId : null).toBe('cb_mine');
+  });
+
+  it('a wrong-branch credit of the WRONG TYPE is not reported as a location problem', () => {
+    const duoElsewhere = batch({ locationId: OTHER, trainingType: 'duo' });
+    expect(canBookSlot(slot(), player, [duoElsewhere], NOW, 'group')).toEqual({
+      ok: false,
+      reason: 'no_usable_credit',
+    });
+  });
+});

@@ -58,29 +58,29 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
   ('sl_sr_empty',  'co_sr', now()+interval '5 day',  now()+interval '5 day 1 hour',  'individual', 1, 1, null,  null,       null, now(), 3,   'published'),
   ('sl_sr_rmv',    'co_sr', now()+interval '7 day',  now()+interval '7 day 1 hour',  'group',      2, 2, 'men', 'beginner', null, null, null, 'published');
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_sr_a1','pl_sr_a1','signup_grant',null,'group',      4,3,now()+interval '30 day',now()),
-  ('cb_sr_a2','pl_sr_a2','signup_grant',null,'group',      4,3,now()+interval '30 day',now()),
-  ('cb_sr_b1','pl_sr_b1','signup_grant',null,'group',      4,3,now()+interval '30 day',now()),
-  ('cb_sr_b2','pl_sr_b2','signup_grant',null,'group',      4,3,now()+interval '30 day',now()),
-  ('cb_sr_b3','pl_sr_b3','signup_grant',null,'group',      4,3,now()+interval '30 day',now()),
-  ('cb_sr_c1','pl_sr_c1','signup_grant',null,'group',      4,3,now()+interval '30 day',now()),
-  ('cb_sr_c2','pl_sr_c2','signup_grant',null,'group',      4,3,now()+interval '30 day',now()),
-  ('cb_sr_d1','pl_sr_d1','signup_grant',null,'individual', 4,3,now()+interval '30 day',now()),
-  ('cb_sr_f1','pl_sr_f1','signup_grant',null,'group',      4,3,now()+interval '30 day',now()),
-  ('cb_sr_f2','pl_sr_f2','signup_grant',null,'group',      4,3,now()+interval '30 day',now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_sr_a1','pl_sr_a1','signup_grant',null,'group',      4,3,now()+interval '30 day',now(), 'loc_oro_plaza'),
+  ('cb_sr_a2','pl_sr_a2','signup_grant',null,'group',      4,3,now()+interval '30 day',now(), 'loc_oro_plaza'),
+  ('cb_sr_b1','pl_sr_b1','signup_grant',null,'group',      4,3,now()+interval '30 day',now(), 'loc_oro_plaza'),
+  ('cb_sr_b2','pl_sr_b2','signup_grant',null,'group',      4,3,now()+interval '30 day',now(), 'loc_oro_plaza'),
+  ('cb_sr_b3','pl_sr_b3','signup_grant',null,'group',      4,3,now()+interval '30 day',now(), 'loc_oro_plaza'),
+  ('cb_sr_c1','pl_sr_c1','signup_grant',null,'group',      4,3,now()+interval '30 day',now(), 'loc_oro_plaza'),
+  ('cb_sr_c2','pl_sr_c2','signup_grant',null,'group',      4,3,now()+interval '30 day',now(), 'loc_oro_plaza'),
+  ('cb_sr_d1','pl_sr_d1','signup_grant',null,'individual', 4,3,now()+interval '30 day',now(), 'loc_oro_plaza'),
+  ('cb_sr_f1','pl_sr_f1','signup_grant',null,'group',      4,3,now()+interval '30 day',now(), 'loc_oro_plaza'),
+  ('cb_sr_f2','pl_sr_f2','signup_grant',null,'group',      4,3,now()+interval '30 day',now(), 'loc_oro_plaza');
 
-insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at) values
-  ('bk_sr_a1','sl_sr_fill2','pl_sr_a1','cb_sr_a1','booked',now()),
-  ('bk_sr_a2','sl_sr_fill2','pl_sr_a2','cb_sr_a2','booked',now()),
-  ('bk_sr_b1','sl_sr_fill3','pl_sr_b1','cb_sr_b1','booked',now()),
-  ('bk_sr_b2','sl_sr_fill3','pl_sr_b2','cb_sr_b2','booked',now()),
-  ('bk_sr_b3','sl_sr_fill3','pl_sr_b3','cb_sr_b3','booked',now()),
-  ('bk_sr_c1','sl_sr_manual','pl_sr_c1','cb_sr_c1','booked',now()),
-  ('bk_sr_c2','sl_sr_manual','pl_sr_c2','cb_sr_c2','booked',now()),
-  ('bk_sr_d1','sl_sr_empty','pl_sr_d1','cb_sr_d1','booked',now()),
-  ('bk_sr_f1','sl_sr_rmv','pl_sr_f1','cb_sr_f1','booked',now()),
-  ('bk_sr_f2','sl_sr_rmv','pl_sr_f2','cb_sr_f2','booked',now());
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, location_id) values
+  ('bk_sr_a1','sl_sr_fill2','pl_sr_a1','cb_sr_a1','booked',now(), 'loc_oro_plaza'),
+  ('bk_sr_a2','sl_sr_fill2','pl_sr_a2','cb_sr_a2','booked',now(), 'loc_oro_plaza'),
+  ('bk_sr_b1','sl_sr_fill3','pl_sr_b1','cb_sr_b1','booked',now(), 'loc_oro_plaza'),
+  ('bk_sr_b2','sl_sr_fill3','pl_sr_b2','cb_sr_b2','booked',now(), 'loc_oro_plaza'),
+  ('bk_sr_b3','sl_sr_fill3','pl_sr_b3','cb_sr_b3','booked',now(), 'loc_oro_plaza'),
+  ('bk_sr_c1','sl_sr_manual','pl_sr_c1','cb_sr_c1','booked',now(), 'loc_oro_plaza'),
+  ('bk_sr_c2','sl_sr_manual','pl_sr_c2','cb_sr_c2','booked',now(), 'loc_oro_plaza'),
+  ('bk_sr_d1','sl_sr_empty','pl_sr_d1','cb_sr_d1','booked',now(), 'loc_oro_plaza'),
+  ('bk_sr_f1','sl_sr_rmv','pl_sr_f1','cb_sr_f1','booked',now(), 'loc_oro_plaza'),
+  ('bk_sr_f2','sl_sr_rmv','pl_sr_f2','cb_sr_f2','booked',now(), 'loc_oro_plaza');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- A) fill-confirmed 2/2 → 1/2: the ONE remaining player is notified, the

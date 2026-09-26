@@ -47,9 +47,9 @@ insert into public.coaches (id, name, bio, is_active) values
 insert into public.session_slots (id, coach_id, starts_at, ends_at, training_type, capacity, booked_count, gender, level, status) values
   ('sl_gdo1', 'co_gdo1', now()+interval '1 day', now()+interval '1 day 1 hour', null, 4, 0, null, null, 'published');
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_gdo_a', 'pl_gdo_a', 'signup_grant', null, 'group', 2, 2, now()+interval '30 day', now()),
-  ('cb_gdo_b', 'pl_gdo_b', 'signup_grant', null, 'group', 2, 2, now()+interval '30 day', now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_gdo_a', 'pl_gdo_a', 'signup_grant', null, 'group', 2, 2, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_gdo_b', 'pl_gdo_b', 'signup_grant', null, 'group', 2, 2, now()+interval '30 day', now(), 'loc_oro_plaza');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- 1) book_slot: two DIFFERENT-gender players book the SAME group slot — both
@@ -83,8 +83,8 @@ select is(
 -- Raw fixture INSERT needs superuser privilege (RLS grants only allow
 -- authenticated writes through the SECURITY DEFINER RPCs, not directly on the
 -- tables) — already `reset role` from the block above.
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at)
-  values ('cb_gdo_c', 'pl_gdo_c', 'signup_grant', null, 'group', 1, 1, now()+interval '30 day', now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id)
+  values ('cb_gdo_c', 'pl_gdo_c', 'signup_grant', null, 'group', 1, 1, now()+interval '30 day', now(), 'loc_oro_plaza');
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"24242424-2121-2121-2121-212121212121","role":"authenticated"}', true);
 select is(public.admin_book_player('sl_gdo1','pl_gdo_c',false)->>'ok', 'true', 'admin books C (ladies) onto the men-recorded sl_gdo1 with override=FALSE — ok (nothing to override)');

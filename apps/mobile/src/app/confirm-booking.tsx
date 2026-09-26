@@ -52,6 +52,8 @@ const UNBOOKABLE_MESSAGE: Record<BookReason, string> = {
   slot_cancelled: 'This session was cancelled.',
   type_mismatch: 'Someone just started a different session here. Go back and pick again.',
   no_usable_credit: 'You no longer have a usable credit for this session.',
+  // 065: they have credits — just not for this branch.
+  credit_wrong_location: 'Your credits are for a different location, so they can’t pay for this session.',
   slot_missing: 'This session is no longer available.',
   already_booked: "You've already booked this session.",
   not_authenticated: 'Your session expired. Please sign in again.',

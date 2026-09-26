@@ -218,8 +218,8 @@ reset role;
 select is(tpa.credit_expiry(), interval '40 days', 'I: tpa.credit_expiry() is now 40 days');
 
 -- A pre-existing batch, seeded as if minted BEFORE this migration (30-day span).
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_news_pre', 'pl_news_a', 'signup_grant', null, 'group', 2, 2, now() - interval '10 days' + interval '30 days', now() - interval '10 days');
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_news_pre', 'pl_news_a', 'signup_grant', null, 'group', 2, 2, now() - interval '10 days' + interval '30 days', now() - interval '10 days', 'loc_oro_plaza');
 select is(
   (select expires_at - created_at from public.credit_batches where id = 'cb_news_pre'),
   interval '30 days', 'I: the PRE-EXISTING batch keeps its original 30-day span — completely untouched');

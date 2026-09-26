@@ -35,8 +35,8 @@ insert into public.packages (id, training_type, session_count, price, name, is_a
 
 -- ── historical signup_grant batch still validates (source/CHECK/index kept) ──
 select lives_ok(
-  $$ insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, note)
-       values ('cb_hist', 'pl_A', 'signup_grant', null, 'trial', 2, 2, now()+interval '30 day', now(), null) $$,
+  $$ insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, note, location_id)
+       values ('cb_hist', 'pl_A', 'signup_grant', null, 'trial', 2, 2, now()+interval '30 day', now(), null, 'loc_oro_plaza') $$,
   'a historical signup_grant batch still inserts (source/CHECK/index kept for history)');
 delete from public.credit_batches where id = 'cb_hist';   -- keep pl_A clean for the flow below
 
@@ -45,11 +45,11 @@ delete from public.credit_batches where id = 'cb_hist';   -- keep pl_A clean for
 insert into public.purchases (id, player_id, package_id, status, amount, created_at, payment_method) values
   ('pu_d1', 'pl_D', 'pk_trial', 'succeeded', 50000, now(), 'cash'),
   ('pu_d2', 'pl_D', 'pk_trial', 'succeeded', 50000, now(), 'cash');
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, note)
-  values ('cb_d1', 'pl_D', 'purchase', 'pu_d1', 'trial', 1, 1, now()+interval '30 day', now(), null);
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, note, location_id)
+  values ('cb_d1', 'pl_D', 'purchase', 'pu_d1', 'trial', 1, 1, now()+interval '30 day', now(), null, 'loc_oro_plaza');
 select throws_ok(
-  $$ insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, note)
-       values ('cb_d2', 'pl_D', 'purchase', 'pu_d2', 'trial', 1, 1, now()+interval '30 day', now(), null) $$,
+  $$ insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, note, location_id)
+       values ('cb_d2', 'pl_D', 'purchase', 'pu_d2', 'trial', 1, 1, now()+interval '30 day', now(), null, 'loc_oro_plaza') $$,
   '23505', null, 'index B: a SECOND trial-purchase batch for a player is rejected');
 
 -- Index A: at most one LIVE trial request. Seed D an APPROVED trial request; a PENDING one

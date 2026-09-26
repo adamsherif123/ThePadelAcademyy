@@ -50,11 +50,11 @@ insert into public.credit_requests
   ('cr_dcb_a', 'pl_dcb_p1', 'pk_dcb', 'instapay', null, 'approved', now(), now(), 'ad_dcb', 'pu_dcb_a');
 
 insert into public.credit_batches
-  (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, note) values
-  ('cb_dcb_a', 'pl_dcb_p1', 'purchase',    'pu_dcb_a', 'group', 4, 4, now() + interval '30 days', now(), null),
-  ('cb_dcb_b', 'pl_dcb_p1', 'purchase',    'pu_dcb_b', 'group', 4, 4, now() + interval '30 days', now(), null),
-  ('cb_dcb_c', 'pl_dcb_p1', 'admin_grant', null,       'group', 2, 2, now() + interval '30 days', now(), 'comp'),
-  ('cb_dcb_d', 'pl_dcb_p1', 'admin_grant', null,       'duo',   1, 1, now() + interval '30 days', now(), 'keep me');
+  (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, note, location_id) values
+  ('cb_dcb_a', 'pl_dcb_p1', 'purchase',    'pu_dcb_a', 'group', 4, 4, now() + interval '30 days', now(), null, 'loc_oro_plaza'),
+  ('cb_dcb_b', 'pl_dcb_p1', 'purchase',    'pu_dcb_b', 'group', 4, 4, now() + interval '30 days', now(), null, 'loc_oro_plaza'),
+  ('cb_dcb_c', 'pl_dcb_p1', 'admin_grant', null,       'group', 2, 2, now() + interval '30 days', now(), 'comp', 'loc_oro_plaza'),
+  ('cb_dcb_d', 'pl_dcb_p1', 'admin_grant', null,       'duo',   1, 1, now() + interval '30 days', now(), 'keep me', 'loc_oro_plaza');
 
 insert into public.session_slots
   (id, coach_id, template_id, starts_at, ends_at, training_type, capacity, gender, level, status) values
@@ -64,8 +64,8 @@ insert into public.session_slots
 -- B's batch has been spent against. The credit was REFUNDED (the booking is
 -- cancelled), so quantity_remaining is back at its total — the exact case that
 -- would look "untouched" to anything that only compared the two numbers.
-insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, cancelled_at) values
-  ('bk_dcb', 'ss_dcb', 'pl_dcb_p1', 'cb_dcb_b', 'cancelled', now(), now());
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, cancelled_at, location_id) values
+  ('bk_dcb', 'ss_dcb', 'pl_dcb_p1', 'cb_dcb_b', 'cancelled', now(), now(), 'loc_oro_plaza');
 
 -- Each call's answer, recorded once. Created and granted as postgres, because
 -- `authenticated` holds no TEMP privilege of its own.

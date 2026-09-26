@@ -38,16 +38,16 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
   ('sl_pub',    'co_active', now() + interval '1 day', now() + interval '1 day 1 hour', 'trial', 4, 1, null, null, 'published', null),
   ('sl_cancel', 'co_active', now() + interval '2 day', now() + interval '2 day 1 hour', 'trial', 4, 0, null, null, 'cancelled', null);
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, note) values
-  ('cb_A', 'pl_A', 'signup_grant', null, 'trial', 2, 2, now() + interval '30 day', now(), null),
-  ('cb_B', 'pl_B', 'signup_grant', null, 'trial', 2, 2, now() + interval '30 day', now(), null);
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, note, location_id) values
+  ('cb_A', 'pl_A', 'signup_grant', null, 'trial', 2, 2, now() + interval '30 day', now(), null, 'loc_oro_plaza'),
+  ('cb_B', 'pl_B', 'signup_grant', null, 'trial', 2, 2, now() + interval '30 day', now(), null, 'loc_oro_plaza');
 
 insert into public.purchases (id, player_id, package_id, status, amount, payment_method, created_at, gateway_order_id, gateway_transaction_id) values
   ('pu_A', 'pl_A', 'pk_active', 'pending', 35000, 'paymob', now(), null, null),
   ('pu_B', 'pl_B', 'pk_active', 'pending', 35000, 'paymob', now(), null, null);
 
-insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, cancelled_at) values
-  ('bk_A', 'sl_pub', 'pl_A', 'cb_A', 'booked', now(), null);
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, cancelled_at, location_id) values
+  ('bk_A', 'sl_pub', 'pl_A', 'cb_A', 'booked', now(), null, 'loc_oro_plaza');
 
 -- Templates: two active (weekdays 0 and 3 → the open days), one inactive.
 insert into public.availability_templates (id, coach_id, weekday, start_time, end_time, training_type, capacity, gender, level, is_active) values
@@ -113,8 +113,8 @@ select is((select count(*)::int from u), 0, 'A''s update targeting B''s row affe
 
 -- bookings: no direct client insert.
 select throws_ok(
-  $$ insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at)
-     values ('bk_hack', 'sl_pub', 'pl_A', 'cb_A', 'booked', now()) $$,
+  $$ insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, location_id)
+     values ('bk_hack', 'sl_pub', 'pl_A', 'cb_A', 'booked', now(), 'loc_oro_plaza') $$,
   '42501', null, 'A cannot insert a booking directly');
 
 -- Public reads: published slot / active coach / active package only.
@@ -212,8 +212,8 @@ select throws_ok(
   $$ update public.session_slots set booked_count = booked_count + 1 where id = 'sl_pub' $$,
   '42501', null, 'admin CANNOT write booked_count directly (column not granted — RPC only)');
 select throws_ok(
-  $$ insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at)
-     values ('bk_admin', 'sl_pub', 'pl_A', 'cb_A', 'booked', now()) $$,
+  $$ insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, location_id)
+     values ('bk_admin', 'sl_pub', 'pl_A', 'cb_A', 'booked', now(), 'loc_oro_plaza') $$,
   '42501', null, 'admin CANNOT insert a booking directly (RPC only)');
 select throws_ok(
   $$ update public.credit_batches set quantity_remaining = 0 where id = 'cb_A' $$,
@@ -245,24 +245,24 @@ reset role;
 -- ════════════════════════════════════════════════════════════════════════════
 
 select throws_ok(
-  $$ insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at)
-     values ('cb_A2', 'pl_A', 'signup_grant', null, 'trial', 2, 2, now() + interval '30 day', now()) $$,
+  $$ insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id)
+     values ('cb_A2', 'pl_A', 'signup_grant', null, 'trial', 2, 2, now() + interval '30 day', now(), 'loc_oro_plaza') $$,
   '23505', null, 'partial unique index rejects a second signup grant');
 select throws_ok(
-  $$ insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at)
-     values ('bk_dup', 'sl_pub', 'pl_A', 'cb_A', 'booked', now()) $$,
+  $$ insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, location_id)
+     values ('bk_dup', 'sl_pub', 'pl_A', 'cb_A', 'booked', now(), 'loc_oro_plaza') $$,
   '23505', null, 'unique(player_id, slot_id) rejects a duplicate booking');
 select throws_ok(
   $$ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_type, capacity, booked_count, gender, level, status)
      values ('sl_grp', 'co_active', now() + interval '3 day', now() + interval '3 day 1 hour', 'group', 4, 0, 'men', null, 'published') $$,
   '23514', null, 'group invariant CHECK rejects a group slot with null level');
 select throws_ok(
-  $$ insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at)
-     values ('cb_bad', 'pl_A', 'purchase', null, 'trial', 2, 2, now() + interval '30 day', now()) $$,
+  $$ insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id)
+     values ('cb_bad', 'pl_A', 'purchase', null, 'trial', 2, 2, now() + interval '30 day', now(), 'loc_oro_plaza') $$,
   '23514', null, 'CHECK rejects source=purchase with null purchase_id');
 select throws_ok(
-  $$ insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, note)
-     values ('cb_note', 'pl_A', 'signup_grant', null, 'trial', 2, 2, now() + interval '30 day', now(), 'why') $$,
+  $$ insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, note, location_id)
+     values ('cb_note', 'pl_A', 'signup_grant', null, 'trial', 2, 2, now() + interval '30 day', now(), 'why', 'loc_oro_plaza') $$,
   '23514', null, 'CHECK rejects a note on a non-admin_grant batch');
 select throws_ok(
   $$ update public.session_slots set booked_count = capacity + 1 where id = 'sl_pub' $$,

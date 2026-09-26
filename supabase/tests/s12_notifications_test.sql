@@ -38,22 +38,22 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
   ('sl_conf',  'co_n', now()+interval '7 day', now()+interval '7 day 1 hour', 'group', 4, 2, 'men','beginner','published'),
   ('sl_fullc', 'co_n', now()+interval '8 day', now()+interval '8 day 1 hour', 'group', 2, 2, 'men','beginner','published');
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_1', 'pl_1','signup_grant',null,'group',      20,10,now()+interval '30 day',now()),
-  ('cb_2', 'pl_2','signup_grant',null,'group',      20,10,now()+interval '30 day',now()),
-  ('cb_3i','pl_3','signup_grant',null,'individual',  5, 5,now()+interval '30 day',now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_1', 'pl_1','signup_grant',null,'group',      20,10,now()+interval '30 day',now(), 'loc_oro_plaza'),
+  ('cb_2', 'pl_2','signup_grant',null,'group',      20,10,now()+interval '30 day',now(), 'loc_oro_plaza'),
+  ('cb_3i','pl_3','signup_grant',null,'individual',  5, 5,now()+interval '30 day',now(), 'loc_oro_plaza');
 
-insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at) values
-  ('bk_fill_1','sl_fill',  'pl_1','cb_1','booked',now()),
-  ('bk_can_1', 'sl_cancel','pl_1','cb_1','booked',now()),
-  ('bk_can_2', 'sl_cancel','pl_2','cb_2','booked',now()),
-  ('bk_rmf_1', 'sl_rmf',   'pl_1','cb_1','booked',now()),
-  ('bk_rmf_2', 'sl_rmf',   'pl_2','cb_2','booked',now()),
-  ('bk_res_1', 'sl_res',   'pl_1','cb_1','booked',now()),
-  ('bk_conf_1','sl_conf',  'pl_1','cb_1','booked',now()),
-  ('bk_conf_2','sl_conf',  'pl_2','cb_2','booked',now()),
-  ('bk_flc_1', 'sl_fullc', 'pl_1','cb_1','booked',now()),
-  ('bk_flc_2', 'sl_fullc', 'pl_2','cb_2','booked',now());
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, location_id) values
+  ('bk_fill_1','sl_fill',  'pl_1','cb_1','booked',now(), 'loc_oro_plaza'),
+  ('bk_can_1', 'sl_cancel','pl_1','cb_1','booked',now(), 'loc_oro_plaza'),
+  ('bk_can_2', 'sl_cancel','pl_2','cb_2','booked',now(), 'loc_oro_plaza'),
+  ('bk_rmf_1', 'sl_rmf',   'pl_1','cb_1','booked',now(), 'loc_oro_plaza'),
+  ('bk_rmf_2', 'sl_rmf',   'pl_2','cb_2','booked',now(), 'loc_oro_plaza'),
+  ('bk_res_1', 'sl_res',   'pl_1','cb_1','booked',now(), 'loc_oro_plaza'),
+  ('bk_conf_1','sl_conf',  'pl_1','cb_1','booked',now(), 'loc_oro_plaza'),
+  ('bk_conf_2','sl_conf',  'pl_2','cb_2','booked',now(), 'loc_oro_plaza'),
+  ('bk_flc_1', 'sl_fullc', 'pl_1','cb_1','booked',now(), 'loc_oro_plaza'),
+  ('bk_flc_2', 'sl_fullc', 'pl_2','cb_2','booked',now(), 'loc_oro_plaza');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- A) book_slot fill → session_confirmed to the OTHER bookings, not the booker.
@@ -108,9 +108,9 @@ select is((select body from public.notifications where type='removed_from_sessio
 
 -- E) grant_credits → credits_granted.
 select is(public.grant_credits('pl_3','group',3,'Rained out')->>'ok','true','grant_credits ok');
-select is((select body from public.notifications where type='credits_granted' and player_id='pl_3'), 'You received 3 Group credits.', 'grant copy names count + type');
+select is((select body from public.notifications where type='credits_granted' and player_id='pl_3'), 'You received 3 Group credits for Oro Plaza Hotel.', 'grant copy names count + type AND the branch they are spendable at');
 select is(public.grant_credits('pl_3','individual',1,'One more')->>'ok','true','grant_credits (1) ok');
-select is((select count(*)::int from public.notifications where type='credits_granted' and player_id='pl_3' and body='You received 1 Individual credit.'), 1, 'singular "credit" for a quantity of 1');
+select is((select count(*)::int from public.notifications where type='credits_granted' and player_id='pl_3' and body='You received 1 Individual credit for Oro Plaza Hotel.'), 1, 'singular "credit" for a quantity of 1');
 
 -- F) reschedule_session → session_rescheduled only when the START moves.
 select is(public.reschedule_session('sl_res','co_n',4, now()+interval '6 day 2 hour', now()+interval '6 day 3 hour')->>'moved','true','reschedule that moves the start → moved=true');

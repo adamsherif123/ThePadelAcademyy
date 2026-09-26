@@ -33,8 +33,8 @@ insert into public.players (id, phone, name, gender, level, created_at, auth_use
   ('pl_st3', '+201900040013', 'Xena Student',  'ladies', 'beginner',     now(), null, 's3@x.eg', null),
   ('pl_st4', '+201900040014', 'Walid Dropout', 'men',    'beginner',     now(), null, 's4@x.eg', null);
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at)
-select 'cb_'||p, p, 'signup_grant', null, 'group', 9, 9, now()+interval '30 day', now()
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id)
+select 'cb_'||p, p, 'signup_grant', null, 'group', 9, 9, now()+interval '30 day', now(), 'loc_oro_plaza'
 from unnest(array['pl_st1','pl_st2','pl_st3','pl_st4']) p;
 
 -- Coach A: three finished sessions and one upcoming, all inside today.
@@ -50,16 +50,16 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
   -- Coach B's own session, finished and attended: must never reach coach A.
   ('sl_db1', 'co_dash_b', now()-interval '90 minutes', now()-interval '30 minutes', 'group',      4, 1, 'men', 'beginner', 'published');
 
-insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, cancelled_at) values
-  ('bk_da1a', 'sl_da1', 'pl_st1', 'cb_pl_st1', 'attended',  now(), null),
-  ('bk_da1b', 'sl_da1', 'pl_st2', 'cb_pl_st2', 'attended',  now(), null),
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, cancelled_at, location_id) values
+  ('bk_da1a', 'sl_da1', 'pl_st1', 'cb_pl_st1', 'attended',  now(), null, 'loc_oro_plaza'),
+  ('bk_da1b', 'sl_da1', 'pl_st2', 'cb_pl_st2', 'attended',  now(), null, 'loc_oro_plaza'),
   -- A cancelled seat on the same session: not a student, not court time.
-  ('bk_da1c', 'sl_da1', 'pl_st4', 'cb_pl_st4', 'cancelled', now(), now()),
+  ('bk_da1c', 'sl_da1', 'pl_st4', 'cb_pl_st4', 'cancelled', now(), now(), 'loc_oro_plaza'),
   -- st1 again: the SAME person on a second session — one student, not two.
-  ('bk_da2a', 'sl_da2', 'pl_st1', 'cb_pl_st1', 'attended',  now(), null),
-  ('bk_da3a', 'sl_da3', 'pl_st3', 'cb_pl_st3', 'booked',    now(), null),
-  ('bk_da4a', 'sl_da4', 'pl_st1', 'cb_pl_st1', 'booked',    now(), null),
-  ('bk_db1a', 'sl_db1', 'pl_st2', 'cb_pl_st2', 'attended',  now(), null);
+  ('bk_da2a', 'sl_da2', 'pl_st1', 'cb_pl_st1', 'attended',  now(), null, 'loc_oro_plaza'),
+  ('bk_da3a', 'sl_da3', 'pl_st3', 'cb_pl_st3', 'booked',    now(), null, 'loc_oro_plaza'),
+  ('bk_da4a', 'sl_da4', 'pl_st1', 'cb_pl_st1', 'booked',    now(), null, 'loc_oro_plaza'),
+  ('bk_db1a', 'sl_db1', 'pl_st2', 'cb_pl_st2', 'attended',  now(), null, 'loc_oro_plaza');
 
 -- Sanity on the fixture itself, as postgres (RLS bypassed): there are genuinely
 -- MORE bookings than distinct students, so the distinct below is doing real work

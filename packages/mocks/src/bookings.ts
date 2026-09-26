@@ -2,6 +2,7 @@ import { cairoCalendarDate } from '@tpa/core';
 import type { Booking, BookingId, CreditBatchId, PlayerId, SessionSlot, SlotId } from '@tpa/types';
 
 import { generatedBookings } from './generated';
+import { MOCK_LOCATION_ID } from './locations';
 import { MOCK_NOW, daysFromNow } from './now';
 import { mockSlots } from './schedule';
 
@@ -41,6 +42,7 @@ const bookedGroupSlot =
 const handBookings: Booking[] = [
   {
     id: 'bk_booked' as BookingId,
+    locationId: MOCK_LOCATION_ID,
     slotId: bookedGroupSlot.id,
     playerId: 'pl_omar' as PlayerId,
     creditBatchId: 'cb_group_main' as CreditBatchId,
@@ -50,6 +52,7 @@ const handBookings: Booking[] = [
   },
   {
     id: 'bk_cancelled' as BookingId,
+    locationId: MOCK_LOCATION_ID,
     slotId: pick(future, 1).id,
     playerId: 'pl_omar' as PlayerId,
     creditBatchId: 'cb_group_main' as CreditBatchId,
@@ -59,6 +62,7 @@ const handBookings: Booking[] = [
   },
   {
     id: 'bk_attended' as BookingId,
+    locationId: MOCK_LOCATION_ID,
     slotId: pick(past, 0).id,
     playerId: 'pl_omar' as PlayerId,
     creditBatchId: 'cb_group_main' as CreditBatchId,
@@ -68,6 +72,7 @@ const handBookings: Booking[] = [
   },
   {
     id: 'bk_no_show' as BookingId,
+    locationId: MOCK_LOCATION_ID,
     slotId: pick(past, 1).id,
     playerId: 'pl_omar' as PlayerId,
     creditBatchId: 'cb_group_main' as CreditBatchId,
@@ -79,6 +84,7 @@ const handBookings: Booking[] = [
   // Paid from the individual batch (cb_indiv_main).
   {
     id: 'bk_soon' as BookingId,
+    locationId: MOCK_LOCATION_ID,
     slotId: 'sl_soon_indiv_20260715' as SlotId,
     playerId: 'pl_omar' as PlayerId,
     creditBatchId: 'cb_indiv_main' as CreditBatchId,
@@ -90,6 +96,7 @@ const handBookings: Booking[] = [
   // (cb_duo_expired) has already lapsed: the refund returns a dead credit.
   {
     id: 'bk_expired_refund' as BookingId,
+    locationId: MOCK_LOCATION_ID,
     slotId: 'sl_future_duo_20260720' as SlotId,
     playerId: 'pl_omar' as PlayerId,
     creditBatchId: 'cb_duo_expired' as CreditBatchId,

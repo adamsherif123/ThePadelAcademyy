@@ -33,18 +33,18 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
   ('sl_fut_keep', 'co_e', now()+interval '2 day', now()+interval '2 day 1 hour', 'individual', 4, 1, null, null, 'published'),
   ('sl_past_del', 'co_d', now()-interval '2 day', now()-interval '2 day' + interval '1 hour', 'individual', 4, 1, null, null, 'published');
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_del',  'pl_del',  'signup_grant', null, 'individual', 4, 2, now()+interval '30 day', now()),
-  ('cb_keep', 'pl_keep', 'signup_grant', null, 'individual', 2, 1, now()+interval '30 day', now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_del',  'pl_del',  'signup_grant', null, 'individual', 4, 2, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_keep', 'pl_keep', 'signup_grant', null, 'individual', 2, 1, now()+interval '30 day', now(), 'loc_oro_plaza');
 
 insert into public.purchases (id, player_id, package_id, status, amount, created_at, payment_method) values
   ('pu_del',  'pl_del', 'pk_i4', 'succeeded', 600000, now(), 'paymob'),
   ('pu_pend', 'pl_del', 'pk_i4', 'pending',   600000, now(), 'paymob');  -- an abandoned pending
 
-insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at) values
-  ('bk_fd', 'sl_fut_del',  'pl_del',  'cb_del',  'booked', now()),   -- future → cancels, frees seat
-  ('bk_fk', 'sl_fut_keep', 'pl_keep', 'cb_keep', 'booked', now()),   -- bystander → untouched
-  ('bk_pd', 'sl_past_del', 'pl_del',  'cb_del',  'booked', now());   -- past → stays as history
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, location_id) values
+  ('bk_fd', 'sl_fut_del',  'pl_del',  'cb_del',  'booked', now(), 'loc_oro_plaza'),   -- future → cancels, frees seat
+  ('bk_fk', 'sl_fut_keep', 'pl_keep', 'cb_keep', 'booked', now(), 'loc_oro_plaza'),   -- bystander → untouched
+  ('bk_pd', 'sl_past_del', 'pl_del',  'cb_del',  'booked', now(), 'loc_oro_plaza');   -- past → stays as history
 
 -- ── an authenticated caller with NO player (sub absent) → not_authenticated ──
 set local role authenticated;

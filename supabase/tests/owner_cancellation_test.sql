@@ -44,10 +44,10 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
   ('sl_ses',  'co_abd', now()+interval '5 day', now()+interval '5 day 1 hour', 'group', 4, 0, 'men', 'beginner', 'published'),
   ('sl_del',  'co_abd', now()+interval '6 day', now()+interval '6 day 1 hour', 'group', 4, 0, 'men', 'beginner', 'published');
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_pete', 'pl_pete', 'signup_grant', null, 'group', 9, 9, now()+interval '30 day', now()),
-  ('cb_o1',   'pl_o1',   'signup_grant', null, 'group', 9, 9, now()+interval '30 day', now()),
-  ('cb_stay', 'pl_stay', 'signup_grant', null, 'group', 9, 9, now()+interval '30 day', now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_pete', 'pl_pete', 'signup_grant', null, 'group', 9, 9, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_o1',   'pl_o1',   'signup_grant', null, 'group', 9, 9, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_stay', 'pl_stay', 'signup_grant', null, 'group', 9, 9, now()+interval '30 day', now(), 'loc_oro_plaza');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- A PLAYER cancels their own booking → both owners pinged, exact string

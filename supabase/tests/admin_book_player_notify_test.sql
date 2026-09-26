@@ -44,8 +44,8 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
   ('sl_abn_gender', 'co_abn2', now()+interval '1 day', now()+interval '1 day 1 hour', 'group', 4, 0, 'ladies', 'beginner', 'published'),
   ('sl_abn_full',   'co_abn3', now()+interval '1 day', now()+interval '1 day 1 hour', 'duo',   1, 1, null, null, 'published');
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_abn_win', 'pl_abn_win', 'signup_grant', null, 'duo', 5, 5, now()+interval '30 day', now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_abn_win', 'pl_abn_win', 'signup_grant', null, 'duo', 5, 5, now()+interval '30 day', now(), 'loc_oro_plaza');
   -- pl_abn_nocredit deliberately holds NO credit batch of any type.
 
 set local role authenticated;

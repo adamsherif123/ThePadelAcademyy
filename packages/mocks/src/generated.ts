@@ -1,3 +1,4 @@
+import { MOCK_LOCATION_ID } from './locations';
 import { CREDIT_EXPIRY_DAYS, buildAdminGrant } from '@tpa/core';
 import type {
   Booking,
@@ -142,6 +143,7 @@ for (let dayOffset = WINDOW_DAYS; dayOffset >= 1; dayOffset -= 1) {
     generatedPurchases.push({
       id: purchaseId,
       playerId: player.id,
+      locationId: MOCK_LOCATION_ID,
       packageId: pkg.id,
       status,
       amount: pkg.price,
@@ -160,6 +162,7 @@ for (let dayOffset = WINDOW_DAYS; dayOffset >= 1; dayOffset -= 1) {
       new Date(createdAt).getTime() + CREDIT_EXPIRY_DAYS * DAY_MS,
     ).toISOString() as CreditBatch['expiresAt'];
     generatedBatches.push({
+        locationId: MOCK_LOCATION_ID,
       id: batchId,
       playerId: player.id,
       source: 'purchase',
@@ -182,7 +185,7 @@ for (let dayOffset = WINDOW_DAYS; dayOffset >= 1; dayOffset -= 1) {
 // NEITHER revenue NOR credit liability.
 const compedPlayer = generatedPlayers[0]!;
 generatedBatches.push({
-  ...buildAdminGrant(compedPlayer.id, 'group', 2, instantDaysAgo(3) as IsoInstant, 'Comped: rained-out session'),
+  ...buildAdminGrant(compedPlayer.id, MOCK_LOCATION_ID, 'group', 2, instantDaysAgo(3) as IsoInstant, 'Comped: rained-out session'),
   id: 'cb_admin_comp' as CreditBatchId,
 });
 
@@ -215,6 +218,7 @@ function addBooking(playerId: PlayerId, slot: SessionSlot, status: BookingStatus
   }
   const bn = String(++bookingSeq).padStart(4, '0');
   generatedBookings.push({
+        locationId: MOCK_LOCATION_ID,
     id: `bk_g${bn}` as BookingId,
     slotId: slot.id,
     playerId,

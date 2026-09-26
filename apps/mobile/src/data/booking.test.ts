@@ -83,6 +83,7 @@ function openSlot(over: Partial<SessionSlot> & Pick<SessionSlot, 'id'>): Session
 
 function batch(over: Partial<CreditBatch> & Pick<CreditBatch, 'id'>): CreditBatch {
   return {
+    locationId: MOCK_LOCATION_ID,
     playerId: player.id,
     source: 'purchase',
     purchaseId: null,
@@ -114,6 +115,7 @@ function template(weekday: Weekday, isActive = true): AvailabilityTemplate {
 
 function booking(over: Partial<Booking> & Pick<Booking, 'id' | 'slotId'>): Booking {
   return {
+    locationId: MOCK_LOCATION_ID,
     playerId: player.id,
     creditBatchId: 'cb_1' as Booking['creditBatchId'],
     status: 'booked',

@@ -25,9 +25,9 @@ insert into public.players (id, phone, name, gender, level, created_at, auth_use
   ('pl_booker',   '+201900030002', 'Mona Player', 'ladies', 'beginner', now(), '0e0e0e02-0000-0000-0000-00000000e002', null),
   ('pl_second',   '+201900030003', 'Sara Player', 'ladies', 'beginner', now(), '0e0e0e03-0000-0000-0000-00000000e003', null);
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_booker', 'pl_booker', 'signup_grant', null, 'group', 9, 9, now()+interval '30 day', now()),
-  ('cb_second', 'pl_second', 'signup_grant', null, 'group', 9, 9, now()+interval '30 day', now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_booker', 'pl_booker', 'signup_grant', null, 'group', 9, 9, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_second', 'pl_second', 'signup_grant', null, 'group', 9, 9, now()+interval '30 day', now(), 'loc_oro_plaza');
 
 -- Booking targets: one on the linked coach, one on the unlinked coach, one full.
 insert into public.session_slots (id, coach_id, starts_at, ends_at, training_type, capacity, booked_count, gender, level, status) values
@@ -38,9 +38,9 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
   ('sl_rm_linked',   'co_linked',   now()+interval '30 minutes', now()+interval '90 minutes', 'group', 4, 1, 'ladies', 'beginner', 'published'),
   ('sl_rm_unlinked', 'co_unlinked', now()+interval '30 minutes', now()+interval '90 minutes', 'group', 4, 1, 'ladies', 'beginner', 'published');
 
-insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, cancelled_at) values
-  ('bk_rm_1', 'sl_rm_linked',   'pl_booker', 'cb_booker', 'booked', now(), null),
-  ('bk_rm_2', 'sl_rm_unlinked', 'pl_second', 'cb_second', 'booked', now(), null);
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, cancelled_at, location_id) values
+  ('bk_rm_1', 'sl_rm_linked',   'pl_booker', 'cb_booker', 'booked', now(), null, 'loc_oro_plaza'),
+  ('bk_rm_2', 'sl_rm_unlinked', 'pl_second', 'cb_second', 'booked', now(), null, 'loc_oro_plaza');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- BOOKING ALERT — a linked coach
@@ -61,8 +61,10 @@ select is(
   'New booking', 'the title reads "New booking"');
 select is(
   (select body from public.notifications where type = 'coach_booking_alert'),
+  -- 065: every booking message now names the branch — a coach works across
+  -- branches and needs to know which court to be at.
   'Mona Player booked your Group session on '
-    || (select tpa.cairo_when(starts_at) from public.session_slots where id = 'sl_cb_linked') || '.',
+    || (select tpa.cairo_when(starts_at) from public.session_slots where id = 'sl_cb_linked') || ' at Oro Plaza Hotel.',
   'the body names the booker, the type and the Cairo day/time');
 select is(
   (select slot_id from public.notifications where type = 'coach_booking_alert'),

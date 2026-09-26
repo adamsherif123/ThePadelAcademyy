@@ -233,7 +233,9 @@ export type SlotAvailability =
   | { kind: 'no_credit' }
   | { kind: 'credits_expired' }
   | { kind: 'past' }
-  | { kind: 'cancelled' };
+  | { kind: 'cancelled' }
+  /** 065: a usable credit exists, but at another branch. */
+  | { kind: 'wrong_location'; locationId: CreditBatch['locationId'] | null };
 
 export function slotAvailability(
   slot: SessionSlot,
@@ -261,6 +263,11 @@ export function slotAvailability(
     // UNBOOKABLE_MESSAGE for the matching confirm-screen copy.
     case 'type_mismatch':
       return { kind: 'type_taken' };
+    // 065: they DO hold a usable credit — at another branch. A distinct kind
+    // because "buy credits" is the wrong next step; the right one is to look at
+    // the branch they already have credits for.
+    case 'credit_wrong_location':
+      return { kind: 'wrong_location', locationId: res.locationId ?? null };
     case 'no_usable_credit': {
       const lapsed = batches
         .filter((b) => b.trainingType === chosenType)

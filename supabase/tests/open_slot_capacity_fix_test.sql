@@ -79,17 +79,17 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
   ('sl_oscf_revert', 'co_oscf7', now()+interval '1 day', now()+interval '1 day 1 hour', null,    5, 0, null,    null, 'published'),
   ('sl_oscf_small',  'co_oscf9', now()+interval '1 day', now()+interval '1 day 1 hour', null,    1, 0, null,    null, 'published');
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_oscf_a', 'pl_oscf_a', 'signup_grant', null, 'duo',        5, 5, now()+interval '30 day', now()),
-  ('cb_oscf_b', 'pl_oscf_b', 'signup_grant', null, 'group',      5, 5, now()+interval '30 day', now()),
-  ('cb_oscf_c', 'pl_oscf_c', 'signup_grant', null, 'trial',      5, 5, now()+interval '30 day', now()),
-  ('cb_oscf_d', 'pl_oscf_d', 'signup_grant', null, 'individual', 5, 5, now()+interval '30 day', now()),
-  ('cb_oscf_e', 'pl_oscf_e', 'signup_grant', null, 'group',      5, 5, now()+interval '30 day', now()),
-  ('cb_oscf_f', 'pl_oscf_f', 'signup_grant', null, 'duo',        5, 5, now()+interval '30 day', now()),
-  ('cb_oscf_g', 'pl_oscf_g', 'signup_grant', null, 'duo',        5, 5, now()+interval '30 day', now()),
-  ('cb_oscf_h', 'pl_oscf_h', 'signup_grant', null, 'duo',        5, 5, now()+interval '30 day', now()),
-  ('cb_oscf_i', 'pl_oscf_i', 'signup_grant', null, 'duo',        5, 5, now()+interval '30 day', now()),
-  ('cb_oscf_j', 'pl_oscf_j', 'signup_grant', null, 'duo',        5, 5, now()+interval '30 day', now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_oscf_a', 'pl_oscf_a', 'signup_grant', null, 'duo',        5, 5, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_oscf_b', 'pl_oscf_b', 'signup_grant', null, 'group',      5, 5, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_oscf_c', 'pl_oscf_c', 'signup_grant', null, 'trial',      5, 5, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_oscf_d', 'pl_oscf_d', 'signup_grant', null, 'individual', 5, 5, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_oscf_e', 'pl_oscf_e', 'signup_grant', null, 'group',      5, 5, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_oscf_f', 'pl_oscf_f', 'signup_grant', null, 'duo',        5, 5, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_oscf_g', 'pl_oscf_g', 'signup_grant', null, 'duo',        5, 5, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_oscf_h', 'pl_oscf_h', 'signup_grant', null, 'duo',        5, 5, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_oscf_i', 'pl_oscf_i', 'signup_grant', null, 'duo',        5, 5, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_oscf_j', 'pl_oscf_j', 'signup_grant', null, 'duo',        5, 5, now()+interval '30 day', now(), 'loc_oro_plaza');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- 1) The core bug — each type forces capacity to ITS OWN canonical number,
@@ -122,8 +122,8 @@ select is((select capacity from public.session_slots where id='sl_oscf_ind'), 1,
 reset role;
 insert into public.session_slots (id, coach_id, starts_at, ends_at, training_type, capacity, booked_count, gender, level, status) values
   ('sl_oscf_admin_duo', 'co_oscf8', now()+interval '1 day', now()+interval '1 day 1 hour', null, 4, 0, null, null, 'published');
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_oscf_admin', 'pl_oscf_a', 'admin_grant', null, 'duo', 5, 5, now()+interval '30 day', now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_oscf_admin', 'pl_oscf_a', 'admin_grant', null, 'duo', 5, 5, now()+interval '30 day', now(), 'loc_oro_plaza');
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"ffffffff-0000-0000-0000-ffffffffffff","role":"authenticated"}', true);
 select is(public.admin_book_player('sl_oscf_admin_duo','pl_oscf_a',false,'duo')->>'ok', 'true', 'Admin books A as duo on an open slot via admin_book_player → ok');

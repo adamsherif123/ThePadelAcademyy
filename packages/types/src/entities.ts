@@ -131,6 +131,8 @@ export interface Package {
  * rows are immune to later package repricing.
  */
 export interface Purchase {
+  /** The branch, always copied from the package by a trigger — never sent by a client. */
+  locationId: LocationId;
   id: PurchaseId;
   playerId: PlayerId;
   packageId: PackageId;
@@ -160,6 +162,8 @@ export interface Purchase {
  * are set together on resolve: `approved` → `purchaseId`, `rejected` → `rejectReason`.
  */
 export interface CreditRequest {
+  /** The branch, always copied from the package by a trigger. */
+  locationId: LocationId;
   id: CreditRequestId;
   playerId: PlayerId;
   packageId: PackageId;
@@ -197,6 +201,8 @@ export interface CreditRequest {
  * `isGroupSlot`).
  */
 export interface CreditBatch {
+  /** The branch these credits are spendable at. From the package (purchase) or the grant. Immutable. */
+  locationId: LocationId;
   id: CreditBatchId;
   playerId: PlayerId;
   source: CreditSource;
@@ -323,6 +329,8 @@ export interface SessionSlot {
  * right batch — with that batch's original expiry, not a fresh window.
  */
 export interface Booking {
+  /** The branch. Composite FKs make this agree with both the slot and the credit batch. */
+  locationId: LocationId;
   id: BookingId;
   slotId: SlotId;
   playerId: PlayerId;

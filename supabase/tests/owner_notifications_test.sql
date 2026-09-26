@@ -47,9 +47,9 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
      'group', 4, 0, 'men', 'beginner', 'published'),
   ('sl_full', 'co_aly', now()+interval '2 day', now()+interval '2 day 1 hour', 'group', 1, 1, 'men', 'beginner', 'published');
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_hady', 'pl_hady', 'signup_grant', null, 'group', 5, 5, now()+interval '30 day', now()),
-  ('cb_own1', 'pl_own1', 'signup_grant', null, 'group', 5, 5, now()+interval '30 day', now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_hady', 'pl_hady', 'signup_grant', null, 'group', 5, 5, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_own1', 'pl_own1', 'signup_grant', null, 'group', 5, 5, now()+interval '30 day', now(), 'loc_oro_plaza');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- The flag itself
@@ -140,7 +140,8 @@ select is(
   2, 'a booking pings BOTH live owners — one row each');
 select is(
   (select distinct body from public.notifications where type = 'owner_booking'),
-  'Hady booked 7pm slot with Aly',
+  -- 065: the owner ping names the branch too.
+  'Hady booked 7pm slot with Aly at Oro Plaza Hotel',
   'the exact required string: "Hady booked 7pm slot with Aly" (Cairo time, coach first name)');
 select is(
   (select distinct slot_id from public.notifications where type = 'owner_booking'),

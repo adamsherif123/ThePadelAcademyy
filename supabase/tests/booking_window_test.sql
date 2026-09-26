@@ -44,14 +44,14 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
   ('sl_bw_nonempty','co_bw4', now()+interval '4 hour',          now()+interval '5 hour',  'trial', 2, 1, 'published'),
   ('sl_bw_admin',   'co_bw5', now()+interval '2 hour',          now()+interval '3 hour',  'trial', 4, 0, 'published');
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_bw_x', 'pl_bw_x', 'signup_grant', null, 'trial', 3, 3, now()+interval '30 day', now()),
-  ('cb_bw_y', 'pl_bw_y', 'signup_grant', null, 'trial', 1, 0, now()+interval '30 day', now()),  -- already spent (the pre-existing booking below)
-  ('cb_bw_z', 'pl_bw_z', 'signup_grant', null, 'trial', 1, 1, now()+interval '30 day', now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_bw_x', 'pl_bw_x', 'signup_grant', null, 'trial', 3, 3, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_bw_y', 'pl_bw_y', 'signup_grant', null, 'trial', 1, 0, now()+interval '30 day', now(), 'loc_oro_plaza'),  -- already spent (the pre-existing booking below, 'loc_oro_plaza')
+  ('cb_bw_z', 'pl_bw_z', 'signup_grant', null, 'trial', 1, 1, now()+interval '30 day', now(), 'loc_oro_plaza');
 
 -- sl_bw_nonempty's pre-existing booking (the state a prior, pre-window booking left).
-insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at) values
-  ('bk_bw_pre', 'sl_bw_nonempty', 'pl_bw_y', 'cb_bw_y', 'booked', now());
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, location_id) values
+  ('bk_bw_pre', 'sl_bw_nonempty', 'pl_bw_y', 'cb_bw_y', 'booked', now(), 'loc_oro_plaza');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- tpa.booking_window() itself

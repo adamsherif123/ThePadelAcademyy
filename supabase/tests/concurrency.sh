@@ -131,6 +131,17 @@ check() { # $1=label $2=got $3=want
   if [ "$2" = "$3" ]; then echo "  ok   — $1 (=$2)"; else echo "  FAIL — $1 (got $2, want $3)"; FAILS=$((FAILS+1)); fi
 }
 
+# A racer that reports the RPC's REASON, not just win/lose — the location
+# scenarios have to tell "lost the seat" apart from "wrong branch".
+racer_reason() { # $1=uuid $2=slot $3=target_iso $4=outfile
+  "${PSQL[@]}" \
+    -c "set role authenticated" \
+    -c "select set_config('request.jwt.claims', '{\"sub\":\"$1\",\"role\":\"authenticated\"}', false)" \
+    -c "select pg_sleep(greatest(0, extract(epoch from (timestamptz '$3' - clock_timestamp()))))" \
+    -c "with r as (select public.book_slot('$2') j) select case when (j->>'ok')='true' then 'WIN' else coalesce(j->>'reason','?') end from r" \
+    > "$4" 2>&1 &
+}
+
 cleanup_rows() {
   # book_slot mints bookings with 'bk_<uuid>' ids, so delete bookings by their
   # slot/player, not by an id prefix (FK-safe order: bookings → batches → slots → players → coaches).
@@ -144,6 +155,7 @@ cleanup_rows() {
        delete from public.players         where id like 'plr_%';
        delete from public.admins          where id like 'adr_%';
        delete from public.coaches         where id like 'cor_%';
+       delete from public.locations       where id like 'loc_qa_%';
        delete from auth.users             where id::text like '00000000-0000-0000-0000-%';" >/dev/null
 }
 
@@ -160,12 +172,12 @@ insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,ca
 # Scenario A players (8) + B players (10), each with one trial credit.
 # S8: auth_user_id FK-references auth.users, and the JWT sub must resolve via it —
 # so each racer's auth.users row is seeded (id-only) before its player.
-for i in $(seq 1 8);  do SETUP+="insert into auth.users (id) values ('$(uuid $((100+i)))');"; SETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_a$i','+2010000${i}1','A','men','beginner',now(),'$(uuid $((100+i)))');"; SETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_a$i','plr_a$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now());"; done
-for i in $(seq 1 10); do SETUP+="insert into auth.users (id) values ('$(uuid $((200+i)))');"; SETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_b$i','+2010000${i}2','B','men','beginner',now(),'$(uuid $((200+i)))');"; SETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_b$i','plr_b$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now());"; done
+for i in $(seq 1 8);  do SETUP+="insert into auth.users (id) values ('$(uuid $((100+i)))');"; SETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_a$i','+2010000${i}1','A','men','beginner',now(),'$(uuid $((100+i)))');"; SETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_a$i','plr_a$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now(),'loc_oro_plaza');"; done
+for i in $(seq 1 10); do SETUP+="insert into auth.users (id) values ('$(uuid $((200+i)))');"; SETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_b$i','+2010000${i}2','B','men','beginner',now(),'$(uuid $((200+i)))');"; SETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_b$i','plr_b$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now(),'loc_oro_plaza');"; done
 # Scenario C: one player, ONE credit, two slots.
 SETUP+="insert into auth.users (id) values ('$(uuid 301)');"
 SETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_c1','+201000099','C','men','beginner',now(),'$(uuid 301)');"
-SETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_c1','plr_c1','signup_grant',null,'trial',1,1,now()+interval '30 day',now());"
+SETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_c1','plr_c1','signup_grant',null,'trial',1,1,now()+interval '30 day',now(),'loc_oro_plaza');"
 sql "$SETUP" >/dev/null
 
 target() { date -u -v+"$1"S +%Y-%m-%dT%H:%M:%S 2>/dev/null || date -u -d "+$1 seconds" +%Y-%m-%dT%H:%M:%S; }
@@ -221,7 +233,7 @@ for i in $(seq 1 $D_N); do
   DSETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status) values ('slr_d$i','cor_d$i',now()+interval '1 day',now()+interval '1 day 1 hour','trial',4,0,'published');"
   DSETUP+="insert into auth.users (id) values ('$(uuid $((400+i)))');"
   DSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_d$i','+2010009${i}','D','men','beginner',now(),'$(uuid $((400+i)))');"
-  DSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_d$i','plr_d$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now());"
+  DSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_d$i','plr_d$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now(),'loc_oro_plaza');"
 done
 sql "$DSETUP" >/dev/null
 
@@ -268,10 +280,10 @@ for k in $(seq 1 $E_KE); do
   ESETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status) values ('slr_ex$k','cor_ex$k',now()+interval '1 day',now()+interval '1 day 1 hour','trial',8,8,'published'),('slr_ey$k','cor_ey$k',now()+interval '1 day',now()+interval '1 day 1 hour','trial',8,8,'published');"
   for p in $(seq 1 8); do
     ESETUP+="insert into public.players (id,phone,name,gender,level,created_at) values ('plr_e${k}_${p}','+201e${k}x${p}','E','men','beginner',now());"
-    ESETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_e${k}_${p}','plr_e${k}_${p}','signup_grant',null,'trial',2,0,now()+interval '30 day',now());"
+    ESETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_e${k}_${p}','plr_e${k}_${p}','signup_grant',null,'trial',2,0,now()+interval '30 day',now(),'loc_oro_plaza');"
   done
-  for p in 1 2 3 4 5 6 7 8; do ESETUP+="insert into public.bookings (id,slot_id,player_id,credit_batch_id,status,booked_at) values ('bkr_ex${k}_${p}','slr_ex$k','plr_e${k}_${p}','cbr_e${k}_${p}','booked',now());"; done
-  for p in 8 7 6 5 4 3 2 1; do ESETUP+="insert into public.bookings (id,slot_id,player_id,credit_batch_id,status,booked_at) values ('bkr_ey${k}_${p}','slr_ey$k','plr_e${k}_${p}','cbr_e${k}_${p}','booked',now());"; done
+  for p in 1 2 3 4 5 6 7 8; do ESETUP+="insert into public.bookings (id,slot_id,player_id,credit_batch_id,status,booked_at,location_id) values ('bkr_ex${k}_${p}','slr_ex$k','plr_e${k}_${p}','cbr_e${k}_${p}','booked',now(),'loc_oro_plaza');"; done
+  for p in 8 7 6 5 4 3 2 1; do ESETUP+="insert into public.bookings (id,slot_id,player_id,credit_batch_id,status,booked_at,location_id) values ('bkr_ey${k}_${p}','slr_ey$k','plr_e${k}_${p}','cbr_e${k}_${p}','booked',now(),'loc_oro_plaza');"; done
 done
 sql "$ESETUP" >/dev/null
 
@@ -381,7 +393,7 @@ for k in $(seq 1 $H_K); do
   HSETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status) values ('slr_h$k','cor_h$k',now()+interval '1 day',now()+interval '1 day 1 hour',null,3,0,'published');"
   HSETUP+="insert into auth.users (id) values ('$(uuid $((800+k)))'),('$(uuid $((850+k)))');"
   HSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_hx$k','+2010h8${k}','HX','men','beginner',now(),'$(uuid $((800+k)))'),('plr_hy$k','+2010h5${k}','HY','men','beginner',now(),'$(uuid $((850+k)))');"
-  HSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_hx$k','plr_hx$k','signup_grant',null,'individual',1,1,now()+interval '30 day',now()),('cbr_hy$k','plr_hy$k','signup_grant',null,'duo',1,1,now()+interval '30 day',now());"
+  HSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_hx$k','plr_hx$k','signup_grant',null,'individual',1,1,now()+interval '30 day',now(),'loc_oro_plaza'),('cbr_hy$k','plr_hy$k','signup_grant',null,'duo',1,1,now()+interval '30 day',now(),'loc_oro_plaza');"
 done
 sql "$HSETUP" >/dev/null
 # Pre-step (un-raced): X books 'individual' on every slot — sets the real
@@ -433,10 +445,10 @@ ISETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,trainin
 for k in $(seq 1 4); do
   ISETUP+="insert into auth.users (id) values ('$(uuid $((700+k)))');"
   ISETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_ig$k','+2010i7${k}','IG','men','beginner',now(),'$(uuid $((700+k)))');"
-  ISETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_ig$k','plr_ig$k','signup_grant',null,'group',1,1,now()+interval '30 day',now());"
+  ISETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_ig$k','plr_ig$k','signup_grant',null,'group',1,1,now()+interval '30 day',now(),'loc_oro_plaza');"
   ISETUP+="insert into auth.users (id) values ('$(uuid $((720+k)))');"
   ISETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_id$k','+2010i2${k}','ID','men','beginner',now(),'$(uuid $((720+k)))');"
-  ISETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_id$k','plr_id$k','signup_grant',null,'duo',1,1,now()+interval '30 day',now());"
+  ISETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_id$k','plr_id$k','signup_grant',null,'duo',1,1,now()+interval '30 day',now(),'loc_oro_plaza');"
 done
 sql "$ISETUP" >/dev/null
 
@@ -470,7 +482,7 @@ JSETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,trainin
 for k in $(seq 1 8); do
   JSETUP+="insert into auth.users (id) values ('$(uuid $((730+k)))');"
   JSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_j$k','+2010j3${k}','J','men','beginner',now(),'$(uuid $((730+k)))');"
-  JSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_j$k','plr_j$k','signup_grant',null,'duo',1,1,now()+interval '30 day',now());"
+  JSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_j$k','plr_j$k','signup_grant',null,'duo',1,1,now()+interval '30 day',now(),'loc_oro_plaza');"
 done
 sql "$JSETUP" >/dev/null
 
@@ -500,10 +512,10 @@ KSETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,trainin
 for k in $(seq 1 4); do
   KSETUP+="insert into auth.users (id) values ('$(uuid $((740+k)))');"
   KSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_kl$k','+2010k4${k}','KL','ladies','beginner',now(),'$(uuid $((740+k)))');"
-  KSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_kl$k','plr_kl$k','signup_grant',null,'group',1,1,now()+interval '30 day',now());"
+  KSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_kl$k','plr_kl$k','signup_grant',null,'group',1,1,now()+interval '30 day',now(),'loc_oro_plaza');"
   KSETUP+="insert into auth.users (id) values ('$(uuid $((760+k)))');"
   KSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_km$k','+2010k6${k}','KM','men','beginner',now(),'$(uuid $((760+k)))');"
-  KSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_km$k','plr_km$k','signup_grant',null,'group',1,1,now()+interval '30 day',now());"
+  KSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_km$k','plr_km$k','signup_grant',null,'group',1,1,now()+interval '30 day',now(),'loc_oro_plaza');"
 done
 sql "$KSETUP" >/dev/null
 
@@ -555,8 +567,8 @@ for k in $(seq 1 $L_K); do
   LSETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,gender,level,set_by_booking_at,status) values ('slr_l$k','cor_l$k',now()+interval '5 hour',now()+interval '6 hour','group',4,2,'men','beginner',now(),'published');"
   LSETUP+="insert into auth.users (id) values ('$(uuid $((900+k)))'),('$(uuid $((950+k)))');"
   LSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_lx$k','+2010l9${k}','LX','men','beginner',now(),'$(uuid $((900+k)))'),('plr_ly$k','+2010l5${k}','LY','men','beginner',now(),'$(uuid $((950+k)))');"
-  LSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_lx$k','plr_lx$k','signup_grant',null,'group',1,0,now()+interval '30 day',now()),('cbr_ly$k','plr_ly$k','signup_grant',null,'group',1,0,now()+interval '30 day',now());"
-  LSETUP+="insert into public.bookings (id,slot_id,player_id,credit_batch_id,status,booked_at) values ('bkr_lx$k','slr_l$k','plr_lx$k','cbr_lx$k','booked',now()),('bkr_ly$k','slr_l$k','plr_ly$k','cbr_ly$k','booked',now());"
+  LSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_lx$k','plr_lx$k','signup_grant',null,'group',1,0,now()+interval '30 day',now(),'loc_oro_plaza'),('cbr_ly$k','plr_ly$k','signup_grant',null,'group',1,0,now()+interval '30 day',now(),'loc_oro_plaza');"
+  LSETUP+="insert into public.bookings (id,slot_id,player_id,credit_batch_id,status,booked_at,location_id) values ('bkr_lx$k','slr_l$k','plr_lx$k','cbr_lx$k','booked',now(),'loc_oro_plaza'),('bkr_ly$k','slr_l$k','plr_ly$k','cbr_ly$k','booked',now(),'loc_oro_plaza');"
 done
 sql "$LSETUP" >/dev/null
 
@@ -655,13 +667,13 @@ NSETUP="insert into public.coaches (id,name,bio,is_active) values ('cor_n1','C',
 insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status) values
   ('slr_n1','cor_n1', now()+interval '3 hour', now()+interval '4 hour','trial',4,0,'published'),
   ('slr_n2','cor_n2', now()+interval '3 hour', now()+interval '4 hour','trial',2,1,'published');"
-for i in $(seq 1 8); do NSETUP+="insert into auth.users (id) values ('$(uuid $((1100+i)))');"; NSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_n1_$i','+201000n1${i}','N','men','beginner',now(),'$(uuid $((1100+i)))');"; NSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_n1_$i','plr_n1_$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now());"; done
-for i in $(seq 1 8); do NSETUP+="insert into auth.users (id) values ('$(uuid $((1200+i)))');"; NSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_n2_$i','+201000n2${i}','N','men','beginner',now(),'$(uuid $((1200+i)))');"; NSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_n2_$i','plr_n2_$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now());"; done
+for i in $(seq 1 8); do NSETUP+="insert into auth.users (id) values ('$(uuid $((1100+i)))');"; NSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_n1_$i','+201000n1${i}','N','men','beginner',now(),'$(uuid $((1100+i)))');"; NSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_n1_$i','plr_n1_$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now(),'loc_oro_plaza');"; done
+for i in $(seq 1 8); do NSETUP+="insert into auth.users (id) values ('$(uuid $((1200+i)))');"; NSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_n2_$i','+201000n2${i}','N','men','beginner',now(),'$(uuid $((1200+i)))');"; NSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_n2_$i','plr_n2_$i','signup_grant',null,'trial',1,1,now()+interval '30 day',now(),'loc_oro_plaza');"; done
 # N2's pre-existing booking (the state a prior successful, pre-window book_slot call would leave).
 NSETUP+="insert into auth.users (id) values ('$(uuid 1299)');"
 NSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_n2_pre','+201000n2pre','N','men','beginner',now(),'$(uuid 1299)');"
-NSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at) values ('cbr_n2_pre','plr_n2_pre','signup_grant',null,'trial',1,0,now()+interval '30 day',now());"
-NSETUP+="insert into public.bookings (id,slot_id,player_id,credit_batch_id,status,booked_at) values ('bkr_n2_pre','slr_n2','plr_n2_pre','cbr_n2_pre','booked',now());"
+NSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_n2_pre','plr_n2_pre','signup_grant',null,'trial',1,0,now()+interval '30 day',now(),'loc_oro_plaza');"
+NSETUP+="insert into public.bookings (id,slot_id,player_id,credit_batch_id,status,booked_at,location_id) values ('bkr_n2_pre','slr_n2','plr_n2_pre','cbr_n2_pre','booked',now(),'loc_oro_plaza');"
 sql "$NSETUP" >/dev/null
 
 T=$(target 4)
@@ -679,6 +691,108 @@ WINS_N2=$(grep -lFx WIN "$TMP"/n2_*.txt 2>/dev/null | wc -l | tr -d ' ')
 check "N2 (already has 1 booking, inside window): exactly one MORE racer wins the remaining seat" "$WINS_N2" "1"
 check "N2: booked_count ends at 2/2 (the pre-existing seat + the new winner)" "$(sql "select booked_count from public.session_slots where id='slr_n2'")" "2"
 check "N2: exactly one NEW booking row among the racers"                     "$(sql "select count(*) from public.bookings where slot_id='slr_n2' and player_id <> 'plr_n2_pre'")" "1"
+
+# ── Scenario O: one credit at A, racing a slot at A and a slot at B ──────────
+# The location rule under contention. A player holds exactly ONE group credit at
+# Oro Plaza and fires two simultaneous bookings: one at Oro Plaza, one at QA.
+# The Oro booking must win, the QA one must be refused as credit_wrong_location
+# (never as no_usable_credit, and never by silently spending the Oro credit),
+# and the credit must be spent exactly once.
+echo "Scenario O — one credit at A, simultaneous bookings at A and B (K=20):"
+O_K=20
+OSETUP="insert into public.locations (id,name,address,maps_url,hours_text,sort_order,is_active,is_default) values ('loc_qa_o','QA O','x','https://a.b','h',5,true,false);
+insert into public.coaches (id,name,bio,is_active) values ('cor_o1','C','b',true),('cor_o2','C','b',true);"
+for k in $(seq 1 $O_K); do
+  OSETUP+="insert into auth.users (id) values ('$(uuid $((3000+k)))');"
+  OSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_o$k','+20100o$k','O','men','beginner',now(),'$(uuid $((3000+k)))');"
+  OSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_o$k','plr_o$k','signup_grant',null,'trial',1,1,now()+interval '30 day',now(),'loc_oro_plaza');"
+  OSETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status,location_id) values ('slr_oa$k','cor_o1', now()+interval '$((10+k)) hour', now()+interval '$((11+k)) hour','trial',1,0,'published','loc_oro_plaza'),('slr_ob$k','cor_o2', now()+interval '$((10+k)) hour', now()+interval '$((11+k)) hour','trial',1,0,'published','loc_qa_o');"
+done
+sql "$OSETUP" >/dev/null
+
+T=$(target 4)
+for k in $(seq 1 $O_K); do
+  racer_reason "$(uuid $((3000+k)))" "slr_oa$k" "$T" "$TMP/oa_$k.txt"
+  racer_reason "$(uuid $((3000+k)))" "slr_ob$k" "$T" "$TMP/ob_$k.txt"
+done
+wait
+
+O_A_WINS=$(grep -lFx WIN "$TMP"/oa_*.txt 2>/dev/null | wc -l | tr -d ' ')
+O_B_WINS=$(grep -lFx WIN "$TMP"/ob_*.txt 2>/dev/null | wc -l | tr -d ' ')
+O_B_WRONG=$(grep -lFx credit_wrong_location "$TMP"/ob_*.txt 2>/dev/null | wc -l | tr -d ' ')
+O_B_NOCRED=$(grep -lFx no_usable_credit "$TMP"/ob_*.txt 2>/dev/null | wc -l | tr -d ' ')
+# BOTH reasons are correct, and real scheduling decides which: if the A booking
+# commits first the credit is already spent, and "no usable credit" is then the
+# honest answer. What must never appear is a WIN, a spent credit, or any OTHER
+# reason — a slot_full or a raw error would mean the mismatch reached the seat.
+check "O: every B attempt is credit_wrong_location OR no_usable_credit — nothing else" "$((O_B_WRONG + O_B_NOCRED))" "$O_K"
+echo "  info — O: $O_B_WRONG/$O_K refused as wrong-branch; $O_B_NOCRED/$O_K as no-credit (A had already committed) — both orderings are legitimate"
+check "O: exactly one credit spent per player (never double-spent)"          "$(sql "select coalesce(sum(quantity_total-quantity_remaining),0) from public.credit_batches where id like 'cbr_o%'")" "$O_K"
+check "O: zero bookings landed at the B branch"                              "$(sql "select count(*) from public.bookings where slot_id like 'slr_ob%'")" "0"
+check "O: every booking that landed agrees with its slot's branch"           "$(sql "select count(*) from public.bookings b join public.session_slots s on s.id=b.slot_id where b.location_id <> s.location_id")" "0"
+
+# ── Scenario P: a wrong-branch racer must never take the seat ───────────────
+# One capacity-1 slot at QA. Two racers hit it together: one holding a QA credit
+# (valid) and one holding only an Oro credit (mismatched). The mismatch must lose
+# on the pre-check WITHOUT consuming the seat, so the valid racer still wins.
+echo "Scenario P — mismatched racer vs valid racer on one capacity-1 slot (K=20):"
+P_K=20
+PSETUP="insert into public.locations (id,name,address,maps_url,hours_text,sort_order,is_active,is_default) values ('loc_qa_p','QA P','x','https://a.b','h',6,true,false);
+insert into public.coaches (id,name,bio,is_active) values ('cor_p','C','b',true);"
+for k in $(seq 1 $P_K); do
+  PSETUP+="insert into auth.users (id) values ('$(uuid $((3200+k)))'),('$(uuid $((3400+k)))');"
+  PSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_pv$k','+20100pv$k','V','men','beginner',now(),'$(uuid $((3200+k)))'),('plr_px$k','+20100px$k','X','men','beginner',now(),'$(uuid $((3400+k)))');"
+  PSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_pv$k','plr_pv$k','signup_grant',null,'trial',1,1,now()+interval '30 day',now(),'loc_qa_p'),('cbr_px$k','plr_px$k','signup_grant',null,'trial',1,1,now()+interval '30 day',now(),'loc_oro_plaza');"
+  PSETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status,location_id) values ('slr_p$k','cor_p', now()+interval '$((40+k)) hour', now()+interval '$((41+k)) hour','trial',1,0,'published','loc_qa_p');"
+done
+sql "$PSETUP" >/dev/null
+
+T=$(target 4)
+for k in $(seq 1 $P_K); do
+  racer_reason "$(uuid $((3200+k)))" "slr_p$k" "$T" "$TMP/pv_$k.txt"
+  racer_reason "$(uuid $((3400+k)))" "slr_p$k" "$T" "$TMP/px_$k.txt"
+done
+wait
+
+P_V=$(grep -lFx WIN "$TMP"/pv_*.txt 2>/dev/null | wc -l | tr -d ' ')
+P_X=$(grep -lFx WIN "$TMP"/px_*.txt 2>/dev/null | wc -l | tr -d ' ')
+check "P: the VALID racer wins every seat — the mismatch never blocks them"   "$P_V" "$P_K"
+check "P: the mismatched racer never wins"                                    "$P_X" "0"
+check "P: the mismatched player's credit is untouched"                        "$(sql "select coalesce(sum(quantity_total-quantity_remaining),0) from public.credit_batches where id like 'cbr_px%'")" "0"
+check "P: every slot ends at exactly 1/1"                                     "$(sql "select count(*) from public.session_slots where id like 'slr_p%' and booked_count <> 1")" "0"
+
+# ── Scenario Q: credits at BOTH branches, one booking each, simultaneously ──
+# The positive case: holding credits at two branches must not make either
+# booking fail, and each must spend ITS OWN branch's batch — not whichever the
+# expiry order happened to put first.
+echo "Scenario Q — credits at both branches, simultaneous booking at each (K=20):"
+Q_K=20
+QSETUP="insert into public.locations (id,name,address,maps_url,hours_text,sort_order,is_active,is_default) values ('loc_qa_q','QA Q','x','https://a.b','h',7,true,false);
+insert into public.coaches (id,name,bio,is_active) values ('cor_q1','C','b',true),('cor_q2','C','b',true);"
+for k in $(seq 1 $Q_K); do
+  QSETUP+="insert into auth.users (id) values ('$(uuid $((3600+k)))');"
+  QSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_q$k','+20100q$k','Q','men','beginner',now(),'$(uuid $((3600+k)))');"
+  # The QA batch expires SOONER, so an order-only selection would grab it for the Oro slot.
+  QSETUP+="insert into public.credit_batches (id,player_id,source,purchase_id,training_type,quantity_total,quantity_remaining,expires_at,created_at,location_id) values ('cbr_qa$k','plr_q$k','signup_grant',null,'trial',1,1,now()+interval '5 day',now(),'loc_qa_q'),('cbr_qo$k','plr_q$k','admin_grant',null,'trial',1,1,now()+interval '30 day',now(),'loc_oro_plaza');"
+  QSETUP+="insert into public.session_slots (id,coach_id,starts_at,ends_at,training_type,capacity,booked_count,status,location_id) values ('slr_qo$k','cor_q1', now()+interval '$((70+k)) hour', now()+interval '$((71+k)) hour','trial',1,0,'published','loc_oro_plaza'),('slr_qq$k','cor_q2', now()+interval '$((70+k)) hour', now()+interval '$((71+k)) hour','trial',1,0,'published','loc_qa_q');"
+done
+sql "$QSETUP" >/dev/null
+
+T=$(target 4)
+for k in $(seq 1 $Q_K); do
+  racer_reason "$(uuid $((3600+k)))" "slr_qo$k" "$T" "$TMP/qo_$k.txt"
+  racer_reason "$(uuid $((3600+k)))" "slr_qq$k" "$T" "$TMP/qq_$k.txt"
+done
+wait
+
+Q_O=$(grep -lFx WIN "$TMP"/qo_*.txt 2>/dev/null | wc -l | tr -d ' ')
+Q_Q=$(grep -lFx WIN "$TMP"/qq_*.txt 2>/dev/null | wc -l | tr -d ' ')
+check "Q: every Oro booking succeeds"                                         "$Q_O" "$Q_K"
+check "Q: every QA booking succeeds too — two branches do not interfere"      "$Q_Q" "$Q_K"
+check "Q: each booking spent ITS OWN branch's batch (never the sooner-expiring foreign one)" \
+  "$(sql "select count(*) from public.bookings b join public.credit_batches cb on cb.id=b.credit_batch_id join public.session_slots s on s.id=b.slot_id where cb.location_id <> s.location_id")" "0"
+check "Q: exactly two credits spent per player"                               "$(sql "select coalesce(sum(quantity_total-quantity_remaining),0) from public.credit_batches where id like 'cbr_q%'")" "$((Q_K*2))"
+
 
 # ── teardown ─────────────────────────────────────────────────────────────────
 cleanup_rows

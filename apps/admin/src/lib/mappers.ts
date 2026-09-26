@@ -68,6 +68,7 @@ export function rowToPackage(r: Row): Package {
 export function rowToCreditRequest(r: Row): CreditRequest {
   return {
     id: str(r.id) as CreditRequest['id'],
+    locationId: str(r.location_id) as CreditRequest['locationId'],
     playerId: str(r.player_id) as CreditRequest['playerId'],
     packageId: str(r.package_id) as CreditRequest['packageId'],
     paymentMethod: str(r.payment_method) as CreditRequest['paymentMethod'],
@@ -85,6 +86,7 @@ export function rowToCreditRequest(r: Row): CreditRequest {
 export function rowToPurchase(r: Row): Purchase {
   return {
     id: str(r.id) as Purchase['id'],
+    locationId: str(r.location_id) as Purchase['locationId'],
     playerId: str(r.player_id) as Purchase['playerId'],
     packageId: str(r.package_id) as Purchase['packageId'],
     status: str(r.status) as Purchase['status'],
@@ -100,6 +102,7 @@ export function rowToPurchase(r: Row): Purchase {
 export function rowToCreditBatch(r: Row): CreditBatch {
   return {
     id: str(r.id) as CreditBatch['id'],
+    locationId: str(r.location_id) as CreditBatch['locationId'],
     playerId: str(r.player_id) as CreditBatch['playerId'],
     source: str(r.source) as CreditBatch['source'],
     purchaseId: (nstr(r.purchase_id) as CreditBatch['purchaseId']) ?? null,
@@ -137,6 +140,7 @@ export function rowToSlot(r: Row): SessionSlot {
 export function rowToBooking(r: Row): Booking {
   return {
     id: str(r.id) as Booking['id'],
+    locationId: str(r.location_id) as Booking['locationId'],
     slotId: str(r.slot_id) as Booking['slotId'],
     playerId: str(r.player_id) as Booking['playerId'],
     creditBatchId: str(r.credit_batch_id) as Booking['creditBatchId'],

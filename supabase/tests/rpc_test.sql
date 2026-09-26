@@ -43,15 +43,15 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
   ('sl_refund',  'co_rf',     now()+interval '6 hour', now()+interval '7 hour',      'trial',      4, 0, null,     null,       'published'),
   ('sl_cxl',     'co_cxl',    now()+interval '1 day', now()+interval '1 day 1 hour', 'trial',      4, 0, null,     null,       'published');
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_a',     'pl_a', 'signup_grant', null, 'trial', 10, 10, now()+interval '30 day', now()),
-  ('cb_b',     'pl_b', 'signup_grant', null, 'trial', 2,  2,  now()+interval '30 day', now()),
-  ('cb_d_exp', 'pl_d', 'signup_grant', null, 'trial', 2,  2,  now()-interval '1 day',  now()-interval '31 day');
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_a',     'pl_a', 'signup_grant', null, 'trial', 10, 10, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_b',     'pl_b', 'signup_grant', null, 'trial', 2,  2,  now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_d_exp', 'pl_d', 'signup_grant', null, 'trial', 2,  2,  now()-interval '1 day',  now()-interval '31 day', 'loc_oro_plaza');
 
 -- B holds a booking (for the not_owner test); A holds one on a PAST slot (not_cancellable).
-insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at) values
-  ('bk_b',       'sl_b',   'pl_b', 'cb_b', 'booked', now()),
-  ('bk_started', 'sl_past','pl_a', 'cb_a', 'booked', now()-interval '2 hour');
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, location_id) values
+  ('bk_b',       'sl_b',   'pl_b', 'cb_b', 'booked', now(), 'loc_oro_plaza'),
+  ('bk_started', 'sl_past','pl_a', 'cb_a', 'booked', now()-interval '2 hour', 'loc_oro_plaza');
 
 -- ── constants mirror @tpa/core, and the boundary is STRICT (as postgres) ─────
 select is(tpa.cancellation_window(), interval '5 hours', 'tpa.cancellation_window() = 5h (mirrors CANCELLATION_WINDOW_HOURS)');
@@ -109,8 +109,8 @@ select is((select booked_count from public.session_slots where id = 'sl_full'), 
 reset role;
 update public.session_slots set booked_count = booked_count + 1 where id = 'sl_forfeit';
 update public.credit_batches set quantity_remaining = quantity_remaining - 1 where id = 'cb_a';
-insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at)
-  values ('bk_forfeit_setup', 'sl_forfeit', 'pl_a', 'cb_a', 'booked', now());
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, location_id)
+  values ('bk_forfeit_setup', 'sl_forfeit', 'pl_a', 'cb_a', 'booked', now(), 'loc_oro_plaza');
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","role":"authenticated"}', true);
 select is(

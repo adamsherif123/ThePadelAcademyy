@@ -3,6 +3,7 @@ import type {
   IsoInstant,
   Package,
   Piastres,
+  LocationId,
   PlayerId,
   Purchase,
   PurchaseId,
@@ -87,12 +88,13 @@ export function creditExpiryState(expiresAt: IsoInstant, now: IsoInstant): Credi
   return 'ok';
 }
 
-export function buildSignupGrant(playerId: PlayerId, now: IsoInstant): CreditBatch {
+export function buildSignupGrant(playerId: PlayerId, locationId: LocationId, now: IsoInstant): CreditBatch {
   return {
     id: newId(ID_PREFIXES.creditBatch) as CreditBatch['id'],
     playerId,
     source: 'signup_grant',
     purchaseId: null,
+    locationId,
     trainingType: 'trial',
     quantityTotal: SIGNUP_TRIAL_CREDITS,
     quantityRemaining: SIGNUP_TRIAL_CREDITS,
@@ -116,6 +118,7 @@ export function buildSignupGrant(playerId: PlayerId, now: IsoInstant): CreditBat
  */
 export function buildAdminGrant(
   playerId: PlayerId,
+  locationId: LocationId,
   trainingType: TrainingType,
   quantity: number,
   now: IsoInstant,
@@ -126,6 +129,7 @@ export function buildAdminGrant(
     playerId,
     source: 'admin_grant',
     purchaseId: null,
+    locationId,
     trainingType,
     quantityTotal: quantity,
     quantityRemaining: quantity,
@@ -156,6 +160,8 @@ export function buildPurchaseCredits(
     playerId,
     source: 'purchase',
     purchaseId,
+    // The branch comes from the PACKAGE — mirrors tpa.mint_credits_for_purchase.
+    locationId: pkg.locationId,
     trainingType: pkg.trainingType,
     quantityTotal: pkg.sessionCount,
     quantityRemaining: pkg.sessionCount,

@@ -123,11 +123,20 @@ export type BookBlockReason =
   | 'slot_in_past'
   | 'slot_full'
   | 'type_mismatch'
-  | 'no_usable_credit';
+  | 'no_usable_credit'
+  /**
+   * The player HAS a usable credit of the right type — just not at this slot's
+   * branch. Distinct from no_usable_credit because the two need different words
+   * and different actions: one sends them to buy credits, the other to the
+   * branch they already hold credits for. Mirrors book_slot's reason of the
+   * same name (migration 065).
+   */
+  | 'credit_wrong_location';
 
 export type CanBookResult =
   | { ok: true; creditBatchId: CreditBatch['id']; trainingType: TrainingType }
-  | { ok: false; reason: BookBlockReason };
+  /** `locationId` is set only for credit_wrong_location — the branch they DO hold credits at. */
+  | { ok: false; reason: BookBlockReason; locationId?: CreditBatch['locationId'] };
 
 /**
  * Whether `player` could book `slot` AS `chosenType`, given their `creditBatches`
@@ -166,12 +175,24 @@ export function canBookSlot(
   }
   const trainingType = slot.trainingType ?? chosenType;
 
+  // Location-locked (migration 065): a credit is spendable only at the branch of
+  // the package it came from. The filter mirrors book_slot's credit selection
+  // exactly, including the earliest-expiring order, so the preview and the RPC
+  // pick the same batch.
   const usable = creditBatches
     .filter((batch) => batch.playerId === player.id && isBatchUsable(batch, trainingType, now))
     .sort((a, b) => parseInstant(a.expiresAt).getTime() - parseInstant(b.expiresAt).getTime());
 
-  const batch = usable[0];
-  if (!batch) return { ok: false, reason: 'no_usable_credit' };
+  const batch = usable.find((b) => b.locationId === slot.locationId);
+  if (!batch) {
+    // Same two-step as the RPC: a usable credit at ANOTHER branch is a different
+    // answer from no credit at all.
+    const elsewhere = usable[0];
+    if (elsewhere) {
+      return { ok: false, reason: 'credit_wrong_location', locationId: elsewhere.locationId };
+    }
+    return { ok: false, reason: 'no_usable_credit' };
+  }
   return { ok: true, creditBatchId: batch.id, trainingType };
 }
 

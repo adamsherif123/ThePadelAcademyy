@@ -71,17 +71,17 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
   ('sl_ots8', 'co_ots8', now()+interval '1 day', now()+interval '1 day 1 hour', null,    3, 0, null, null, 'published'),
   ('sl_ots9', 'co_ots9', now()+interval '1 day', now()+interval '1 day 1 hour', null,    4, 0, null, null, 'published');
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_ots_a_grp',   'pl_ots_a', 'signup_grant', null, 'group',      5, 5, now()+interval '30 day', now()),
-  ('cb_ots_a_duo',   'pl_ots_a', 'admin_grant',  null, 'duo',        2, 2, now()+interval '30 day', now()),
-  ('cb_ots_b_grp',   'pl_ots_b', 'signup_grant', null, 'group',      5, 5, now()+interval '30 day', now()),
-  ('cb_ots_c_grp',   'pl_ots_c', 'signup_grant', null, 'group',      5, 5, now()+interval '30 day', now()),
-  ('cb_ots_d_trial', 'pl_ots_d', 'signup_grant', null, 'trial',      5, 5, now()+interval '30 day', now()), -- NOT group — the credit-of-chosen-type test
-  ('cb_ots_e_ind',   'pl_ots_e', 'signup_grant', null, 'individual', 2, 2, now()+interval '30 day', now()),
-  ('cb_ots_f_trial', 'pl_ots_f', 'signup_grant', null, 'trial',      5, 5, now()+interval '30 day', now()),
-  ('cb_ots_g_duo',   'pl_ots_g', 'signup_grant', null, 'duo',        2, 2, now()+interval '30 day', now()),
-  ('cb_ots_h_grp',   'pl_ots_h', 'signup_grant', null, 'group',      2, 2, now()+interval '30 day', now()),
-  ('cb_ots_i_duo',   'pl_ots_i', 'signup_grant', null, 'duo',        2, 2, now()+interval '30 day', now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_ots_a_grp',   'pl_ots_a', 'signup_grant', null, 'group',      5, 5, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_ots_a_duo',   'pl_ots_a', 'admin_grant',  null, 'duo',        2, 2, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_ots_b_grp',   'pl_ots_b', 'signup_grant', null, 'group',      5, 5, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_ots_c_grp',   'pl_ots_c', 'signup_grant', null, 'group',      5, 5, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_ots_d_trial', 'pl_ots_d', 'signup_grant', null, 'trial',      5, 5, now()+interval '30 day', now(), 'loc_oro_plaza'), -- NOT group — the credit-of-chosen-type test
+  ('cb_ots_e_ind',   'pl_ots_e', 'signup_grant', null, 'individual', 2, 2, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_ots_f_trial', 'pl_ots_f', 'signup_grant', null, 'trial',      5, 5, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_ots_g_duo',   'pl_ots_g', 'signup_grant', null, 'duo',        2, 2, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_ots_h_grp',   'pl_ots_h', 'signup_grant', null, 'group',      2, 2, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_ots_i_duo',   'pl_ots_i', 'signup_grant', null, 'duo',        2, 2, now()+interval '30 day', now(), 'loc_oro_plaza');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- 1) TYPE-SET-ON-FIRST-BOOKING, IMMUTABILITY, credit-of-the-CHOSEN-type,
@@ -256,8 +256,8 @@ insert into public.players (id, phone, name, gender, level, created_at, auth_use
 insert into public.coaches (id, name, bio, is_active) values ('co_ots_da','C','b',true);
 insert into public.session_slots (id, coach_id, starts_at, ends_at, training_type, capacity, booked_count, gender, level, status) values
   ('sl_ots_da', 'co_ots_da', now()+interval '1 day', now()+interval '1 day 1 hour', null, 3, 0, null, null, 'published');
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_ots_j_ind', 'pl_ots_j', 'signup_grant', null, 'individual', 2, 2, now()+interval '30 day', now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_ots_j_ind', 'pl_ots_j', 'signup_grant', null, 'individual', 2, 2, now()+interval '30 day', now(), 'loc_oro_plaza');
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"12121212-1212-1212-1212-121212121212","role":"authenticated"}', true);
@@ -288,9 +288,9 @@ insert into public.coaches (id, name, bio, is_active) values ('co_ots_rs1','C','
 insert into public.session_slots (id, coach_id, starts_at, ends_at, training_type, capacity, booked_count, gender, level, status) values
   ('sl_ots_rs1', 'co_ots_rs1', now()+interval '1 day', now()+interval '1 day 1 hour', null, 3, 0, null, null, 'published'),
   ('sl_ots_rs2', 'co_ots_rs2', now()+interval '1 day', now()+interval '1 day 1 hour', null, 3, 0, null, null, 'published');
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_ots_k_ind', 'pl_ots_k', 'signup_grant', null, 'individual', 1, 1, now()+interval '30 day', now()),
-  ('cb_ots_l_ind', 'pl_ots_l', 'signup_grant', null, 'individual', 1, 1, now()+interval '30 day', now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_ots_k_ind', 'pl_ots_k', 'signup_grant', null, 'individual', 1, 1, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_ots_l_ind', 'pl_ots_l', 'signup_grant', null, 'individual', 1, 1, now()+interval '30 day', now(), 'loc_oro_plaza');
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"13131313-1313-1313-1313-131313131313","role":"authenticated"}', true);
@@ -337,9 +337,9 @@ insert into public.players (id, phone, name, gender, level, created_at, auth_use
 insert into public.coaches (id, name, bio, is_active) values ('co_ots_ov','C','b',true);
 insert into public.session_slots (id, coach_id, starts_at, ends_at, training_type, capacity, booked_count, gender, level, status) values
   ('sl_ots_ov', 'co_ots_ov', now()+interval '1 day', now()+interval '1 day 1 hour', null, 4, 0, null, null, 'published');
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_ots_m_grp', 'pl_ots_m', 'signup_grant', null, 'group', 2, 2, now()+interval '30 day', now()),
-  ('cb_ots_n_grp', 'pl_ots_n', 'signup_grant', null, 'group', 2, 2, now()+interval '30 day', now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_ots_m_grp', 'pl_ots_m', 'signup_grant', null, 'group', 2, 2, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_ots_n_grp', 'pl_ots_n', 'signup_grant', null, 'group', 2, 2, now()+interval '30 day', now(), 'loc_oro_plaza');
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"ffffffff-ffff-ffff-ffff-ffffffffffff","role":"authenticated"}', true);
@@ -374,12 +374,12 @@ insert into public.players (id, phone, name, gender, level, created_at, auth_use
 insert into public.coaches (id, name, bio, is_active) values ('co_ots_da2','C','b',true);
 insert into public.session_slots (id, coach_id, starts_at, ends_at, training_type, capacity, booked_count, gender, level, set_by_booking_at, status) values
   ('sl_ots_da2', 'co_ots_da2', now()+interval '5 hour', now()+interval '6 hour', 'group', 4, 2, 'men', 'beginner', now(), 'published');
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_ots_o_grp', 'pl_ots_o', 'signup_grant', null, 'group', 1, 0, now()+interval '30 day', now()),
-  ('cb_ots_p_grp', 'pl_ots_p', 'signup_grant', null, 'group', 1, 0, now()+interval '30 day', now());
-insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at) values
-  ('bk_ots_o', 'sl_ots_da2', 'pl_ots_o', 'cb_ots_o_grp', 'booked', now()),
-  ('bk_ots_p', 'sl_ots_da2', 'pl_ots_p', 'cb_ots_p_grp', 'booked', now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_ots_o_grp', 'pl_ots_o', 'signup_grant', null, 'group', 1, 0, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_ots_p_grp', 'pl_ots_p', 'signup_grant', null, 'group', 1, 0, now()+interval '30 day', now(), 'loc_oro_plaza');
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, location_id) values
+  ('bk_ots_o', 'sl_ots_da2', 'pl_ots_o', 'cb_ots_o_grp', 'booked', now(), 'loc_oro_plaza'),
+  ('bk_ots_p', 'sl_ots_da2', 'pl_ots_p', 'cb_ots_p_grp', 'booked', now(), 'loc_oro_plaza');
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"17171717-1717-1717-1717-171717171717","role":"authenticated"}', true);

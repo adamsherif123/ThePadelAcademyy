@@ -79,8 +79,14 @@ select pg_temp.set_client('');
 select is(tpa.client_is_location_aware(), false, 'an empty header is LEGACY');
 select pg_temp.set_client('mobile/1.4.0-beta');
 select is(tpa.client_is_location_aware(), false, 'a prerelease suffix is LEGACY — the pattern is anchored');
+-- NOTE (review issue #4): this is a SQL-LEVEL property that HTTP cannot
+-- produce. RFC 7230 has the transport strip optional whitespace around a header
+-- value, so ' mobile/1.4.0' arrives at PostgREST as 'mobile/1.4.0' and reads as
+-- AWARE over the wire — verified by curl in the Session 2 review. The assertion
+-- stays because the predicate's anchoring is worth pinning, but it does not
+-- describe a request anyone can actually send.
 select pg_temp.set_client(' mobile/1.4.0');
-select is(tpa.client_is_location_aware(), false, 'a leading space is LEGACY — anchored at both ends');
+select is(tpa.client_is_location_aware(), false, 'a leading space is LEGACY at the SQL level (HTTP strips it before we see it)');
 
 -- Unparseable request.headers must not raise.
 select set_config('request.headers', 'not json at all', true);

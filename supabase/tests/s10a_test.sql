@@ -29,10 +29,10 @@ insert into public.admins (id, auth_user_id, display_name, created_at) values
 
 insert into public.coaches (id, name, bio, is_active) values ('co1', 'Coach', 'b', true);
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, note) values
-  ('cb_a', 'pl_a', 'signup_grant', null, 'trial', 2, 1, now() + interval '30 day', now(), null),
-  ('cb_b', 'pl_b', 'signup_grant', null, 'trial', 2, 1, now() + interval '30 day', now(), null),
-  ('cb_c', 'pl_c', 'signup_grant', null, 'trial', 2, 1, now() + interval '30 day', now(), null);
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, note, location_id) values
+  ('cb_a', 'pl_a', 'signup_grant', null, 'trial', 2, 1, now() + interval '30 day', now(), null, 'loc_oro_plaza'),
+  ('cb_b', 'pl_b', 'signup_grant', null, 'trial', 2, 1, now() + interval '30 day', now(), null, 'loc_oro_plaza'),
+  ('cb_c', 'pl_c', 'signup_grant', null, 'trial', 2, 1, now() + interval '30 day', now(), null, 'loc_oro_plaza');
 
 -- A PAST slot (started 2h ago), 2 booked → booked_count 2. A FUTURE slot with one
 -- booking. A PAST slot whose only booking is already cancelled.
@@ -41,11 +41,11 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
   ('sl_future', 'co1', now() + interval '1 day',  now() + interval '1 day 1 hour', 'trial', 4, 1, null, null, 'published'),
   ('sl_pastc',  'co1', now() - interval '3 hour', now() - interval '2 hour',       'trial', 4, 0, null, null, 'published');
 
-insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, cancelled_at) values
-  ('bk_p1', 'sl_past',   'pl_a', 'cb_a', 'booked',    now(), null),
-  ('bk_p2', 'sl_past',   'pl_b', 'cb_b', 'booked',    now(), null),
-  ('bk_f',  'sl_future', 'pl_a', 'cb_a', 'booked',    now(), null),
-  ('bk_c',  'sl_pastc',  'pl_c', 'cb_c', 'cancelled', now(), now());
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, cancelled_at, location_id) values
+  ('bk_p1', 'sl_past',   'pl_a', 'cb_a', 'booked',    now(), null, 'loc_oro_plaza'),
+  ('bk_p2', 'sl_past',   'pl_b', 'cb_b', 'booked',    now(), null, 'loc_oro_plaza'),
+  ('bk_f',  'sl_future', 'pl_a', 'cb_a', 'booked',    now(), null, 'loc_oro_plaza'),
+  ('bk_c',  'sl_pastc',  'pl_c', 'cb_c', 'cancelled', now(), now(), 'loc_oro_plaza');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- AS ADMIN

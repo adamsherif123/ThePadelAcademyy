@@ -51,22 +51,22 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
   ('sl_past',  'co_gama', now()-interval '10 minutes', now()+interval '50 minutes', 'group', 4, 1, 'men', 'beginner', 'published', null),
   ('sl_book',  'co_nour', now()+interval '1 day',      now()+interval '1 day 1 hour','group', 4, 0, 'men', 'beginner', 'published', null);
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_book', 'pl_book', 'signup_grant', null, 'group', 5, 5, now()+interval '30 day', now()),
-  ('cb_mate', 'pl_mate', 'signup_grant', null, 'group', 5, 5, now()+interval '30 day', now()),
-  ('cb_quit', 'pl_quit', 'signup_grant', null, 'group', 5, 5, now()+interval '30 day', now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_book', 'pl_book', 'signup_grant', null, 'group', 5, 5, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_mate', 'pl_mate', 'signup_grant', null, 'group', 5, 5, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_quit', 'pl_quit', 'signup_grant', null, 'group', 5, 5, now()+interval '30 day', now(), 'loc_oro_plaza');
 
 -- sl_soon: two live bookings and one cancelled one.
 -- Every other in-window slot gets a live booking too, so that when it is NOT
 -- reminded the reason is the slot's own state and never "nobody was booked".
-insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, cancelled_at) values
-  ('bk_s1', 'sl_soon',  'pl_book', 'cb_book', 'booked',    now(), null),
-  ('bk_s2', 'sl_soon',  'pl_mate', 'cb_mate', 'booked',    now(), null),
-  ('bk_s3', 'sl_soon',  'pl_quit', 'cb_quit', 'cancelled', now(), now()),
-  ('bk_l1', 'sl_later', 'pl_book', 'cb_book', 'booked',    now(), null),
-  ('bk_d1', 'sl_done',  'pl_book', 'cb_book', 'booked',    now(), null),
-  ('bk_x1', 'sl_dead',  'pl_book', 'cb_book', 'booked',    now(), null),
-  ('bk_p1', 'sl_past',  'pl_book', 'cb_book', 'booked',    now(), null);
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, cancelled_at, location_id) values
+  ('bk_s1', 'sl_soon',  'pl_book', 'cb_book', 'booked',    now(), null, 'loc_oro_plaza'),
+  ('bk_s2', 'sl_soon',  'pl_mate', 'cb_mate', 'booked',    now(), null, 'loc_oro_plaza'),
+  ('bk_s3', 'sl_soon',  'pl_quit', 'cb_quit', 'cancelled', now(), now(), 'loc_oro_plaza'),
+  ('bk_l1', 'sl_later', 'pl_book', 'cb_book', 'booked',    now(), null, 'loc_oro_plaza'),
+  ('bk_d1', 'sl_done',  'pl_book', 'cb_book', 'booked',    now(), null, 'loc_oro_plaza'),
+  ('bk_x1', 'sl_dead',  'pl_book', 'cb_book', 'booked',    now(), null, 'loc_oro_plaza'),
+  ('bk_p1', 'sl_past',  'pl_book', 'cb_book', 'booked',    now(), null, 'loc_oro_plaza');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- The column the whole idempotency argument rests on
@@ -167,7 +167,7 @@ select is(
   (select body from public.notifications where type = 'booking_confirmation'),
   'Your Group session on '
     || (select tpa.cairo_when(starts_at) from public.session_slots where id = 'sl_book')
-    || ' with Nour is booked.',
+    || ' with Nour at Oro Plaza Hotel is booked.',
   'the body reads: "Your Group session on <when> with Nour is booked."');
 select is(
   (select slot_id from public.notifications where type = 'booking_confirmation'),

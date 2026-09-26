@@ -59,6 +59,7 @@ const mkPlayer = (over: Partial<Player> = {}): Player => ({
   ...over,
 });
 const groupBatch: CreditBatch = {
+  locationId: MOCK_LOCATION_ID,
   id: 'cb_x' as CreditBatchId,
   playerId: 'pl_x' as PlayerId,
   source: 'purchase',

@@ -30,12 +30,12 @@ insert into public.admins (id, auth_user_id, display_name, created_at) values
 
 insert into public.coaches (id, name, bio, is_active) values ('co1', 'Coach', 'b', true);
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, note) values
-  ('cb_a_grp', 'pl_a', 'admin_grant', null, 'group',      5, 5, now() + interval '30 day', now(), 'seed'),
-  ('cb_a_ind', 'pl_a', 'admin_grant', null, 'individual', 5, 5, now() + interval '30 day', now(), 'seed'),
-  ('cb_a_cnf', 'pl_a', 'admin_grant', null, 'group',      5, 4, now() + interval '30 day', now(), 'seed'),
-  ('cb_b_grp', 'pl_b', 'admin_grant', null, 'group',      5, 5, now() + interval '30 day', now(), 'seed'),
-  ('cb_b_duo', 'pl_b', 'admin_grant', null, 'duo',        5, 5, now() + interval '30 day', now(), 'seed');
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, note, location_id) values
+  ('cb_a_grp', 'pl_a', 'admin_grant', null, 'group',      5, 5, now() + interval '30 day', now(), 'seed', 'loc_oro_plaza'),
+  ('cb_a_ind', 'pl_a', 'admin_grant', null, 'individual', 5, 5, now() + interval '30 day', now(), 'seed', 'loc_oro_plaza'),
+  ('cb_a_cnf', 'pl_a', 'admin_grant', null, 'group',      5, 4, now() + interval '30 day', now(), 'seed', 'loc_oro_plaza'),
+  ('cb_b_grp', 'pl_b', 'admin_grant', null, 'group',      5, 5, now() + interval '30 day', now(), 'seed', 'loc_oro_plaza'),
+  ('cb_b_duo', 'pl_b', 'admin_grant', null, 'duo',        5, 5, now() + interval '30 day', now(), 'seed', 'loc_oro_plaza');
 
 -- Distinct time windows (coach-overlap exclusion). sl_confirmed is MANUALLY confirmed.
 insert into public.session_slots (id, coach_id, starts_at, ends_at, training_type, capacity, booked_count, gender, level, status, manually_confirmed_at) values
@@ -48,8 +48,8 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
   ('sl_past',     'co1', now()-interval '2 hour',       now()-interval '1 hour',        'trial',      4, 0, null, null,        'published', null),
   ('sl_capedit',  'co1', now()+interval '6 day',        now()+interval '6 day 1 hour',  'group',      4, 3, 'men', 'beginner', 'published', null);
 
-insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at) values
-  ('bk_conf', 'sl_confirmed', 'pl_a', 'cb_a_cnf', 'booked', now());
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, location_id) values
+  ('bk_conf', 'sl_confirmed', 'pl_a', 'cb_a_cnf', 'booked', now(), 'loc_oro_plaza');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- AS ADMIN

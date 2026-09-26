@@ -1,4 +1,6 @@
 import { CREDIT_EXPIRY_DAYS, buildSignupGrant } from '@tpa/core';
+
+import { MOCK_LOCATION_ID } from './locations';
 import type {
   CreditBatch,
   CreditBatchId,
@@ -17,18 +19,18 @@ import { MOCK_NOW, daysFromNow, egp } from './now';
  * UI states. `amount` mirrors the package price at purchase time.
  */
 const handPurchases: Purchase[] = [
-  { id: 'pu_omar_group8' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_group_8' as PackageId, status: 'succeeded', amount: egp(2800), createdAt: daysFromNow(-5), paymentMethod: 'paymob', gatewayOrderId: 'pmob_ord_1001', gatewayTransactionId: 'pmob_txn_5001', paid: true },
+  { id: 'pu_omar_group8' as PurchaseId, playerId: 'pl_omar' as PlayerId, locationId: MOCK_LOCATION_ID, packageId: 'pk_group_8' as PackageId, status: 'succeeded', amount: egp(2800), createdAt: daysFromNow(-5), paymentMethod: 'paymob', gatewayOrderId: 'pmob_ord_1001', gatewayTransactionId: 'pmob_txn_5001', paid: true },
   // A CASH sale taken at the desk: succeeded, no gateway refs — exercises the cash
   // channel in purchase history and proves cash funds an ordinary purchased batch.
-  { id: 'pu_omar_group4' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_group_4' as PackageId, status: 'succeeded', amount: egp(1600), createdAt: daysFromNow(-28), paymentMethod: 'cash', gatewayOrderId: null, gatewayTransactionId: null, paid: true },
-  { id: 'pu_omar_duo4' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_duo_4' as PackageId, status: 'succeeded', amount: egp(2200), createdAt: daysFromNow(-33), paymentMethod: 'paymob', gatewayOrderId: 'pmob_ord_1003', gatewayTransactionId: 'pmob_txn_5003', paid: true },
-  { id: 'pu_omar_indiv4' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_indiv_4' as PackageId, status: 'succeeded', amount: egp(3200), createdAt: daysFromNow(-10), paymentMethod: 'paymob', gatewayOrderId: 'pmob_ord_1004', gatewayTransactionId: 'pmob_txn_5004', paid: true },
+  { id: 'pu_omar_group4' as PurchaseId, playerId: 'pl_omar' as PlayerId, locationId: MOCK_LOCATION_ID, packageId: 'pk_group_4' as PackageId, status: 'succeeded', amount: egp(1600), createdAt: daysFromNow(-28), paymentMethod: 'cash', gatewayOrderId: null, gatewayTransactionId: null, paid: true },
+  { id: 'pu_omar_duo4' as PurchaseId, playerId: 'pl_omar' as PlayerId, locationId: MOCK_LOCATION_ID, packageId: 'pk_duo_4' as PackageId, status: 'succeeded', amount: egp(2200), createdAt: daysFromNow(-33), paymentMethod: 'paymob', gatewayOrderId: 'pmob_ord_1003', gatewayTransactionId: 'pmob_txn_5003', paid: true },
+  { id: 'pu_omar_indiv4' as PurchaseId, playerId: 'pl_omar' as PlayerId, locationId: MOCK_LOCATION_ID, packageId: 'pk_indiv_4' as PackageId, status: 'succeeded', amount: egp(3200), createdAt: daysFromNow(-10), paymentMethod: 'paymob', gatewayOrderId: 'pmob_ord_1004', gatewayTransactionId: 'pmob_txn_5004', paid: true },
 
   // pending: client created it, webhook hasn't confirmed — no transaction yet.
   // (Belongs to the current player so purchase history shows every status.)
-  { id: 'pu_omar_duo4_pending' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_duo_4' as PackageId, status: 'pending', amount: egp(2200), createdAt: daysFromNow(0), paymentMethod: 'paymob', gatewayOrderId: 'pmob_ord_1005', gatewayTransactionId: null, paid: false },
+  { id: 'pu_omar_duo4_pending' as PurchaseId, playerId: 'pl_omar' as PlayerId, locationId: MOCK_LOCATION_ID, packageId: 'pk_duo_4' as PackageId, status: 'pending', amount: egp(2200), createdAt: daysFromNow(0), paymentMethod: 'paymob', gatewayOrderId: 'pmob_ord_1005', gatewayTransactionId: null, paid: false },
   // failed: gateway declined the transaction.
-  { id: 'pu_omar_indiv4_failed' as PurchaseId, playerId: 'pl_omar' as PlayerId, packageId: 'pk_indiv_4' as PackageId, status: 'failed', amount: egp(3200), createdAt: daysFromNow(-1), paymentMethod: 'paymob', gatewayOrderId: 'pmob_ord_1006', gatewayTransactionId: 'pmob_txn_5006', paid: false },
+  { id: 'pu_omar_indiv4_failed' as PurchaseId, playerId: 'pl_omar' as PlayerId, locationId: MOCK_LOCATION_ID, packageId: 'pk_indiv_4' as PackageId, status: 'failed', amount: egp(3200), createdAt: daysFromNow(-1), paymentMethod: 'paymob', gatewayOrderId: 'pmob_ord_1006', gatewayTransactionId: 'pmob_txn_5006', paid: false },
 ];
 
 /** Hand-tuned core purchases + academy-scale generated history (dashboard revenue). */
@@ -44,17 +46,17 @@ export const mockPurchases: Purchase[] = [...handPurchases, ...generatedPurchase
  */
 const signupGrants: CreditBatch[] = [
   // Fresh account: 2 unused trial credits, a full CREDIT_EXPIRY_DAYS of runway.
-  { ...buildSignupGrant('pl_omar' as PlayerId, MOCK_NOW), id: 'cb_grant_omar' as CreditBatchId },
+  { ...buildSignupGrant('pl_omar' as PlayerId, MOCK_LOCATION_ID, MOCK_NOW), id: 'cb_grant_omar' as CreditBatchId },
   // Used 1 of 2.
   {
-    ...buildSignupGrant('pl_youssef' as PlayerId, daysFromNow(-5)),
+    ...buildSignupGrant('pl_youssef' as PlayerId, MOCK_LOCATION_ID, daysFromNow(-5)),
     id: 'cb_grant_youssef' as CreditBatchId,
     quantityRemaining: 1,
   },
   // Granted just past CREDIT_EXPIRY_DAYS ago, expired unused (created + CREDIT_EXPIRY_DAYS < now).
   // Relative to the constant (not a hardcoded day count) so this stays "expired" whatever the window is.
   {
-    ...buildSignupGrant('pl_nour' as PlayerId, daysFromNow(-(CREDIT_EXPIRY_DAYS + 1))),
+    ...buildSignupGrant('pl_nour' as PlayerId, MOCK_LOCATION_ID, daysFromNow(-(CREDIT_EXPIRY_DAYS + 1))),
     id: 'cb_grant_nour' as CreditBatchId,
   },
 ];
@@ -70,13 +72,13 @@ const signupGrants: CreditBatch[] = [
  */
 const handBatches: CreditBatch[] = [
   // Healthy group credits, plenty of runway.
-  { id: 'cb_group_main' as CreditBatchId, playerId: 'pl_omar' as PlayerId, source: 'purchase', purchaseId: 'pu_omar_group8' as PurchaseId, trainingType: 'group', quantityTotal: 8, quantityRemaining: 5, createdAt: daysFromNow(-5), expiresAt: daysFromNow(25), note: null },
+  { id: 'cb_group_main' as CreditBatchId, playerId: 'pl_omar' as PlayerId, locationId: MOCK_LOCATION_ID, source: 'purchase', purchaseId: 'pu_omar_group8' as PurchaseId, trainingType: 'group', quantityTotal: 8, quantityRemaining: 5, createdAt: daysFromNow(-5), expiresAt: daysFromNow(25), note: null },
   // Expiring in 2 days — drives the "expires in 2 days" warning.
-  { id: 'cb_group_expiring' as CreditBatchId, playerId: 'pl_omar' as PlayerId, source: 'purchase', purchaseId: 'pu_omar_group4' as PurchaseId, trainingType: 'group', quantityTotal: 4, quantityRemaining: 2, createdAt: daysFromNow(-28), expiresAt: daysFromNow(2), note: null },
+  { id: 'cb_group_expiring' as CreditBatchId, playerId: 'pl_omar' as PlayerId, locationId: MOCK_LOCATION_ID, source: 'purchase', purchaseId: 'pu_omar_group4' as PurchaseId, trainingType: 'group', quantityTotal: 4, quantityRemaining: 2, createdAt: daysFromNow(-28), expiresAt: daysFromNow(2), note: null },
   // Already expired — drives the "expired" state; not usable.
-  { id: 'cb_duo_expired' as CreditBatchId, playerId: 'pl_omar' as PlayerId, source: 'purchase', purchaseId: 'pu_omar_duo4' as PurchaseId, trainingType: 'duo', quantityTotal: 4, quantityRemaining: 1, createdAt: daysFromNow(-33), expiresAt: daysFromNow(-3), note: null },
+  { id: 'cb_duo_expired' as CreditBatchId, playerId: 'pl_omar' as PlayerId, locationId: MOCK_LOCATION_ID, source: 'purchase', purchaseId: 'pu_omar_duo4' as PurchaseId, trainingType: 'duo', quantityTotal: 4, quantityRemaining: 1, createdAt: daysFromNow(-33), expiresAt: daysFromNow(-3), note: null },
   // Individual credits, full and fresh.
-  { id: 'cb_indiv_main' as CreditBatchId, playerId: 'pl_omar' as PlayerId, source: 'purchase', purchaseId: 'pu_omar_indiv4' as PurchaseId, trainingType: 'individual', quantityTotal: 4, quantityRemaining: 4, createdAt: daysFromNow(-10), expiresAt: daysFromNow(20), note: null },
+  { id: 'cb_indiv_main' as CreditBatchId, playerId: 'pl_omar' as PlayerId, locationId: MOCK_LOCATION_ID, source: 'purchase', purchaseId: 'pu_omar_indiv4' as PurchaseId, trainingType: 'individual', quantityTotal: 4, quantityRemaining: 4, createdAt: daysFromNow(-10), expiresAt: daysFromNow(20), note: null },
 
   ...signupGrants,
 ];

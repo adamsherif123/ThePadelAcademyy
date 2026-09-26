@@ -7,6 +7,7 @@ import type {
   PlayerId,
   Purchase,
   PurchaseId,
+  LocationId,
 } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
@@ -20,6 +21,7 @@ import {
   unusedCreditValue,
 } from './credits';
 
+const LOC = 'loc_oro_plaza' as LocationId;
 const NOW = '2026-07-15T09:00:00.000Z' as IsoInstant;
 const PLAYER = 'pl_test' as PlayerId;
 
@@ -52,7 +54,7 @@ describe('creditExpiryState', () => {
 });
 
 describe('buildSignupGrant', () => {
-  const grant = buildSignupGrant(PLAYER, NOW);
+  const grant = buildSignupGrant(PLAYER, LOC, NOW);
 
   it('grants SIGNUP_TRIAL_CREDITS trial credits, unused', () => {
     expect(grant.trainingType).toBe('trial');
@@ -112,7 +114,7 @@ describe('buildPurchaseCredits', () => {
 });
 
 describe('buildAdminGrant', () => {
-  const grant = buildAdminGrant(PLAYER, 'group', 3, NOW, 'Rained-out session on 12 Jul');
+  const grant = buildAdminGrant(PLAYER, LOC, 'group', 3, NOW, 'Rained-out session on 12 Jul');
 
   it('is an admin grant with no purchase — never revenue or liability', () => {
     expect(grant.source).toBe('admin_grant');
@@ -128,7 +130,7 @@ describe('buildAdminGrant', () => {
 
   it('carries the reason on the batch, and defaults it to null', () => {
     expect(grant.note).toBe('Rained-out session on 12 Jul');
-    expect(buildAdminGrant(PLAYER, 'duo', 1, NOW).note).toBeNull();
+    expect(buildAdminGrant(PLAYER, LOC, 'duo', 1, NOW).note).toBeNull();
   });
 
   it('expires CREDIT_EXPIRY_DAYS after now — a comp does not buy extra time', () => {
@@ -150,8 +152,8 @@ describe('isPurchaseBacked', () => {
       purchaseId: 'pu_1',
     } as unknown as CreditBatch;
     expect(isPurchaseBacked(purchased)).toBe(true);
-    expect(isPurchaseBacked(buildSignupGrant(PLAYER, NOW))).toBe(false);
-    expect(isPurchaseBacked(buildAdminGrant(PLAYER, 'group', 1, NOW))).toBe(false);
+    expect(isPurchaseBacked(buildSignupGrant(PLAYER, LOC, NOW))).toBe(false);
+    expect(isPurchaseBacked(buildAdminGrant(PLAYER, LOC, 'group', 1, NOW))).toBe(false);
   });
 });
 

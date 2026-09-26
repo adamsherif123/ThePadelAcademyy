@@ -51,19 +51,19 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
 -- One signup_grant per player (the partial index). The extra group batches are
 -- admin_grants. cb_a2 expires LATER than cb_a_grp so admin_book deterministically
 -- spends cb_a_grp (earliest-expiring wins).
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_a',     'pl_a', 'signup_grant', null, 'trial', 2, 1, now()+interval '30 day', now()),
-  ('cb_b',     'pl_b', 'signup_grant', null, 'trial', 2, 1, now()+interval '30 day', now()),
-  ('cb_a2',    'pl_a', 'admin_grant',  null, 'group', 2, 1, now()+interval '40 day', now()),
-  ('cb_b2',    'pl_b', 'admin_grant',  null, 'group', 2, 1, now()+interval '40 day', now()),
-  ('cb_a_grp', 'pl_a', 'admin_grant',  null, 'group', 3, 3, now()+interval '30 day', now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_a',     'pl_a', 'signup_grant', null, 'trial', 2, 1, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_b',     'pl_b', 'signup_grant', null, 'trial', 2, 1, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_a2',    'pl_a', 'admin_grant',  null, 'group', 2, 1, now()+interval '40 day', now(), 'loc_oro_plaza'),
+  ('cb_b2',    'pl_b', 'admin_grant',  null, 'group', 2, 1, now()+interval '40 day', now(), 'loc_oro_plaza'),
+  ('cb_a_grp', 'pl_a', 'admin_grant',  null, 'group', 3, 3, now()+interval '30 day', now(), 'loc_oro_plaza');
 
 -- Active bookings for cancel_session (sl_cs) and remove_booking (sl_rb).
-insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at) values
-  ('bk_cs1', 'sl_cs', 'pl_a', 'cb_a',  'booked', now()),
-  ('bk_cs2', 'sl_cs', 'pl_b', 'cb_b',  'booked', now()),
-  ('bk_rb1', 'sl_rb', 'pl_a', 'cb_a2', 'booked', now()),
-  ('bk_rb2', 'sl_rb', 'pl_b', 'cb_b2', 'booked', now());
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, location_id) values
+  ('bk_cs1', 'sl_cs', 'pl_a', 'cb_a',  'booked', now(), 'loc_oro_plaza'),
+  ('bk_cs2', 'sl_cs', 'pl_b', 'cb_b',  'booked', now(), 'loc_oro_plaza'),
+  ('bk_rb1', 'sl_rb', 'pl_a', 'cb_a2', 'booked', now(), 'loc_oro_plaza'),
+  ('bk_rb2', 'sl_rb', 'pl_b', 'cb_b2', 'booked', now(), 'loc_oro_plaza');
 
 -- Pending paymob purchases: pu_s for settle_purchase, pu_f for fail_purchase (S6.1).
 insert into public.purchases (id, player_id, package_id, status, amount, created_at, payment_method, gateway_order_id) values

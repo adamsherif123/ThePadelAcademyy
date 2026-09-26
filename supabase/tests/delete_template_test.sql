@@ -60,20 +60,20 @@ insert into public.session_slots
   ('sl_dt_past_attended', 'co_dt', now()-interval '3 day', now()-interval '3 day'+interval '1 hour', 'group', 4, 1, 'men', 'beginner', 'published', 'at_dt', null);
 
 insert into public.credit_batches
-  (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_dt_a', 'pl_dt_a', 'signup_grant', null, 'group', 4, 3, now()+interval '20 day', now()),
-  ('cb_dt_b', 'pl_dt_b', 'signup_grant', null, 'group', 4, 3, now()+interval '20 day', now()),
-  ('cb_dt_c', 'pl_dt_c', 'signup_grant', null, 'group', 4, 3, now()+interval '20 day', now()),
-  ('cb_dt_d', 'pl_dt_d', 'signup_grant', null, 'group', 4, 3, now()+interval '20 day', now()),
-  ('cb_dt_past', 'pl_dt_e', 'signup_grant', null, 'group', 4, 3, now()+interval '20 day', now());
+  (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_dt_a', 'pl_dt_a', 'signup_grant', null, 'group', 4, 3, now()+interval '20 day', now(), 'loc_oro_plaza'),
+  ('cb_dt_b', 'pl_dt_b', 'signup_grant', null, 'group', 4, 3, now()+interval '20 day', now(), 'loc_oro_plaza'),
+  ('cb_dt_c', 'pl_dt_c', 'signup_grant', null, 'group', 4, 3, now()+interval '20 day', now(), 'loc_oro_plaza'),
+  ('cb_dt_d', 'pl_dt_d', 'signup_grant', null, 'group', 4, 3, now()+interval '20 day', now(), 'loc_oro_plaza'),
+  ('cb_dt_past', 'pl_dt_e', 'signup_grant', null, 'group', 4, 3, now()+interval '20 day', now(), 'loc_oro_plaza');
 
-insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at) values
-  ('bk_dt_future_booked', 'sl_dt_future_booked', 'pl_dt_a', 'cb_dt_a', 'booked', now()),
-  ('bk_dt_future_manual', 'sl_dt_future_manual', 'pl_dt_b', 'cb_dt_b', 'booked', now()),
-  ('bk_dt_future_filled', 'sl_dt_future_filled', 'pl_dt_c', 'cb_dt_c', 'booked', now()),
-  ('bk_dt_future_soon',   'sl_dt_future_soon',   'pl_dt_d', 'cb_dt_d', 'booked', now()),
-  ('bk_dt_past_booked',   'sl_dt_past_booked',   'pl_dt_e', 'cb_dt_past', 'booked', now()-interval '3 day'),
-  ('bk_dt_past_attended', 'sl_dt_past_attended', 'pl_dt_e', 'cb_dt_past', 'attended', now()-interval '4 day');
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, location_id) values
+  ('bk_dt_future_booked', 'sl_dt_future_booked', 'pl_dt_a', 'cb_dt_a', 'booked', now(), 'loc_oro_plaza'),
+  ('bk_dt_future_manual', 'sl_dt_future_manual', 'pl_dt_b', 'cb_dt_b', 'booked', now(), 'loc_oro_plaza'),
+  ('bk_dt_future_filled', 'sl_dt_future_filled', 'pl_dt_c', 'cb_dt_c', 'booked', now(), 'loc_oro_plaza'),
+  ('bk_dt_future_soon',   'sl_dt_future_soon',   'pl_dt_d', 'cb_dt_d', 'booked', now(), 'loc_oro_plaza'),
+  ('bk_dt_past_booked',   'sl_dt_past_booked',   'pl_dt_e', 'cb_dt_past', 'booked', now()-interval '3 day', 'loc_oro_plaza'),
+  ('bk_dt_past_attended', 'sl_dt_past_attended', 'pl_dt_e', 'cb_dt_past', 'attended', now()-interval '4 day', 'loc_oro_plaza');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- Guards: not_admin, template_missing

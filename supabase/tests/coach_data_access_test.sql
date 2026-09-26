@@ -46,16 +46,16 @@ insert into public.session_slots (id, coach_id, starts_at, ends_at, training_typ
   ('sl_da_next', 'co_da', now() + interval '2 days', now() + interval '2 days 1 hour', 'group', 4, 2, 'ladies', 'intermediate', 'published'),
   ('sl_db_next', 'co_db', now() + interval '2 days', now() + interval '2 days 1 hour', 'group', 4, 0, 'men', 'beginner', 'published');
 
-insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at) values
-  ('cb_stud', 'pl_stud',  'signup_grant', null, 'group', 9, 9, now()+interval '30 day', now()),
-  ('cb_quit2','pl_quit2', 'signup_grant', null, 'group', 9, 9, now()+interval '30 day', now()),
-  ('cb_da',   'pl_da',    'admin_grant',  null, 'group', 9, 9, now()+interval '30 day', now());
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id) values
+  ('cb_stud', 'pl_stud',  'signup_grant', null, 'group', 9, 9, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_quit2','pl_quit2', 'signup_grant', null, 'group', 9, 9, now()+interval '30 day', now(), 'loc_oro_plaza'),
+  ('cb_da',   'pl_da',    'admin_grant',  null, 'group', 9, 9, now()+interval '30 day', now(), 'loc_oro_plaza');
 
-insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, cancelled_at) values
-  ('bk_da_done1', 'sl_da_done', 'pl_stud',  'cb_stud',  'attended', now(), null),
-  ('bk_db_done1', 'sl_db_done', 'pl_stud',  'cb_stud',  'attended', now(), null),
-  ('bk_da_next1', 'sl_da_next', 'pl_stud',  'cb_stud',  'booked',   now(), null),
-  ('bk_da_next2', 'sl_da_next', 'pl_quit2', 'cb_quit2', 'cancelled',now(), now());
+insert into public.bookings (id, slot_id, player_id, credit_batch_id, status, booked_at, cancelled_at, location_id) values
+  ('bk_da_done1', 'sl_da_done', 'pl_stud',  'cb_stud',  'attended', now(), null, 'loc_oro_plaza'),
+  ('bk_db_done1', 'sl_db_done', 'pl_stud',  'cb_stud',  'attended', now(), null, 'loc_oro_plaza'),
+  ('bk_da_next1', 'sl_da_next', 'pl_stud',  'cb_stud',  'booked',   now(), null, 'loc_oro_plaza'),
+  ('bk_da_next2', 'sl_da_next', 'pl_quit2', 'cb_quit2', 'cancelled',now(), now(), 'loc_oro_plaza');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- 1. HOURS — self-read only
