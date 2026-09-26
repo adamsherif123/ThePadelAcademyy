@@ -10,6 +10,7 @@ import type {
   CreditRequest,
   IsoInstant,
   LocalTime,
+  Location,
   News,
   Package,
   Player,
@@ -54,6 +55,7 @@ export function rowToCoach(r: Row): Coach {
 export function rowToPackage(r: Row): Package {
   return {
     id: str(r.id) as Package['id'],
+    locationId: str(r.location_id) as Package['locationId'],
     trainingType: str(r.training_type) as Package['trainingType'],
     sessionCount: num(r.session_count),
     price: num(r.price) as Package['price'],
@@ -113,6 +115,7 @@ export function rowToCreditBatch(r: Row): CreditBatch {
 export function rowToSlot(r: Row): SessionSlot {
   return {
     id: str(r.id) as SessionSlot['id'],
+    locationId: str(r.location_id) as SessionSlot['locationId'],
     coachId: str(r.coach_id) as SessionSlot['coachId'],
     startsAt: iso(r.starts_at),
     endsAt: iso(r.ends_at),
@@ -160,6 +163,7 @@ export function rowToAvailabilityTemplate(r: Row): AvailabilityTemplate {
   const hhmm = (v: unknown): LocalTime => str(v).slice(0, 5) as LocalTime;
   return {
     id: str(r.id) as AvailabilityTemplate['id'],
+    locationId: str(r.location_id) as AvailabilityTemplate['locationId'],
     coachId: str(r.coach_id) as AvailabilityTemplate['coachId'],
     weekday: num(r.weekday) as Weekday,
     startTime: hhmm(r.start_time),
@@ -174,5 +178,20 @@ export function rowToAvailabilityTemplate(r: Row): AvailabilityTemplate {
     level: (r.level as AvailabilityTemplate['level']) ?? null,
     isActive: bool(r.is_active),
     deletedAt: nstr(r.deleted_at) as IsoInstant | null,
+  };
+}
+
+/** A branch. is_default is read-only fact — no API path can write it (migration 061). */
+export function rowToLocation(r: Row): Location {
+  return {
+    id: str(r.id) as Location['id'],
+    name: str(r.name),
+    address: str(r.address),
+    mapsUrl: str(r.maps_url),
+    hoursText: str(r.hours_text),
+    sortOrder: num(r.sort_order),
+    isActive: Boolean(r.is_active),
+    isDefault: Boolean(r.is_default),
+    createdAt: iso(r.created_at),
   };
 }

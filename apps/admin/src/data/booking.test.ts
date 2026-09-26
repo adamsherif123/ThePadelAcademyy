@@ -1,4 +1,4 @@
-import { MOCK_NOW, mockBookings } from '@tpa/mocks';
+import { MOCK_NOW, mockBookings, MOCK_LOCATION_ID } from '@tpa/mocks';
 import type {
   CoachId,
   CreditBatch,
@@ -34,6 +34,7 @@ const daysFrom = (n: number) =>
 // --- Constructed inputs for the pure classifier ---
 const mkSlot = (over: Partial<SessionSlot> = {}): SessionSlot => ({
   id: 'sl_x' as SlotId,
+  locationId: MOCK_LOCATION_ID,
   coachId: 'co_hany' as CoachId,
   startsAt: daysFrom(5),
   endsAt: daysFrom(5),

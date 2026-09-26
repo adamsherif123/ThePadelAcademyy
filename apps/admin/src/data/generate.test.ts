@@ -1,5 +1,5 @@
 import { cairoCalendarDate } from '@tpa/core';
-import { MOCK_NOW, mockBookings, mockSlots, mockTemplates } from '@tpa/mocks';
+import { MOCK_NOW, mockBookings, mockSlots, mockTemplates, MOCK_LOCATION_ID } from '@tpa/mocks';
 import type { AvailabilityTemplate, AvailabilityTemplateId, CoachId, IsoInstant, LocalTime } from '@tpa/types';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -96,6 +96,7 @@ describe('generateSlots — coach conflicts are skipped, not exploded', () => {
     // co_hany already runs Wed 17:00–18:30 (at_grp_men_beg_wed_a). Add an overlapper.
     const overlapper: AvailabilityTemplate = {
       id: 'at_overlap_test' as AvailabilityTemplateId,
+      locationId: MOCK_LOCATION_ID,
       coachId: 'co_hany' as CoachId,
       weekday: 3,
       startTime: '17:30' as LocalTime,
@@ -137,6 +138,7 @@ describe('generateSlots — an OPEN (untyped) recurring template generates untyp
   it('copies trainingType/gender/level straight through — an open template yields a CHECK-legal untyped slot for free', () => {
     const openTemplate: AvailabilityTemplate = {
       id: 'at_open_test' as AvailabilityTemplateId,
+      locationId: MOCK_LOCATION_ID,
       coachId: 'co_karim' as CoachId,
       weekday: 5, // Friday — outside the fixture coaches' usual days, avoids conflicts
       startTime: '17:00' as LocalTime,
@@ -163,6 +165,7 @@ describe('generateSlots — an OPEN (untyped) recurring template generates untyp
   it('a PAUSED open template is still skipped like any other inactive rule', () => {
     const pausedOpen: AvailabilityTemplate = {
       id: 'at_open_paused' as AvailabilityTemplateId,
+      locationId: MOCK_LOCATION_ID,
       coachId: 'co_karim' as CoachId,
       weekday: 5,
       startTime: '17:00' as LocalTime,
@@ -184,7 +187,7 @@ describe('createOneOffSlot — validation rejections (return before any network 
 
   it('rejects end before or equal to start', async () => {
     const res = await createOneOffSlot(
-      { coachId: 'co_karim' as CoachId, trainingType: 'individual', capacity: 1, gender: null, level: null, startsAt: future.endsAt, endsAt: future.startsAt },
+      { locationId: MOCK_LOCATION_ID, coachId: 'co_karim' as CoachId, trainingType: 'individual', capacity: 1, gender: null, level: null, startsAt: future.endsAt, endsAt: future.startsAt },
       now,
     );
     expect(res.ok ? null : res.reason).toBe('end_before_start');
@@ -193,7 +196,7 @@ describe('createOneOffSlot — validation rejections (return before any network 
   it('rejects a start in the past', async () => {
     const past = slotTimesFromWall(2026, 7, 1, 18 * 60, 90);
     const res = await createOneOffSlot(
-      { coachId: 'co_karim' as CoachId, trainingType: 'individual', capacity: 1, gender: null, level: null, startsAt: past.startsAt, endsAt: past.endsAt },
+      { locationId: MOCK_LOCATION_ID, coachId: 'co_karim' as CoachId, trainingType: 'individual', capacity: 1, gender: null, level: null, startsAt: past.startsAt, endsAt: past.endsAt },
       now,
     );
     expect(res.ok ? null : res.reason).toBe('in_past');
@@ -201,7 +204,7 @@ describe('createOneOffSlot — validation rejections (return before any network 
 
   it('rejects a capacity below one', async () => {
     const res = await createOneOffSlot(
-      { coachId: 'co_karim' as CoachId, trainingType: 'individual', capacity: 0, gender: null, level: null, startsAt: future.startsAt, endsAt: future.endsAt },
+      { locationId: MOCK_LOCATION_ID, coachId: 'co_karim' as CoachId, trainingType: 'individual', capacity: 0, gender: null, level: null, startsAt: future.startsAt, endsAt: future.endsAt },
       now,
     );
     expect(res.ok ? null : res.reason).toBe('capacity_below_one');
@@ -209,7 +212,7 @@ describe('createOneOffSlot — validation rejections (return before any network 
 
   it('requires gender + level for a group one-off', async () => {
     const res = await createOneOffSlot(
-      { coachId: 'co_hany' as CoachId, trainingType: 'group', capacity: 4, gender: null, level: null, startsAt: future.startsAt, endsAt: future.endsAt },
+      { locationId: MOCK_LOCATION_ID, coachId: 'co_hany' as CoachId, trainingType: 'group', capacity: 4, gender: null, level: null, startsAt: future.startsAt, endsAt: future.endsAt },
       now,
     );
     expect(res.ok ? null : res.reason).toBe('group_requires_gender_level');
@@ -221,7 +224,7 @@ describe('createOneOffSlot — validation rejections (return before any network 
     // 'network' result. The point: it must NOT be rejected as group_requires_gender_level
     // just because gender/level are null — an open block has neither yet, by design.
     const res = await createOneOffSlot(
-      { coachId: 'co_hany' as CoachId, trainingType: null, capacity: 4, gender: null, level: null, startsAt: future.startsAt, endsAt: future.endsAt },
+      { locationId: MOCK_LOCATION_ID, coachId: 'co_hany' as CoachId, trainingType: null, capacity: 4, gender: null, level: null, startsAt: future.startsAt, endsAt: future.endsAt },
       now,
     );
     expect(res.ok ? null : res.reason).not.toBe('group_requires_gender_level');

@@ -2,6 +2,7 @@ import type { IsoInstant, SessionSlot } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
 import { coachDays, coachSchedule, sessionState, startsInLabel, typeSlices, weekStrip } from './coachSchedule';
+import { MOCK_LOCATION_ID } from '@tpa/mocks';
 
 // 2026-03-15 09:00Z is 11:00 Cairo (UTC+2 in March), so "today" in Cairo runs from
 // 22:00Z the previous day to 22:00Z this one — the offsets below stay well inside it
@@ -13,6 +14,7 @@ const at = (hoursFromNow: number): IsoInstant =>
 function slot(id: string, startsIn: number, lengthHours = 1): SessionSlot {
   return {
     id: id as SessionSlot['id'],
+    locationId: MOCK_LOCATION_ID,
     coachId: 'co_1' as SessionSlot['coachId'],
     startsAt: at(startsIn),
     endsAt: at(startsIn + lengthHours),

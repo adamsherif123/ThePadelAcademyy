@@ -1,4 +1,4 @@
-import type { AvailabilityTemplate, Coach, CoachId, LocalTime, TrainingType, Weekday } from '@tpa/types';
+import type { AvailabilityTemplate, Coach, CoachId, LocalTime, LocationId, TrainingType, Weekday } from '@tpa/types';
 import { AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 
@@ -36,10 +36,17 @@ const ERROR_TEXT: Record<string, string> = {
 export function TemplateModal({
   template,
   coaches,
+  locationId,
   onClose,
 }: {
   template?: AvailabilityTemplate;
   coaches: Coach[];
+  /**
+   * The branch a NEW rule is created at. There is no picker yet (Session 3), so
+   * the Schedule page passes the default branch. On an edit it is ignored: a
+   * template's location is immutable, enforced by a trigger in migration 062.
+   */
+  locationId: LocationId;
   onClose: () => void;
 }) {
   const editing = template !== undefined;
@@ -64,6 +71,9 @@ export function TemplateModal({
 
   const onSubmit = async () => {
     const payload = {
+      // An edit keeps the rule's own branch: location is immutable, and sending
+      // a different one would be refused by the trigger rather than silently win.
+      locationId: template?.locationId ?? locationId,
       coachId: draft.coachId,
       weekday,
       startTime: startTime as LocalTime,

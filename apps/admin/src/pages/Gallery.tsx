@@ -28,12 +28,14 @@ import {
   type DonutSegment,
 } from '../ui';
 import styles from './Gallery.module.css';
+import { MOCK_LOCATION_ID } from '@tpa/mocks';
 
 const egp = (n: number) => (n * 100) as Piastres;
 
 /** A realistic worst-case card: long coach name + long tags + 0/4 capacity. */
 const DEMO_SLOT: SessionSlot = {
   id: 'sl_demo' as SlotId,
+  locationId: MOCK_LOCATION_ID,
   coachId: 'co_mariam' as CoachId, // → "Mariam"
   startsAt: '2026-07-19T15:00:00.000Z' as SessionSlot['startsAt'], // 6 PM Cairo
   endsAt: '2026-07-19T17:00:00.000Z' as SessionSlot['startsAt'], // 8 PM Cairo

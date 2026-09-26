@@ -12,6 +12,7 @@ import type {
   Gender,
   IsoInstant,
   Level,
+  LocationId,
   SessionSlot,
   SlotId,
   TrainingType,
@@ -184,6 +185,9 @@ export function generateSlots(
         date: dateKey(date),
         slot: {
           id: newId(ID_PREFIXES.slot) as SlotId,
+          // A generated slot is always at its template's branch — never chosen
+          // separately, so a rule cannot scatter sessions across locations.
+          locationId: template.locationId,
           coachId: template.coachId,
           startsAt,
           endsAt,
@@ -236,6 +240,8 @@ export async function commitGeneration(plan: GenerationPlan): Promise<CommitGene
  * required (see the session report for why this is deferred, not fixed here).
  */
 export interface OneOffDraft {
+  /** The branch the one-off happens at. Immutable once inserted. */
+  locationId: LocationId;
   coachId: CoachId;
   trainingType: TrainingType | null;
   capacity: number;
@@ -266,6 +272,7 @@ export async function createOneOffSlot(draft: OneOffDraft, now: IsoInstant): Pro
 
   const slot: SessionSlot = {
     id: newId(ID_PREFIXES.slot) as SlotId,
+    locationId: draft.locationId,
     coachId: draft.coachId,
     startsAt: draft.startsAt,
     endsAt: draft.endsAt,

@@ -1,5 +1,6 @@
 import type { Package, PackageId } from '@tpa/types';
 
+import { atDefaultLocation } from './locations';
 import { egp } from './now';
 
 /**
@@ -16,7 +17,7 @@ import { egp } from './now';
  *
  * The 1-session Group package (pk_group_1, 500 EGP) is confirmed by the academy.
  */
-export const mockPackages: Package[] = [
+const packageRows: Omit<Package, 'locationId'>[] = [
   { id: 'pk_group_1' as PackageId, trainingType: 'group', sessionCount: 1, price: egp(500), name: 'Group · 1 Session', isActive: true },
   { id: 'pk_group_4' as PackageId, trainingType: 'group', sessionCount: 4, price: egp(1600), name: 'Group · 4 Sessions', isActive: true },
   { id: 'pk_group_8' as PackageId, trainingType: 'group', sessionCount: 8, price: egp(2800), name: 'Group · 8 Sessions', isActive: true },
@@ -29,3 +30,5 @@ export const mockPackages: Package[] = [
   { id: 'pk_indiv_4' as PackageId, trainingType: 'individual', sessionCount: 4, price: egp(3200), name: 'Individual · 4 Sessions', isActive: true },
   { id: 'pk_indiv_8' as PackageId, trainingType: 'individual', sessionCount: 8, price: egp(6000), name: 'Individual · 8 Sessions', isActive: true },
 ];
+
+export const mockPackages: Package[] = packageRows.map(atDefaultLocation);

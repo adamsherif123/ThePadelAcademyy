@@ -1,4 +1,4 @@
-import { MOCK_NOW, mockSlots, mockTemplates } from '@tpa/mocks';
+import { MOCK_NOW, mockSlots, mockTemplates, MOCK_LOCATION_ID } from '@tpa/mocks';
 import type { SessionSlot } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
@@ -18,6 +18,7 @@ const addHours = (instant: SessionSlot['startsAt'], hours: number): SessionSlot[
 function oneOffSlot(over: Partial<SessionSlot> & Pick<SessionSlot, 'startsAt' | 'endsAt'>): SessionSlot {
   return {
     id: 'sl_oneoff_test' as SessionSlot['id'],
+    locationId: MOCK_LOCATION_ID,
     coachId: mockTemplates[0]!.coachId,
     trainingType: null,
     capacity: 1,

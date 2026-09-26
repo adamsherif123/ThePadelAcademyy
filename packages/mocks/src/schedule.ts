@@ -9,6 +9,7 @@ import type {
   SlotStatus,
 } from '@tpa/types';
 
+import { atDefaultLocation } from './locations';
 import { MOCK_NOW, hoursFromNow } from './now';
 
 /**
@@ -16,7 +17,7 @@ import { MOCK_NOW, hoursFromNow } from './now';
  * (weekday 0–3), 5–11 PM; group training runs mainly 5–9 PM. gender/level are set
  * for group templates only (per the domain invariant); null otherwise.
  */
-export const mockTemplates: AvailabilityTemplate[] = [
+const templateRows: Omit<AvailabilityTemplate, 'locationId'>[] = [
   { id: 'at_grp_men_beg_sun' as AvailabilityTemplateId, coachId: 'co_hany' as CoachId, weekday: 0, startTime: '17:00' as LocalTime, endTime: '18:30' as LocalTime, trainingType: 'group', capacity: 4, gender: 'men', level: 'beginner', isActive: true },
   { id: 'at_grp_men_int_sun' as AvailabilityTemplateId, coachId: 'co_hany' as CoachId, weekday: 0, startTime: '18:30' as LocalTime, endTime: '20:00' as LocalTime, trainingType: 'group', capacity: 4, gender: 'men', level: 'intermediate', isActive: true },
   { id: 'at_grp_lad_beg_mon' as AvailabilityTemplateId, coachId: 'co_mariam' as CoachId, weekday: 1, startTime: '17:00' as LocalTime, endTime: '18:30' as LocalTime, trainingType: 'group', capacity: 4, gender: 'ladies', level: 'beginner', isActive: true },
@@ -38,6 +39,8 @@ export const mockTemplates: AvailabilityTemplate[] = [
   // are skipped by generation.
   { id: 'at_grp_lad_beg_tue' as AvailabilityTemplateId, coachId: 'co_laila' as CoachId, weekday: 2, startTime: '18:30' as LocalTime, endTime: '20:00' as LocalTime, trainingType: 'group', capacity: 4, gender: 'ladies', level: 'beginner', isActive: false },
 ];
+
+export const mockTemplates: AvailabilityTemplate[] = templateRows.map(atDefaultLocation);
 
 // Start a few days before MOCK_NOW so there are past sessions for attended/
 // no-show booking history; the future portion still covers the next ~2 weeks.
@@ -67,9 +70,9 @@ const pad = (n: number) => String(n).padStart(2, '0');
  * deterministic spread of occupancy so the UI has empty / partly-booked / full /
  * cancelled cases to render. Occupancy is derived from an index, not the clock.
  */
-function generateSlots(): SessionSlot[] {
+function generateSlots(): Omit<SessionSlot, 'locationId'>[] {
   const bookedPattern = [0, 1, 4, 2]; // clamped to each slot's capacity below
-  const slots: SessionSlot[] = [];
+  const slots: Omit<SessionSlot, 'locationId'>[] = [];
   let idx = 0;
 
   for (const template of mockTemplates) {
@@ -146,7 +149,7 @@ function isSameCairoDay(
  * the index-based booking picks in bookings.ts (which filter to template slots),
  * so adding them here doesn't shift the attended/no-show/cancelled fixtures.
  */
-const adHocSlots: SessionSlot[] = [
+const adHocSlots: Omit<SessionSlot, 'locationId'>[] = [
   // Starts ~2h from now → inside the 3-hour window → cancelling forfeits.
   {
     id: 'sl_soon_indiv_20260715' as SlotId,
@@ -202,4 +205,4 @@ const adHocSlots: SessionSlot[] = [
   },
 ];
 
-export const mockSlots: SessionSlot[] = [...generateSlots(), ...adHocSlots];
+export const mockSlots: SessionSlot[] = [...generateSlots(), ...adHocSlots].map(atDefaultLocation);

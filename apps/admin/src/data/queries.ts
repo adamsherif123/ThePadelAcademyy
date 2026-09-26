@@ -4,6 +4,7 @@ import type {
   Coach,
   CoachId,
   CreditBatch,
+  Location,
   News,
   Package,
   Player,
@@ -31,6 +32,7 @@ import {
   fetchBookingStatusCounts,
   fetchCoachHours,
   fetchCoaches,
+  fetchLocations,
   fetchCreditBatches,
   fetchCreditRequests,
   fetchNews,
@@ -70,6 +72,7 @@ function toResource<T>(q: {
 }
 
 export const useCoaches = () => toResource(useQuery({ queryKey: queryKeys.coaches, queryFn: fetchCoaches }));
+export const useLocations = () => toResource(useQuery({ queryKey: queryKeys.locations, queryFn: fetchLocations }));
 /** Hours coached per coach for the CURRENT Cairo month — a separate lightweight
  *  query (the SQL aggregate), never folded into useAdminData's monolith.
  *  Coaches.tsx defaults a coach absent from the map to 0. */
@@ -174,6 +177,7 @@ export function combine(...rs: Resource<unknown>[]): { isPending: boolean; isErr
  */
 export interface AdminData {
   coaches: Coach[];
+  locations: Location[];
   players: Player[];
   packages: Package[];
   templates: AvailabilityTemplate[];
@@ -188,6 +192,7 @@ export interface AdminData {
 
 export function useAdminData(): AdminData {
   const coaches = useCoaches();
+  const locations = useLocations();
   const players = usePlayers();
   const packages = usePackages();
   const templates = useTemplates();
@@ -195,9 +200,10 @@ export function useAdminData(): AdminData {
   const batches = useBatches();
   const bookings = useBookings();
   const purchases = usePurchases();
-  const gate = combine(coaches, players, packages, templates, slots, batches, bookings, purchases);
+  const gate = combine(coaches, locations, players, packages, templates, slots, batches, bookings, purchases);
   return {
     coaches: coaches.data ?? [],
+    locations: locations.data ?? [],
     players: players.data ?? [],
     packages: packages.data ?? [],
     templates: templates.data ?? [],

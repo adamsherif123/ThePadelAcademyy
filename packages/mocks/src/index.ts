@@ -10,3 +10,4 @@ export { mockPackages } from './catalog';
 export { mockSlots, mockTemplates } from './schedule';
 export { mockCreditBatches, mockPurchases } from './wallet';
 export { mockBookings } from './bookings';
+export { mockLocations, MOCK_LOCATION_ID, atDefaultLocation } from './locations';

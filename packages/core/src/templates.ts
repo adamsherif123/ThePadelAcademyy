@@ -5,6 +5,7 @@ import type {
   Gender,
   Level,
   LocalTime,
+  LocationId,
   TrainingType,
   Weekday,
 } from '@tpa/types';
@@ -22,6 +23,12 @@ import { parseLocalTime } from './time';
  * block.
  */
 export interface TemplateDraft {
+  /**
+   * The branch this rule generates slots at. Carried on the draft rather than
+   * defaulted in the DB because a template that quietly lands at the wrong
+   * branch generates weeks of sessions there before anyone notices.
+   */
+  locationId: LocationId;
   coachId: CoachId;
   weekday: Weekday;
   startTime: LocalTime;
@@ -81,6 +88,7 @@ export function buildAvailabilityTemplate(
     ok: true,
     template: {
       id,
+      locationId: draft.locationId,
       coachId: draft.coachId,
       weekday: draft.weekday,
       startTime: draft.startTime,

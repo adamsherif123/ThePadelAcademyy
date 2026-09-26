@@ -4,6 +4,7 @@ import type {
   CoachId,
   CreditBatchId,
   CreditRequestId,
+  LocationId,
   NewsId,
   NotificationId,
   PackageId,
@@ -79,8 +80,40 @@ export interface Coach {
  * A purchasable bundle. Buying it grants `sessionCount` credits, all of
  * `trainingType`. `price` is the total for the bundle (integer piastres).
  */
+/**
+ * A branch. The academy opened a second one; everything that happens at a
+ * physical place — a session slot, the recurring rule that generates it, and the
+ * packages sold for it — belongs to exactly one.
+ *
+ * `isDefault` marks the original branch and is the pin every pre-1.4 client is
+ * held to: those binaries cannot filter by location or send one, so everything
+ * they see and insert resolves here. It is set by migration and by nothing else
+ * — the API holds no privilege on the column — so treat it as read-only fact,
+ * not as a setting with a toggle somewhere.
+ *
+ * `hoursText` is the human sentence shown on a card ("Sun – Wed · 5:00 PM –
+ * 11:00 PM"), deliberately free text: the real opening rule is the branch's
+ * availability templates, and branches will want to phrase this differently.
+ */
+export interface Location {
+  id: LocationId;
+  name: string;
+  address: string;
+  /** Deep link for "tap for directions". http(s) only — enforced by a CHECK. */
+  mapsUrl: string;
+  hoursText: string;
+  /** Ascending; the admin list and (later) the mobile picker order by this then name. */
+  sortOrder: number;
+  isActive: boolean;
+  /** The original branch. Exactly one row has it; migration-only. */
+  isDefault: boolean;
+  createdAt: IsoInstant;
+}
+
 export interface Package {
   id: PackageId;
+  /** The branch this package is sold for. Immutable after insert. */
+  locationId: LocationId;
   trainingType: TrainingType;
   /** Whole sessions granted; integer >= 1. */
   sessionCount: number;
@@ -200,6 +233,8 @@ export interface CreditBatch {
  */
 export interface AvailabilityTemplate {
   id: AvailabilityTemplateId;
+  /** The branch this rule generates slots at. Immutable after insert. */
+  locationId: LocationId;
   coachId: CoachId;
   weekday: Weekday;
   startTime: LocalTime;
@@ -244,6 +279,12 @@ export interface AvailabilityTemplate {
  */
 export interface SessionSlot {
   id: SlotId;
+  /**
+   * The branch this session happens at. Immutable after insert — `authenticated`
+   * holds INSERT but not UPDATE on the column, so a reschedule can move the time
+   * and never the place.
+   */
+  locationId: LocationId;
   coachId: CoachId;
   startsAt: IsoInstant;
   endsAt: IsoInstant;

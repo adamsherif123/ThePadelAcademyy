@@ -3,6 +3,7 @@ import type {
   AvailabilityTemplate,
   Coach,
   CoachId,
+  LocationId,
   SessionSlot,
   SlotId,
   TrainingType,
@@ -47,10 +48,13 @@ export function OneOffModal({
   coaches,
   slots,
   templates,
+  locationId,
   defaultDate,
   onClose,
 }: {
   coaches: Coach[];
+  /** The branch the one-off is created at — the default until Session 3 adds a picker. */
+  locationId: LocationId;
   slots: SessionSlot[];
   templates: AvailabilityTemplate[];
   /** Prefill the date field. The mobile day view passes the day you're looking at;
@@ -100,6 +104,7 @@ export function OneOffModal({
   const onSubmit = async () => {
     const res = await createOneOffSlot(
       {
+        locationId,
         coachId: draft.coachId,
         trainingType: openSelected ? null : draft.trainingType,
         capacity: draft.capacity,

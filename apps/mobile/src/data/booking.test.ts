@@ -25,6 +25,7 @@ import {
   withOlderSessions,
 } from './booking';
 import { balanceByType } from './wallet';
+import { MOCK_LOCATION_ID } from '@tpa/mocks';
 
 /**
  * The client-side read derivations that survived S9 — pure functions of the rows
@@ -58,6 +59,7 @@ const coach: Coach = {
 
 function slot(over: Partial<SessionSlot> & Pick<SessionSlot, 'id'>): SessionSlot {
   return {
+    locationId: MOCK_LOCATION_ID,
     coachId: coach.id,
     startsAt: iso(2),
     endsAt: iso(2, 13),
@@ -97,6 +99,7 @@ function batch(over: Partial<CreditBatch> & Pick<CreditBatch, 'id'>): CreditBatc
 function template(weekday: Weekday, isActive = true): AvailabilityTemplate {
   return {
     id: `at_${weekday}_${isActive ? 'a' : 'i'}` as AvailabilityTemplate['id'],
+    locationId: MOCK_LOCATION_ID,
     coachId: coach.id,
     weekday,
     startTime: '09:00' as LocalTime,

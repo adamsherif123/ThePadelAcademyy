@@ -11,6 +11,7 @@ import { TemplateModal } from '../calendar/TemplateModal';
 import { TemplatesPanel } from '../calendar/TemplatesPanel';
 import { WeekCalendar } from '../calendar/WeekCalendar';
 import { weekColumns } from '../data/schedule';
+import { creationLocationId } from '../data/locations';
 import { useAdminData } from '../data/queries';
 import { useSession } from '../session/SessionProvider';
 import { ErrorView, LoadingView, PageHeader, SegmentedTabs, useIsMobile } from '../ui';
@@ -45,6 +46,10 @@ export function Schedule() {
   const weekOffset = Math.floor(cursor / 7);
   const selectedIndex = ((cursor % 7) + 7) % 7;
   const columns = weekColumns(data.templates, data.slots, now, weekOffset);
+  // The branch new sessions and rules are created at. No picker yet (Session 3
+  // adds the toggle); until then everything is created at the original branch,
+  // which is also where every existing row was backfilled.
+  const createAt = creationLocationId(data.locations);
 
   return (
     <div>
@@ -115,10 +120,11 @@ export function Schedule() {
           onClose={() => setSelected(null)}
         />
       ) : null}
-      {templateTarget ? (
+      {templateTarget && createAt ? (
         <TemplateModal
           template={templateTarget.mode === 'edit' ? templateTarget.template : undefined}
           coaches={data.coaches}
+          locationId={createAt}
           onClose={() => setTemplateTarget(null)}
         />
       ) : null}
@@ -130,11 +136,12 @@ export function Schedule() {
           onClose={() => setGenerating(false)}
         />
       ) : null}
-      {oneOff ? (
+      {oneOff && createAt ? (
         <OneOffModal
           coaches={data.coaches}
           slots={data.slots}
           templates={data.templates}
+          locationId={createAt}
           defaultDate={oneOff.date}
           onClose={() => setOneOff(null)}
         />

@@ -22,3 +22,4 @@ export type NotificationId = Brand<string, 'NotificationId'>; //    nt_
 export type DeviceTokenId = Brand<string, 'DeviceTokenId'>; //      dpt_
 export type CreditRequestId = Brand<string, 'CreditRequestId'>; //  cr_ (server-minted in request_credits)
 export type NewsId = Brand<string, 'NewsId'>; //                    nw_ (server-minted in create_news)
+export type LocationId = Brand<string, 'LocationId'>; //            loc_ (DB-defaulted: the API holds no INSERT privilege on locations.id)

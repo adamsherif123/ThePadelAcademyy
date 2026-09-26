@@ -26,6 +26,7 @@ export const queryClient = new QueryClient({
 export const queryKeys = {
   player: ['player'] as const, // the signed-in admin's own player row
   coaches: ['coaches'] as const,
+  locations: ['locations'] as const,
   players: ['players'] as const,
   packages: ['packages'] as const,
   templates: ['templates'] as const,
@@ -72,6 +73,9 @@ export const TOUCHED = {
   ] as const,
   attendance: [queryKeys.bookings, queryKeys.bookingsPage, queryKeys.bookingStatusCounts, queryKeys.coachHours] as const,
   coaches: [queryKeys.coaches] as const,
+  // A location edit changes the branch label on the schedule and (later) the
+  // package list, so both read surfaces refetch alongside the list itself.
+  locations: [queryKeys.locations, queryKeys.slots, queryKeys.templates] as const,
   packages: [queryKeys.packages] as const,
   templates: [queryKeys.templates] as const,
   slots: [queryKeys.slots] as const,

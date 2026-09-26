@@ -57,6 +57,7 @@ export function rowToCoach(r: Row): Coach {
 export function rowToPackage(r: Row): Package {
   return {
     id: str(r.id) as Package['id'],
+    locationId: str(r.location_id) as Package['locationId'],
     trainingType: str(r.training_type) as Package['trainingType'],
     sessionCount: num(r.session_count),
     price: num(r.price) as Package['price'],
@@ -117,6 +118,7 @@ export function rowToCreditBatch(r: Row): CreditBatch {
 export function rowToSlot(r: Row): SessionSlot {
   return {
     id: str(r.id) as SessionSlot['id'],
+    locationId: str(r.location_id) as SessionSlot['locationId'],
     coachId: str(r.coach_id) as SessionSlot['coachId'],
     startsAt: iso(r.starts_at),
     endsAt: iso(r.ends_at),
@@ -140,6 +142,7 @@ export function rowToAvailabilityTemplate(r: Row): AvailabilityTemplate {
   const hhmm = (v: unknown): LocalTime => str(v).slice(0, 5) as LocalTime;
   return {
     id: str(r.id) as AvailabilityTemplate['id'],
+    locationId: str(r.location_id) as AvailabilityTemplate['locationId'],
     coachId: str(r.coach_id) as AvailabilityTemplate['coachId'],
     weekday: num(r.weekday) as Weekday,
     startTime: hhmm(r.start_time),

@@ -18,6 +18,8 @@ import type {
   CreditRequest,
   Gender,
   Level,
+  Location,
+  LocationId,
   News,
   NewsId,
   Package,
@@ -39,6 +41,7 @@ import {
   rowToCoach,
   rowToCreditBatch,
   rowToCreditRequest,
+  rowToLocation,
   rowToNews,
   rowToPackage,
   rowToPlayer,
@@ -66,6 +69,13 @@ async function selectAll<T>(table: string, map: (r: Record<string, unknown>) => 
 }
 
 export const fetchCoaches = (): Promise<Coach[]> => selectAll('coaches', rowToCoach);
+
+/** Every branch, active or not — the admin manages both. Ordered as the list shows them. */
+export async function fetchLocations(): Promise<Location[]> {
+  const { data, error } = await supabase.from('locations').select('*').order('sort_order').order('name');
+  if (error) throw new ApiError(`Failed to load locations: ${error.message}`, error.code, error);
+  return (data ?? []).map(rowToLocation);
+}
 
 /**
  * Hours coached per coach THIS CALENDAR MONTH (Africa/Cairo) — a SQL-side
@@ -624,6 +634,55 @@ export function insertCoach(fields: CoachFields): Promise<Coach> {
     supabase.from('coaches').insert({ id, name: fields.name, bio: fields.bio, photo_url: fields.photoUrl, is_active: fields.isActive }).select().single(),
     rowToCoach, 'Save coach');
 }
+export interface LocationFields {
+  name: string;
+  address: string;
+  mapsUrl: string;
+  hoursText: string;
+  sortOrder: number;
+}
+
+/**
+ * Create a branch. No id is sent: `authenticated` holds no INSERT privilege on
+ * locations.id, so the column default mints it — and no is_default either, for
+ * the same reason (migration 061). is_admin() gates the row.
+ */
+export function insertLocation(fields: LocationFields): Promise<Location> {
+  return writeRow(
+    supabase.from('locations').insert({
+      name: fields.name, address: fields.address, maps_url: fields.mapsUrl,
+      hours_text: fields.hoursText, sort_order: fields.sortOrder,
+    }).select().single(),
+    rowToLocation, 'Save location');
+}
+
+export function updateLocation(id: LocationId, fields: Partial<LocationFields>): Promise<Location> {
+  const patch: Record<string, unknown> = {};
+  if (fields.name !== undefined) patch.name = fields.name;
+  if (fields.address !== undefined) patch.address = fields.address;
+  if (fields.mapsUrl !== undefined) patch.maps_url = fields.mapsUrl;
+  if (fields.hoursText !== undefined) patch.hours_text = fields.hoursText;
+  if (fields.sortOrder !== undefined) patch.sort_order = fields.sortOrder;
+  return writeRow(supabase.from('locations').update(patch).eq('id', id).select().single(), rowToLocation, 'Update location');
+}
+
+export type SetLocationActiveReason =
+  | 'not_admin' | 'location_missing' | 'default_location' | 'has_future_slots' | 'has_active_templates';
+export type SetLocationActiveResult =
+  | { ok: true; already: boolean; isActive: boolean }
+  | { ok: false; reason: SetLocationActiveReason; slots: number; templates: number };
+/**
+ * Activate or deactivate a branch through the guard. An RPC rather than a plain
+ * UPDATE because the refusals are workflow facts a human has to read — "3
+ * sessions are still scheduled there" — not constraint violations.
+ */
+export async function setLocationActiveRpc(id: LocationId, active: boolean): Promise<SetLocationActiveResult> {
+  const d = await callRpc('set_location_active', { p_location_id: id, p_active: active });
+  return d.ok
+    ? { ok: true, already: Boolean(d.already), isActive: Boolean(d.is_active) }
+    : { ok: false, reason: d.reason as SetLocationActiveReason, slots: Number(d.slots ?? 0), templates: Number(d.templates ?? 0) };
+}
+
 export function updateCoach(id: CoachId, fields: Partial<CoachFields>): Promise<Coach> {
   const patch: Record<string, unknown> = {};
   if (fields.name !== undefined) patch.name = fields.name;
