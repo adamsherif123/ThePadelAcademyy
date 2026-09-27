@@ -145,12 +145,19 @@ function PurchaseRow({
   const status = badgeFor(purchase);
   return (
     <Card>
+      {/* Name and status only. The branch went here first and pushed the badge off
+          the card: three children in a row, and React Native defaults flexShrink
+          to 0, so nothing gave. It belongs on its own line anyway — it is the same
+          kind of quiet fact as the date below it, not something competing with the
+          package name. */}
       <View style={styles.rowTop}>
-        <Text variant="body" weight="bold">
+        <Text variant="body" weight="bold" style={styles.name} numberOfLines={2}>
           {pkg?.name ?? 'Package'}
         </Text>
+        <Badge label={status.label} tone={status.tone} style={styles.badge} />
+      </View>
+      <View style={styles.branch}>
         <BranchLabel name={locationName} />
-        <Badge label={status.label} tone={status.tone} />
       </View>
       <View style={styles.rowBottom}>
         <Text variant="caption" tone="secondary">
@@ -166,5 +173,12 @@ const styles = StyleSheet.create({
   filter: { marginBottom: space.sm },
   content: { gap: space.md },
   rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.sm },
+  // The name yields, the badge never does: a long package name wraps or truncates
+  // rather than pushing "SUCCEEDED" past the edge of the card.
+  name: { flex: 1 },
+  // Empty and zero-height when BranchLabel renders null (a single branch), so a
+  // one-location academy's card is byte-for-byte the card it had before.
+  branch: { marginTop: space.xs },
+  badge: { flexShrink: 0 },
   rowBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: space.sm },
 });
