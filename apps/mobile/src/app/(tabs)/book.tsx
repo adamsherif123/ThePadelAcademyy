@@ -13,7 +13,7 @@ import {
   type SlotAvailability,
   type WeekAvailabilitySummary,
 } from '../../data/booking';
-import { useBatches, useBookings, useCoaches, useSlots, useTemplates, combine } from '../../data/queries';
+import { useBatches, useBookings, useCoaches, useLocations, useSlots, useTemplates, combine } from '../../data/queries';
 import { totalReadyToBook } from '../../data/wallet';
 import { queryKeys } from '../../lib/queryClient';
 import { useLocation } from '../../location/LocationProvider';
@@ -67,10 +67,15 @@ const DAYS = 14;
 // accent "… ›" line) and it pairs with the onPress the screen wires for exactly
 // those kinds. full/past/cancelled/type_taken get no cta and no onPress, so they
 // stay inert: tapping "buy credits" wouldn't help, and we don't pretend it would.
-function slotDisplay(av: SlotAvailability): {
+function slotDisplay(
+  av: SlotAvailability,
+  /** The branch the player's credits are actually at — null while locations load. */
+  creditLocationName: string | null,
+): {
   state: SlotCardState;
   note?: string;
   creditNote?: string;
+  reasonNote?: string;
   cta?: string;
 } {
   switch (av.kind) {
@@ -91,8 +96,20 @@ function slotDisplay(av: SlotAvailability): {
       return { state: 'unavailable', note: 'No credits', cta: 'Add credits to book' };
     // 065: they hold credits, just for another branch. Deliberately NO cta —
     // buying more would not help; the fix is to switch branch, not to spend.
+    //
+    // The pill gets two words and the explanation gets the full-width row. It
+    // used to be one 31-character `note`, which is a sentence in a pill: it held
+    // its intrinsic width and crushed the time and coach beside it to one
+    // character per line. The pill can no longer do that (SlotCard), but a
+    // sentence still does not belong in one.
     case 'wrong_location':
-      return { state: 'unavailable', note: 'Credits are for another location' };
+      return {
+        state: 'unavailable',
+        note: 'Other location',
+        reasonNote: creditLocationName
+          ? `Your credits are at ${creditLocationName}. Switch location to use them.`
+          : 'Your credits are for another location. Switch location to use them.',
+      };
     case 'past':
       return { state: 'unavailable', note: 'Started' };
     case 'cancelled':
@@ -146,6 +163,9 @@ export default function BookScreen() {
   const batchesQ = useBatches();
   const bookingsQ = useBookings();
   const coachesQ = useCoaches();
+  // Only for naming the branch a wrong_location card's credits are at. NOT a gate:
+  // the day must render whether or not the branch list has arrived.
+  const locationsQ = useLocations();
   const templatesQ = useTemplates();
   const gate = combine(slotsQ, batchesQ, bookingsQ, coachesQ, templatesQ);
   const [dayKey, setDayKey] = useState<string | null>(null);
@@ -237,7 +257,12 @@ export default function BookScreen() {
       ) : (
         <View style={styles.slots}>
           {daySessions.map(({ slot, availability }) => {
-            const display = slotDisplay(availability);
+            const display = slotDisplay(
+              availability,
+              availability.kind === 'wrong_location'
+                ? (locationsQ.data ?? []).find((l) => l.id === availability.locationId)?.name ?? null
+                : null,
+            );
             // `kind` as a const local (not the property) so isCreditShort's
             // narrowing survives into the onPress closure below.
             const kind = availability.kind;
@@ -256,6 +281,7 @@ export default function BookScreen() {
                 state={display.state}
                 note={display.note}
                 creditNote={display.creditNote}
+                reasonNote={display.reasonNote}
                 cta={display.cta}
                 onPress={onPress}
               />

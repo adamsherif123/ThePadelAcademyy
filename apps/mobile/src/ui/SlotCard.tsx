@@ -38,6 +38,7 @@ export function SlotCard({
   state,
   note,
   creditNote,
+  reasonNote,
   cta,
   onPress,
 }: {
@@ -47,6 +48,13 @@ export function SlotCard({
   state: SlotCardState;
   note?: string;
   creditNote?: string;
+  /**
+   * A full-width sentence under the card, for an unbookable reason the two-word
+   * pill cannot carry — today, credits held at another branch. Unlike `cta` it is
+   * not an invitation and the card stays inert: there is nothing to tap here,
+   * only something to know.
+   */
+  reasonNote?: string;
   /**
    * An invitation shown on a card that is NOT `bookable` but is still tappable —
    * today, a credit-short session ("Add credits to book"). Rendered as an accent
@@ -75,7 +83,14 @@ export function SlotCard({
       open: { borderStyle: 'dashed', borderColor: color.accent.default, borderWidth: 1.5 },
       pressed: { opacity: 0.85 },
       top: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-      info: { flex: 1, gap: 2 },
+      // Two guards against one bug. React Native defaults flexShrink to 0, so a
+      // wide status pill held its full intrinsic width and squeezed this flex:1
+      // column to nothing — the time and coach then wrapped one CHARACTER per
+      // line. The pill shrinks now (below), which fixes it; minWidth is the floor
+      // for the case where even a shrunk pill would take the row, and it is set
+      // to roughly the time range's own width so the worst case is a word wrap
+      // here and a truncated pill there, never the other way round.
+      info: { flex: 1, gap: 2, minWidth: 110 },
       bottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
       creditNote: {},
       ctaRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
@@ -86,6 +101,9 @@ export function SlotCard({
         borderRadius: radius.pill,
         paddingVertical: space.xs,
         paddingHorizontal: space.sm,
+        // See `info`: RN's flexShrink default is 0, which is what let a long note
+        // crush the column beside it.
+        flexShrink: 1,
       },
       pillOutline: { borderWidth: 1, borderColor: color.border.strong, backgroundColor: color.bg.surface },
       pillOpen: { borderWidth: 1, borderColor: color.accent.default, backgroundColor: color.bg.surface },
@@ -157,6 +175,10 @@ export function SlotCard({
           </Text>
           <Ionicons name="chevron-forward" size={14} color={color.accent.default} />
         </View>
+      ) : !bookable && reasonNote ? (
+        <Text variant="caption" tone="secondary">
+          {reasonNote}
+        </Text>
       ) : null}
     </View>
   );
@@ -224,7 +246,10 @@ function StatusPill({
   }
   return (
     <View style={[styles.pill, styles.pillOutline]}>
-      <Text variant="micro" tone="secondary">
+      {/* One line, always. A status pill that wrapped to three lines would be a
+          paragraph wearing a pill's border — a note that needs more than a couple
+          of words belongs on the full-width row at the foot of the card. */}
+      <Text variant="micro" tone="secondary" numberOfLines={1}>
         {note ?? 'Unavailable'}
       </Text>
     </View>
