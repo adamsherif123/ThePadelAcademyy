@@ -8,10 +8,11 @@ import {
   mockPurchases,
   mockSlots,
 } from '@tpa/mocks';
-import type { IsoInstant, PackageId, Piastres } from '@tpa/types';
+import type { IsoInstant, LocationId, PackageId, Piastres } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
 import {
+  atLocation,
   activePlayerCount,
   batchLiability,
   creditLiability,
@@ -243,5 +244,44 @@ describe('paid gating — revenue counts only money the academy has COLLECTED', 
     const recent = recentPurchases(allUnpaid, 4);
     expect(recent).toHaveLength(recentPurchases(mockPurchases, 4).length);
     expect(recent.every((p) => !p.paid)).toBe(true);
+  });
+});
+
+describe('atLocation', () => {
+  const rows = [
+    { locationId: 'loc_a' as LocationId, n: 1 },
+    { locationId: 'loc_b' as LocationId, n: 2 },
+    { locationId: 'loc_a' as LocationId, n: 3 },
+  ];
+
+  it('narrows to one branch', () => {
+    expect(atLocation(rows, 'loc_a' as LocationId).map((r) => r.n)).toEqual([1, 3]);
+  });
+
+  it("'all' keeps everything — the Dashboard's default is the whole academy", () => {
+    expect(atLocation(rows, 'all')).toHaveLength(3);
+  });
+
+  it('returns a copy, never the caller’s array', () => {
+    expect(atLocation(rows, 'all')).not.toBe(rows);
+  });
+
+  it('is empty for a branch with nothing', () => {
+    expect(atLocation(rows, 'loc_zzz' as LocationId)).toEqual([]);
+  });
+
+  // The property that matters most: revenue is computed from the FILTERED list,
+  // and a refund-required purchase (068: status 'failed' + paid) is excluded by
+  // revenueThisMonth's own succeeded-AND-paid rule at every branch.
+  it('cannot smuggle a refund-required payment into a branch’s revenue', () => {
+    const refundRequired = {
+      ...mockPurchases[0]!,
+      status: 'failed' as const,
+      paid: true,
+      refundRequiredAt: MOCK_NOW,
+      locationId: 'loc_a' as LocationId,
+    };
+    const scoped = atLocation([refundRequired], 'loc_a' as LocationId);
+    expect(revenueThisMonth(scoped, MOCK_NOW).current).toBe(0);
   });
 });

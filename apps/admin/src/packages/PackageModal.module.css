@@ -63,3 +63,23 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Where this package will be sold. Mirrors GenerateModal's "Generating at". */
+.locationNote {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+/* The one thing an owner is most likely to get wrong once branches exist. */
+.trialNote {
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-canvas);
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  line-height: 1.5;
+}

@@ -173,6 +173,7 @@ export function Players() {
       {selected ? (
         <PlayerDetailModal
           player={selected}
+          locations={modalData.locations}
           batches={modalData.batches}
           purchases={modalData.purchases}
           bookings={modalData.bookings}

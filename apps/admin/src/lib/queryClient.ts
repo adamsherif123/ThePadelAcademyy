@@ -46,6 +46,13 @@ export const queryKeys = {
   /** The Credit Requests page's own paginated read + its whole-table status counts. */
   creditRequestsPage: ['creditRequestsPage'] as const,
   creditRequestStatusCounts: ['creditRequestStatusCounts'] as const,
+  /**
+   * The refund queue (068): purchases the gateway captured that could not be
+   * turned into credits. Two keys, because the sidebar badge is a head:true
+   * count that must stay live even while the Dashboard section is unmounted.
+   */
+  refundQueue: ['refundQueue'] as const,
+  refundPendingCount: ['refundPendingCount'] as const,
   purchases: ['purchases'] as const,
   creditRequests: ['creditRequests'] as const,
   news: ['news'] as const,
@@ -58,6 +65,11 @@ export const TOUCHED = {
   booking: [queryKeys.bookings, queryKeys.bookingsPage, queryKeys.bookingStatusCounts, queryKeys.slots, queryKeys.batches] as const,
   // grant_credits / record_cash_purchase mint credits (+ a purchase row)
   money: [queryKeys.batches, queryKeys.purchases, queryKeys.playersPage] as const,
+  // transfer_credit_batch moves quantity between two batches of the same player:
+  // the wallet and the players page both show those totals.
+  transfer: [queryKeys.batches, queryKeys.playersPage] as const,
+  // mark_purchase_refunded resolves a row out of the queue AND changes the badge.
+  refunds: [queryKeys.refundQueue, queryKeys.refundPendingCount, queryKeys.purchases] as const,
   // approve mints a batch + a purchase AND resolves the request; reject resolves it (the
   // extra money keys are harmless no-ops on reject).
   // Approve/reject RESOLVES the request, so the paginated list and the whole-table

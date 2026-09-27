@@ -13,6 +13,8 @@ import type {
   Gender,
   IsoInstant,
   Level,
+  Location,
+  LocationId,
   Package,
   PackageId,
   PaymentMethod,
@@ -22,12 +24,17 @@ import type {
   SessionSlot,
   TrainingType,
 } from '@tpa/types';
-import { AlertTriangle, ArrowLeft, Banknote, Gift, Medal, Pencil, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowLeftRight, Banknote, Gift, MapPin, Medal, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
+import type { DeleteCreditBatchReason } from '../lib/api';
 import { recordCashPurchase } from '../data/cashPurchase';
 import { deleteCreditBatch } from '../data/creditBatch';
 import { grantCredits } from '../data/grant';
+import { locationNameById } from '../data/locations';
+import { activeLocations } from '../data/useSelectedLocation';
+import { canTransferBatch, transferCreditBatch, transferTargets, TRANSFER_ERROR } from '../data/transfer';
+import { groupBatchesByLocation, groupPackagesByLocation } from '../data/wallet';
 import { setPlayerCoach } from '../data/playerCoach';
 import { sessionRetailValue, SELLABLE_TYPES } from '../data/packages';
 import {
@@ -77,9 +84,17 @@ const GRANT_ERROR: Record<string, string> = {
   network: GENERIC_ERROR,
 };
 
-const DELETE_BATCH_ERROR: Record<string, string> = {
+/**
+ * Exhaustive over what delete_credit_batch can return, so a new server reason is
+ * a build error rather than a shrug. batch_has_bookings and batch_has_transfers
+ * are both handled earlier with fresher copy (the dialog re-reads the server's
+ * answer); they are here so the map stays total.
+ */
+const DELETE_BATCH_ERROR: Record<DeleteCreditBatchReason | 'network', string> = {
   batch_missing: 'That batch is already gone. Close and reopen to refresh.',
   batch_in_use: 'Something still references this batch, so nothing was removed.',
+  batch_has_bookings: 'Someone has booked with these credits, so nothing was removed.',
+  batch_has_transfers: 'Credits were moved out of this batch, so nothing was removed.',
   not_admin: 'You don’t have permission.',
   network: GENERIC_ERROR,
 };
@@ -104,6 +119,8 @@ interface PlayerDetailProps {
   slots: SessionSlot[];
   coaches: Coach[];
   packages: Package[];
+  /** Every branch, active or not — the wallet has to name closed ones too. */
+  locations: Location[];
   onClose: () => void;
 }
 
@@ -122,10 +139,14 @@ export function PlayerDetailModal({
   slots,
   coaches,
   packages,
+  locations,
   onClose,
 }: PlayerDetailProps) {
   const { now } = useSession();
   const [view, setView] = useState<View>('main');
+  // Which batch the owner is moving to another branch. Like `deleting`, its own
+  // state rather than a View, because it has to carry WHICH batch.
+  const [moving, setMoving] = useState<CreditBatch | null>(null);
   // Which batch the owner is about to remove. Its own state rather than a View,
   // because the confirm has to carry WHICH batch — a bare mode string cannot.
   const [deleting, setDeleting] = useState<CreditBatch | null>(null);
@@ -133,20 +154,27 @@ export function PlayerDetailModal({
   if (view === 'edit')
     return <EditView player={player} bookings={bookings} slots={slots} onBack={() => setView('main')} onClose={onClose} />;
   if (view === 'grant')
-    return <GrantView player={player} packages={packages} onBack={() => setView('main')} onClose={onClose} />;
+    return <GrantView player={player} packages={packages} locations={locations} onBack={() => setView('main')} onClose={onClose} />;
   if (view === 'cash')
-    return <CashView player={player} now={now} packages={packages} onBack={() => setView('main')} onClose={onClose} />;
+    return <CashView player={player} now={now} packages={packages} locations={locations} onBack={() => setView('main')} onClose={onClose} />;
+  if (moving)
+    return <TransferView batch={moving} locations={locations} onBack={() => setMoving(null)} />;
   if (deleting)
     return (
       <BatchDeleteConfirm
         batch={deleting}
         purchase={deleting.purchaseId ? purchases.find((p) => p.id === deleting.purchaseId) ?? null : null}
         bookingCount={bookings.filter((b) => b.creditBatchId === deleting.id).length}
+        transferCount={batches.filter((b) => b.transferredFrom === deleting.id).length}
+        locations={locations}
         onBack={() => setDeleting(null)}
       />
     );
 
   const walletBatches = batchesForPlayerSorted(batches, player.id);
+  // Grouped, not flat: with more than one branch a bare list of "4 left" rows
+  // cannot answer the only question that matters — WHERE can they spend it.
+  const walletGroups = groupBatchesByLocation(walletBatches, locations);
   const bookingRows = bookingsForPlayer(bookings, player.id)
     .map((b) => ({ booking: b, slot: slotById(slots, b.slotId) }))
     .sort((a, b) => (b.slot ? new Date(b.slot.startsAt).getTime() : 0) - (a.slot ? new Date(a.slot.startsAt).getTime() : 0));
@@ -202,37 +230,66 @@ export function PlayerDetailModal({
           {walletBatches.length === 0 ? (
             <p className={styles.empty}>No credits yet.</p>
           ) : (
-            <div className={styles.list}>
-              {walletBatches.map((b) => {
-                const state = creditExpiryState(b.expiresAt, now);
-                return (
-                  <div key={b.id} className={styles.row}>
-                    <TypePill type={b.trainingType} />
-                    <div className={styles.rowMain}>
-                      <span className={styles.rowTitle}>
-                        {b.quantityRemaining} / {b.quantityTotal} left
-                      </span>
-                      <span className={styles.rowSub}>
-                        {SOURCE_LABEL[b.source]}
-                        {b.source === 'admin_grant' && b.note ? ` · ${b.note}` : ''}
-                      </span>
-                    </div>
-                    <div className={styles.rowEnd}>
-                      <span className={styles.expiry} data-state={state}>
-                        {formatExpiry(b.expiresAt, now)}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        icon={Trash2}
-                        aria-label={`Delete this ${TRAINING_LABEL[b.trainingType].toLowerCase()} batch`}
-                        onClick={() => setDeleting(b)}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            walletGroups.map((group) => (
+              <div key={group.locationId} className={styles.walletGroup}>
+                {/* Always shown, even with one branch: "which branch" is now part
+                    of what a credit IS, so it should never be implied. */}
+                <div className={styles.walletGroupHead}>
+                  <MapPin size={13} aria-hidden />
+                  <span>{group.locationName}</span>
+                  <span className={styles.walletGroupCount}>
+                    {group.items.reduce((n, b) => n + b.quantityRemaining, 0)} left
+                  </span>
+                </div>
+                <div className={styles.list}>
+                  {group.items.map((b) => {
+                    const state = creditExpiryState(b.expiresAt, now);
+                    // A transferred batch says where it came from — otherwise
+                    // "Moved branch" raises the question it should answer.
+                    const from = b.transferredFrom
+                      ? batches.find((x) => x.id === b.transferredFrom)
+                      : undefined;
+                    return (
+                      <div key={b.id} className={styles.row}>
+                        <TypePill type={b.trainingType} />
+                        <div className={styles.rowMain}>
+                          <span className={styles.rowTitle}>
+                            {b.quantityRemaining} / {b.quantityTotal} left
+                          </span>
+                          <span className={styles.rowSub}>
+                            {b.source === 'transfer'
+                              ? `Moved from ${locationNameById(locations, from?.locationId)}`
+                              : SOURCE_LABEL[b.source]}
+                            {b.note ? ` · ${b.note}` : ''}
+                          </span>
+                        </div>
+                        <div className={styles.rowEnd}>
+                          <span className={styles.expiry} data-state={state}>
+                            {formatExpiry(b.expiresAt, now)}
+                          </span>
+                          {canTransferBatch(b, now) ? (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              icon={ArrowLeftRight}
+                              aria-label={`Move these ${TRAINING_LABEL[b.trainingType].toLowerCase()} credits to another location`}
+                              onClick={() => setMoving(b)}
+                            />
+                          ) : null}
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            icon={Trash2}
+                            aria-label={`Delete this ${TRAINING_LABEL[b.trainingType].toLowerCase()} batch`}
+                            onClick={() => setDeleting(b)}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))
           )}
         </div>
 
@@ -450,22 +507,29 @@ function CoachLinkSection({ player, coaches }: { player: Player; coaches: Coach[
 }
 
 // ---- GRANT ----
-function GrantView({ player, packages, onBack, onClose }: { player: Player; packages: Package[]; onBack: () => void; onClose: () => void }) {
+function GrantView({ player, packages, locations, onBack, onClose }: { player: Player; packages: Package[]; locations: Location[]; onBack: () => void; onClose: () => void }) {
   const [trainingType, setTrainingType] = useState<TrainingType>('group');
   const [quantity, setQuantity] = useState(1);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Only ACTIVE branches: grant_credits refuses a closed one (location_unavailable),
+  // so offering it would be offering a guaranteed failure. Defaults to the first
+  // active branch — the RPC would default to the DEFAULT branch, but an owner
+  // should see which branch they are about to comp, never infer it.
+  const branches = activeLocations(locations);
+  const [locationId, setLocationId] = useState<LocationId | ''>(branches[0]?.id ?? '');
 
   const unit = sessionRetailValue(packages, trainingType);
   const totalValue = unit != null ? ((unit * Math.max(1, quantity)) as typeof unit) : null;
-  const canSave = reason.trim() !== '' && quantity >= 1 && !saving;
+  const canSave = reason.trim() !== '' && quantity >= 1 && locationId !== '' && !saving;
 
   const onSave = async () => {
+    if (locationId === '') return;
     setError(null);
     setSaving(true);
     // Seam returns { ok, reason } and self-invalidates the cache — never throws.
-    const res = await grantCredits(player.id, trainingType, quantity, reason);
+    const res = await grantCredits(player.id, trainingType, quantity, reason, locationId);
     setSaving(false);
     if (res.ok) onBack();
     else setError(GRANT_ERROR[res.reason] ?? GENERIC_ERROR);
@@ -504,6 +568,16 @@ function GrantView({ player, packages, onBack, onClose }: { player: Player; pack
             onChange={(e) => setQuantity(Number(e.target.value))}
           />
         </div>
+
+        {/* Required, and full width: a credit is only spendable at ONE branch
+            (065), so this is as load-bearing as the training type. */}
+        <Select
+          label="Location"
+          value={locationId}
+          onChange={(e) => setLocationId(e.target.value as LocationId)}
+          options={branches.map((l) => ({ value: l.id, label: l.name }))}
+          hint="These credits can only be used at this location."
+        />
 
         <div className={styles.field}>
           <label className={styles.label} htmlFor="grant-reason">
@@ -551,17 +625,23 @@ function CashView({
   player,
   now,
   packages: allPkgs,
+  locations,
   onBack,
   onClose,
 }: {
   player: Player;
   now: IsoInstant;
   packages: Package[];
+  locations: Location[];
   onBack: () => void;
   onClose: () => void;
 }) {
   const packages = sellablePackages(allPkgs);
-  const [packageId, setPackageId] = useState<PackageId | ''>(packages[0]?.id ?? '');
+  // Grouped by branch, because two branches may sell a bundle with the SAME name
+  // at different prices — a flat list would make those indistinguishable, and
+  // picking the wrong one mints credits at the wrong branch.
+  const pkgGroups = groupPackagesByLocation(packages, locations);
+  const [packageId, setPackageId] = useState<PackageId | ''>(pkgGroups[0]?.items[0]?.id ?? '');
   const selected = packages.find((p) => p.id === packageId) ?? null;
   const [amountEgp, setAmountEgp] = useState<number>(selected ? selected.price / 100 : 0);
   const [error, setError] = useState<string | null>(null);
@@ -615,7 +695,11 @@ function CashView({
             label="Package"
             value={packageId}
             onChange={(e) => pickPackage(e.target.value)}
-            options={packages.map((p) => ({ value: p.id, label: p.name }))}
+            groups={pkgGroups.map((g) => ({
+              label: g.locationName,
+              options: g.items.map((p) => ({ value: p.id, label: p.name })),
+            }))}
+            hint={selected ? `Credits will be usable at ${locationNameById(locations, selected.locationId)}.` : undefined}
           />
           <Input
             label="Amount received (EGP)"
@@ -680,20 +764,143 @@ function CashView({
  * attendance history coach hours are paid from; deleting the batch would rewrite
  * what somebody is owed.
  */
+/**
+ * Move some of a batch's remaining credits to another branch (067).
+ *
+ * Quantity defaults to the WHOLE remainder, because that is the common case —
+ * "this player has moved to the other branch" — and splitting is the exception.
+ * The note is required by the RPC and is the only record of why value moved
+ * between two branches' books, so it is a first-class field here, not a footnote.
+ */
+function TransferView({
+  batch,
+  locations,
+  onBack,
+}: {
+  batch: CreditBatch;
+  locations: Location[];
+  onBack: () => void;
+}) {
+  const targets = transferTargets(locations, batch);
+  const [toLocationId, setToLocationId] = useState<LocationId | ''>(targets[0]?.id ?? '');
+  const [quantity, setQuantity] = useState(batch.quantityRemaining);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const typeLabel = TRAINING_LABEL[batch.trainingType].toLowerCase();
+  const canSave =
+    toLocationId !== '' && note.trim() !== '' && quantity >= 1 && quantity <= batch.quantityRemaining && !busy;
+
+  const onSave = async () => {
+    if (toLocationId === '') return;
+    setError(null);
+    setBusy(true);
+    const res = await transferCreditBatch(batch.id, toLocationId, quantity, note);
+    setBusy(false);
+    if (res.ok) onBack();
+    else setError(TRANSFER_ERROR[res.reason]);
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onBack}
+      eyebrow="Wallet"
+      title="Move credits to another location"
+      footer={
+        <>
+          <Button variant="secondary" icon={ArrowLeft} onClick={onBack} disabled={busy}>
+            Back
+          </Button>
+          <Button icon={ArrowLeftRight} onClick={() => void onSave()} disabled={!canSave}>
+            {busy ? 'Moving…' : `Move ${quantity} credit${quantity === 1 ? '' : 's'}`}
+          </Button>
+        </>
+      }
+    >
+      <div className={styles.form}>
+        <p className={styles.confirmBatch}>
+          {batch.quantityRemaining} {typeLabel} credit{batch.quantityRemaining === 1 ? '' : 's'} at{' '}
+          {locationNameById(locations, batch.locationId)}
+        </p>
+
+        {targets.length === 0 ? (
+          <p className={styles.confirmWarn}>
+            There’s nowhere to move these to — you need a second open location first.
+          </p>
+        ) : (
+          <>
+            <div className={styles.grid}>
+              <Select
+                label="Move to"
+                value={toLocationId}
+                onChange={(e) => setToLocationId(e.target.value as LocationId)}
+                options={targets.map((l) => ({ value: l.id, label: l.name }))}
+              />
+              <Input
+                label="How many"
+                type="number"
+                min={1}
+                max={batch.quantityRemaining}
+                value={quantity}
+                onChange={(e) => setQuantity(Number(e.target.value))}
+                hint={`${batch.quantityRemaining} available`}
+              />
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="transfer-note">
+                Reason (required)
+              </label>
+              <textarea
+                id="transfer-note"
+                className={styles.textarea}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={2}
+                placeholder="e.g. court closed for maintenance"
+              />
+            </div>
+
+            {/* The two things an owner is most likely to assume wrongly. */}
+            <p className={styles.hint}>
+              The credits keep their original expiry — moving them doesn’t extend it — and the player
+              will only be able to use the moved credits at the new location.
+            </p>
+          </>
+        )}
+
+        {error ? (
+          <p className={styles.error}>
+            <AlertTriangle size={15} aria-hidden />
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </Modal>
+  );
+}
+
 function BatchDeleteConfirm({
   batch,
   purchase,
   bookingCount,
+  transferCount,
+  locations,
   onBack,
 }: {
   batch: CreditBatch;
   purchase: Purchase | null;
   bookingCount: number;
+  /** Batches transferred OUT of this one — 067 refuses the delete while any exist. */
+  transferCount: number;
+  locations: Location[];
   onBack: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const blocked = bookingCount > 0;
+  const blocked = bookingCount > 0 || transferCount > 0;
   const typeLabel = TRAINING_LABEL[batch.trainingType].toLowerCase();
 
   const onDelete = async () => {
@@ -709,6 +916,12 @@ function BatchDeleteConfirm({
     // opened with: one could have landed in between.
     if (res.reason === 'batch_has_bookings') {
       setError('Someone has booked with these credits since you opened this. Nothing was removed.');
+      return;
+    }
+    // Same shape: the server is the authority, and a transfer could have landed
+    // between opening this dialog and confirming it.
+    if (res.reason === 'batch_has_transfers') {
+      setError('Credits were moved out of this batch since you opened this. Nothing was removed.');
       return;
     }
     setError(DELETE_BATCH_ERROR[res.reason] ?? 'Could not remove the batch.');
@@ -736,11 +949,20 @@ function BatchDeleteConfirm({
       <div className={styles.confirm}>
         <p className={styles.confirmBatch}>
           {batch.quantityRemaining} of {batch.quantityTotal} {typeLabel} credit
-          {batch.quantityTotal === 1 ? '' : 's'} · {SOURCE_LABEL[batch.source]}
-          {batch.source === 'admin_grant' && batch.note ? ` · ${batch.note}` : ''}
+          {batch.quantityTotal === 1 ? '' : 's'} · {SOURCE_LABEL[batch.source]} at{' '}
+          {locationNameById(locations, batch.locationId)}
+          {batch.note ? ` · ${batch.note}` : ''}
         </p>
 
-        {blocked ? (
+        {transferCount > 0 ? (
+          <p className={styles.confirmWarn}>
+            {transferCount === 1 ? 'A batch of credits was' : `${transferCount} batches of credits were`} moved
+            out of this one to another location, so it can’t be removed — deleting it would leave
+            {transferCount === 1 ? ' that batch' : ' those batches'} with no record of where the credits
+            came from. Remove the moved {transferCount === 1 ? 'batch' : 'batches'} first if this really
+            was a mistake.
+          </p>
+        ) : blocked ? (
           <p className={styles.confirmWarn}>
             {bookingCount} booking{bookingCount === 1 ? ' has' : 's have'} already been made against this
             batch, so it can’t be removed — those bookings are what coach hours are counted from. Cancel

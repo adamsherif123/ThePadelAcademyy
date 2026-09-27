@@ -1,4 +1,4 @@
-import type { PlayerId, TrainingType } from '@tpa/types';
+import type { LocationId, PlayerId, TrainingType } from '@tpa/types';
 
 import { grantCreditsRpc, type GrantResult } from '../lib/api';
 import { TOUCHED } from '../lib/queryClient';
@@ -14,6 +14,7 @@ export function grantCredits(
   trainingType: TrainingType,
   quantity: number,
   reason: string,
+  locationId: LocationId,
 ): Promise<GrantResult | { ok: false; reason: 'network' }> {
-  return runRpc(() => grantCreditsRpc(playerId, trainingType, quantity, reason), TOUCHED.money);
+  return runRpc(() => grantCreditsRpc(playerId, trainingType, quantity, reason, locationId), TOUCHED.money);
 }

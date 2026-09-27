@@ -16,6 +16,7 @@ import type {
   Purchase,
   SessionSlot,
   TrainingType,
+  LocationId,
 } from '@tpa/types';
 
 /**
@@ -38,6 +39,21 @@ const monthStart = (now: IsoInstant): IsoInstant => {
   const c = cairoCalendarDate(now);
   return cairoMidnight({ year: c.year, month: c.month, day: 1 });
 };
+
+/**
+ * Narrow a list to one branch, or leave it whole for ALL_LOCATIONS.
+ *
+ * The Dashboard filters its INPUTS rather than teaching each metric about
+ * branches: every figure on the page then respects the filter by construction,
+ * and none of the arithmetic below had to change. It also means a metric added
+ * later is branch-aware for free instead of being a new place to forget.
+ */
+export function atLocation<T extends { locationId: LocationId }>(
+  rows: readonly T[],
+  locationId: LocationId | 'all',
+): T[] {
+  return locationId === 'all' ? [...rows] : rows.filter((r) => r.locationId === locationId);
+}
 
 const succeeded = (purchases: Purchase[]): Purchase[] => purchases.filter((p) => p.status === 'succeeded');
 /**

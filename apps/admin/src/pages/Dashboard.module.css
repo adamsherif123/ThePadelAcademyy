@@ -122,3 +122,9 @@
   font-weight: var(--font-weight-bold);
   white-space: nowrap;
 }
+
+/* Same placement as Packages and Schedule: above the content it scopes. */
+.locationRow {
+  max-width: 280px;
+  margin-bottom: var(--space-lg);
+}

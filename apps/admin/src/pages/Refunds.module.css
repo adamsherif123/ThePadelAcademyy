@@ -1,0 +1,81 @@
+/* Mirrors CreditRequests.module.css — this is the same shape of screen (a work
+   queue with one action per row), so it should not look like a new species. */
+.tableWrap {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.empty {
+  padding: var(--space-xl);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body);
+}
+
+.muted { color: var(--color-text-muted); }
+
+.playerCell { display: flex; flex-direction: column; gap: 2px; }
+.playerName { font-weight: var(--font-weight-semibold); color: var(--color-text-primary); }
+.playerSub { font-size: var(--font-size-caption); color: var(--color-text-muted); }
+
+/* The gateway handle an owner pastes into Paymob to find the payment. */
+.txn {
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: var(--font-size-caption);
+  color: var(--color-text-secondary);
+}
+
+.amount { font-weight: var(--font-weight-bold); color: var(--color-text-primary); }
+
+/* Days outstanding. Not a hard threshold — just enough weight that a week-old
+   refund stops reading like a fresh one. */
+.age { font-size: var(--font-size-caption); color: var(--color-text-muted); }
+.age[data-stale='true'] { color: var(--expiry-expired-fg); font-weight: var(--font-weight-semibold); }
+
+.summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+.summaryValue { font-size: var(--font-size-h2); font-weight: var(--font-weight-bold); color: var(--color-text-primary); }
+.summaryLabel { color: var(--color-text-muted); font-size: var(--font-size-body); }
+
+.section { margin-top: var(--space-xl); }
+.sectionToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  background: none;
+  border: none;
+  padding: 0 0 var(--space-sm);
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-semibold);
+}
+.sectionToggle:hover { color: var(--color-text-primary); }
+
+.form { display: flex; flex-direction: column; gap: var(--space-md); }
+.field { display: flex; flex-direction: column; gap: var(--space-xs); }
+.label { font-size: var(--font-size-caption); color: var(--color-text-secondary); font-weight: var(--font-weight-semibold); }
+.textarea {
+  width: 100%;
+  padding: var(--space-sm);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+  font: inherit;
+  resize: vertical;
+}
+.confirmLead { color: var(--color-text-secondary); font-size: var(--font-size-body); line-height: 1.6; }
+.error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--expiry-expired-fg);
+  font-size: var(--font-size-caption);
+}

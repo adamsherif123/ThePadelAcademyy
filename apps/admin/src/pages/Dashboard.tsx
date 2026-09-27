@@ -18,8 +18,10 @@ import type {
   TrainingType,
 } from '@tpa/types';
 import { AlertTriangle, CalendarCheck, DollarSign, Gauge, Users, Wallet } from 'lucide-react';
+import { useState } from 'react';
 
 import {
+  atLocation,
   activePlayerCount,
   creditsExpiringSoon,
   recentPurchases,
@@ -30,6 +32,7 @@ import {
   slotFillRate,
   todaysSessions,
 } from '../data/dashboard';
+import { ALL_LOCATIONS, locationFilterOptions, type LocationFilter } from '../data/locations';
 import { coachById, packageById, playerById } from '../data/selectors';
 import { useAdminData } from '../data/queries';
 import { useSession } from '../session/SessionProvider';
@@ -42,6 +45,7 @@ import {
   LoadingView,
   PageHeader,
   Panel,
+  Select,
   StatCard,
   TRAINING_LABEL,
   TypePill,
@@ -163,14 +167,22 @@ function PurchaseRow({
 export function Dashboard() {
   const { now } = useSession();
   const data = useAdminData();
+  const [locationId, setLocationId] = useState<LocationFilter>(ALL_LOCATIONS);
   if (data.isPending) return <LoadingView />;
   if (data.isError) return <ErrorView onRetry={data.refetch} />;
 
   const cNow = cairoCalendarDate(now);
   const monthName = MONTHS[cNow.month - 1] ?? '';
-  const rev = revenueThisMonth(data.purchases, now);
-  const rbt = revenueByType(data.purchases, data.packages);
-  const line = revenueOverTime(data.purchases, now).map((b) => ({ label: b.label, value: b.revenue }));
+  // Filter the inputs once; every figure below is then about the same branch.
+  // Revenue stays `succeeded AND paid` inside revenueThisMonth, so a refund-required
+  // payment (068: status 'failed' + paid) can never be counted here regardless of branch.
+  const purchases = atLocation(data.purchases, locationId);
+  const slots = atLocation(data.slots, locationId);
+  const batches = atLocation(data.batches, locationId);
+
+  const rev = revenueThisMonth(purchases, now);
+  const rbt = revenueByType(purchases, data.packages);
+  const line = revenueOverTime(purchases, now).map((b) => ({ label: b.label, value: b.revenue }));
   const donutSegments: DonutSegment[] = rbt.rows.map((r) => ({
     key: r.type,
     label: TRAINING_LABEL[r.type],
@@ -178,9 +190,9 @@ export function Dashboard() {
     color: DONUT_COLOR[r.type],
   }));
 
-  const today = todaysSessions(data.slots, now);
-  const expiring = creditsExpiringSoon(data.batches, now, 7);
-  const recent = recentPurchases(data.purchases, 4);
+  const today = todaysSessions(slots, now);
+  const expiring = creditsExpiringSoon(batches, now, 7);
+  const recent = recentPurchases(purchases, 4);
 
   return (
     <div>
@@ -189,6 +201,17 @@ export function Dashboard() {
         title="Dashboard"
         subtitle="The state of The Padel Academy — revenue, players, sessions, and what needs your attention today."
       />
+
+      {/* Defaults to every branch: the Dashboard's job is "how is the academy
+          doing", and the split is the follow-up question. */}
+      <div className={styles.locationRow}>
+        <Select
+          label="Location"
+          value={locationId}
+          onChange={(e) => setLocationId(e.target.value as LocationFilter)}
+          options={locationFilterOptions(data.locations)}
+        />
+      </div>
 
       <div className={styles.kpis}>
         <StatCard
@@ -199,9 +222,9 @@ export function Dashboard() {
           delta={rev.deltaPct}
           caption="vs last month"
         />
-        <StatCard eyebrow="Active players" icon={Users} value={String(activePlayerCount(data.batches, data.bookings, now))} caption="with credits or bookings" />
-        <StatCard eyebrow="Sessions this week" icon={CalendarCheck} value={String(sessionsThisWeek(data.slots, now))} caption="booked, Sun–Wed" />
-        <StatCard eyebrow="Slot fill rate" icon={Gauge} value={`${slotFillRate(data.slots, now)}%`} caption="capacity booked this week" />
+        <StatCard eyebrow="Active players" icon={Users} value={String(activePlayerCount(batches, data.bookings, now))} caption="with credits or bookings" />
+        <StatCard eyebrow="Sessions this week" icon={CalendarCheck} value={String(sessionsThisWeek(slots, now))} caption="booked, Sun–Wed" />
+        <StatCard eyebrow="Slot fill rate" icon={Gauge} value={`${slotFillRate(slots, now)}%`} caption="capacity booked this week" />
       </div>
 
       <div className={styles.charts}>

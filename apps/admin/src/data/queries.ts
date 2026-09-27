@@ -5,6 +5,7 @@ import type {
   CoachId,
   CreditBatch,
   Location,
+  LocationId,
   News,
   Package,
   Player,
@@ -21,6 +22,7 @@ import type {
   CreditRequestStatusCounts,
   PlayersPageParams,
   PlayersPageResult,
+  RefundRow,
 } from '../lib/api';
 import {
   ApiError,
@@ -39,6 +41,8 @@ import {
   fetchPackages,
   fetchPlayers,
   fetchPurchases,
+  fetchRefundPendingCount,
+  fetchRefunds,
   fetchSlots,
   fetchTemplates,
 } from '../lib/api';
@@ -151,15 +155,34 @@ export function useCreditRequestsPage(params: CreditRequestsPageParams): {
   return { data: q.data, isPending: q.isPending, isFetching: q.isFetching, isError: q.isError, refetch: () => void q.refetch() };
 }
 
-/** Whole-table credit-request counts — independent of the page and the active filter. */
-export const useCreditRequestStatusCounts = (): Resource<CreditRequestStatusCounts> =>
+/**
+ * Whole-table credit-request counts — independent of the PAGE, but scoped to the
+ * branch filter (S6): the cards describe the population the list is showing, so
+ * "3 awaiting review" must mean three at this branch, not three somewhere.
+ * The branch joins the query key, so each branch caches its own counts.
+ */
+export const useCreditRequestStatusCounts = (locationId: LocationId | 'all'): Resource<CreditRequestStatusCounts> =>
   toResource(
-    useQuery({ queryKey: queryKeys.creditRequestStatusCounts, queryFn: fetchCreditRequestStatusCounts }),
+    useQuery({
+      queryKey: [...queryKeys.creditRequestStatusCounts, locationId],
+      queryFn: () => fetchCreditRequestStatusCounts(locationId),
+    }),
   );
 
-/** The 4 status-count cards — all-time, across every booking, not just the current page. */
-export const useBookingStatusCounts = (): Resource<BookingStatusCounts> =>
-  toResource(useQuery({ queryKey: queryKeys.bookingStatusCounts, queryFn: fetchBookingStatusCounts }));
+/** The 4 status-count cards — all-time across the selected branch, not just the current page. */
+export const useBookingStatusCounts = (locationId: LocationId | 'all'): Resource<BookingStatusCounts> =>
+  toResource(
+    useQuery({
+      queryKey: [...queryKeys.bookingStatusCounts, locationId],
+      queryFn: () => fetchBookingStatusCounts(locationId),
+    }),
+  );
+
+/** The refund queue (068) and the sidebar badge that counts it. */
+export const useRefunds = (refunded: boolean): Resource<RefundRow[]> =>
+  toResource(useQuery({ queryKey: [...queryKeys.refundQueue, refunded], queryFn: () => fetchRefunds(refunded) }));
+export const useRefundPendingCount = (): Resource<number> =>
+  toResource(useQuery({ queryKey: queryKeys.refundPendingCount, queryFn: fetchRefundPendingCount }));
 
 /** Collapse several resources into one loading / error / retry gate for a page. */
 export function combine(...rs: Resource<unknown>[]): { isPending: boolean; isError: boolean; refetch: () => void } {

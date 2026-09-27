@@ -1,6 +1,6 @@
 import { PIASTRES_PER_EGP, formatPiastres } from '@tpa/core';
 import type { Package, Piastres, TrainingType, LocationId } from '@tpa/types';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, MapPin } from 'lucide-react';
 import { useState } from 'react';
 
 import {
@@ -33,14 +33,19 @@ const suggestName = (type: TrainingType, sessions: number): string =>
 export function PackageModal({
   pkg,
   locationId,
+  locationName,
   onClose,
 }: {
   pkg?: Package;
   /**
-   * The branch a NEW package is sold for. No picker here yet — per-location
-   * pricing is its own session — so the Packages page passes the default.
+   * The branch a NEW package is sold for — the one selected on the Packages page.
+   * There is no picker HERE on purpose: the page is already scoped to a branch,
+   * and a second control that could disagree with it is a way to create a package
+   * somewhere you weren't looking.
    */
   locationId: LocationId;
+  /** Shown read-only, so "where does this go" is answered before you type. */
+  locationName: string;
   onClose: () => void;
 }) {
   const editing = pkg !== undefined;
@@ -96,6 +101,19 @@ export function PackageModal({
       }
     >
       <div className={styles.body}>
+        <p className={styles.locationNote}>
+          <MapPin size={15} aria-hidden />
+          {editing ? 'Sold at: ' : 'Creating at: '}
+          <strong>{locationName}</strong>
+        </p>
+
+        {trainingType === 'trial' ? (
+          <p className={styles.trialNote}>
+            A player gets <strong>one free trial ever</strong> — across every location, not one per
+            branch. A trial package here doesn’t give anyone a second one.
+          </p>
+        ) : null}
+
         <div className={styles.grid}>
           <div>
             <Select

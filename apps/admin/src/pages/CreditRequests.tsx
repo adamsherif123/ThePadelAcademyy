@@ -10,6 +10,7 @@ import {
   type CreditRequestRow,
   type CreditRequestStatusFilter,
 } from '../lib/api';
+import { ALL_LOCATIONS, locationFilterOptions, locationNameById, type LocationFilter } from '../data/locations';
 import { PlayerDetailModal } from '../players/PlayerDetailModal';
 import { PaidToggle } from '../purchases/PaidToggle';
 import {
@@ -78,20 +79,23 @@ export function CreditRequests() {
   // opens on Pending, which is what this page exists for, and history is one dropdown
   // away. Within a filter, newest first — consistent with Bookings.
   const [status, setStatus] = useState<StatusFilter>('pending');
+  const [locationId, setLocationId] = useState<LocationFilter>(ALL_LOCATIONS);
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Player | null>(null);
   const [modal, setModal] = useState<{ kind: 'approve' | 'reject'; row: Row } | null>(null);
 
   // A new filter is a different result set — page 3 of the old one is meaningless
   // against it. Adjusted during render so the stale page never flashes through a fetch.
-  const [prevStatus, setPrevStatus] = useState(status);
-  if (prevStatus !== status) {
-    setPrevStatus(status);
+  const [prevStatus, setPrevStatus] = useState({ status, locationId });
+  if (prevStatus.status !== status || prevStatus.locationId !== locationId) {
+    setPrevStatus({ status, locationId });
     setPage(0);
   }
 
-  const reqsPage = useCreditRequestsPage({ page, pageSize: PAGE_SIZE, status });
-  const counts = useCreditRequestStatusCounts();
+  const reqsPage = useCreditRequestsPage({ page, pageSize: PAGE_SIZE, status, locationId });
+  // Scoped to the branch for the same reason the Bookings cards are: a count
+  // beside a filtered list has to describe the same population.
+  const counts = useCreditRequestStatusCounts(locationId);
   // PlayerDetailModal shows a player's FULL history — that still needs the monolith.
   const modalData = useAdminData();
 
@@ -152,6 +156,13 @@ export function CreditRequests() {
     },
     { key: 'price', header: 'Price', render: (r) => <span className={styles.muted}>{r.pkg ? formatPiastres(r.pkg.price) : '—'}</span> },
     { key: 'method', header: 'Method', render: (r) => METHOD_LABEL[r.request.paymentMethod] },
+    {
+      key: 'location',
+      header: 'Location',
+      render: (r) => (
+        <span className={styles.muted}>{locationNameById(modalData.locations, r.request.locationId)}</span>
+      ),
+    },
     { key: 'submitted', header: 'Submitted', render: (r) => <span className={styles.muted}>{formatInstantDate(r.request.createdAt)}</span> },
     { key: 'proof', header: 'Proof', render: (r) => <ProofLink path={r.request.proofPath} /> },
     {
@@ -193,6 +204,11 @@ export function CreditRequests() {
           value={status}
           onChange={(e) => setStatus(e.target.value as StatusFilter)}
           options={STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+        />
+        <Select
+          value={locationId}
+          onChange={(e) => setLocationId(e.target.value as LocationFilter)}
+          options={locationFilterOptions(modalData.locations)}
         />
       </div>
 
@@ -245,6 +261,7 @@ export function CreditRequests() {
       {selected ? (
         <PlayerDetailModal
           player={selected}
+          locations={modalData.locations}
           batches={modalData.batches}
           purchases={modalData.purchases}
           bookings={modalData.bookings}

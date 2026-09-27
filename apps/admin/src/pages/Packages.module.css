@@ -261,3 +261,10 @@
     padding: var(--space-lg);
   }
 }
+
+/* The branch picker sits above the stat cards — the same place the Schedule
+   puts it, so the two screens feel like one app. */
+.locationRow {
+  max-width: 280px;
+  margin-bottom: var(--space-lg);
+}

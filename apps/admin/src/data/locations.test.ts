@@ -8,7 +8,14 @@ import { describe, expect, it, vi } from 'vitest';
 // the same shape coaches.test.ts uses.
 vi.mock('../lib/supabase', () => ({ supabase: {} }));
 
-import { creationLocationId, defaultLocation, locationsForDisplay } from './locations';
+import {
+  ALL_LOCATIONS,
+  creationLocationId,
+  defaultLocation,
+  locationFilterOptions,
+  locationNameById,
+  locationsForDisplay,
+} from './locations';
 
 const loc = (over: Partial<Location> & Pick<Location, 'id'>): Location => ({
   name: 'Branch',
@@ -76,5 +83,33 @@ describe('the fixtures agree with migration 061', () => {
     // The seed id is a literal in the migration; a rename on either side
     // should fail here rather than silently split the two worlds.
     expect(MOCK_LOCATION_ID).toBe('loc_oro_plaza');
+  });
+});
+
+describe('locationNameById', () => {
+  it('resolves a branch to its name', () => {
+    expect(locationNameById([A, B], B.id)).toBe('B');
+  });
+
+  // Mirrors tpa.location_name's coalesce (068) so the admin and the notification
+  // copy never disagree about what an unresolvable branch is called.
+  it('falls back to a word, never a raw id — for a missing branch or a null', () => {
+    expect(locationNameById([A], B.id)).toBe('the academy');
+    expect(locationNameById([A], null)).toBe('the academy');
+    expect(locationNameById([A], undefined)).toBe('the academy');
+  });
+});
+
+describe('locationFilterOptions', () => {
+  it('leads with All locations, so the default reads as a choice', () => {
+    const opts = locationFilterOptions([A, B]);
+    expect(opts[0]).toEqual({ value: ALL_LOCATIONS, label: 'All locations' });
+    expect(opts.map((o) => o.value)).toEqual([ALL_LOCATIONS, A.id, B.id]);
+  });
+
+  // A closed branch stays filterable: its history did not stop existing.
+  it('keeps CLOSED branches and marks them', () => {
+    const opts = locationFilterOptions([A, CLOSED]);
+    expect(opts.map((o) => o.label)).toEqual(['All locations', 'A', 'C (closed)']);
   });
 });

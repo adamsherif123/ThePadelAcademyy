@@ -17,6 +17,7 @@ import type {
   CreditBatch,
   CreditRequest,
   Gender,
+  IsoInstant,
   Level,
   Location,
   LocationId,
@@ -27,6 +28,7 @@ import type {
   Player,
   PlayerId,
   Purchase,
+  PurchaseId,
   SessionSlot,
   SlotId,
   TrainingType,
@@ -189,6 +191,8 @@ export interface BookingsPageParams {
   search: string; // trimmed; '' = no filter
   status: BookingStatusFilter;
   type: BookingTypeFilter;
+  /** A branch id, or 'all'. Filters SERVER-side like every other filter here. */
+  locationId: LocationId | 'all';
 }
 
 export interface BookingsPageResult {
@@ -232,6 +236,10 @@ export async function fetchBookingsPage(params: BookingsPageParams): Promise<Boo
     .range(from, to);
   if (params.status !== 'all') query = query.eq('status', params.status);
   if (params.type !== 'all') query = query.eq('session_slots.training_type', params.type);
+  // bookings.location_id, not session_slots.location_id: the composite FK
+  // bookings_slot_same_location makes them equal by construction, and filtering
+  // the base table avoids turning the embed into an inner-join filter.
+  if (params.locationId !== 'all') query = query.eq('location_id', params.locationId);
   const search = params.search.trim();
   if (search !== '') query = query.ilike('players.name', `%${search}%`);
   const { data, error, count } = await query;
@@ -247,6 +255,8 @@ export interface CreditRequestsPageParams {
   page: number; // 0-indexed
   pageSize: number;
   status: CreditRequestStatusFilter;
+  /** A branch id, or 'all'. Server-side, like `status`. */
+  locationId: LocationId | 'all';
 }
 
 export interface CreditRequestRow {
@@ -310,6 +320,7 @@ export async function fetchCreditRequestsPage(
     .order('created_at', { ascending: false })
     .range(from, to);
   if (params.status !== 'all') query = query.eq('status', params.status);
+  if (params.locationId !== 'all') query = query.eq('location_id', params.locationId);
   const { data, error, count } = await query;
   if (error) throw new ApiError(`Failed to load credit requests: ${error.message}`, error.code, error);
   return { rows: (data ?? []).map(rowToCreditRequestPageRow), total: count ?? 0 };
@@ -323,11 +334,15 @@ const CREDIT_REQUEST_STATUSES: CreditRequest['status'][] = ['pending', 'approved
  * looking at. Three head:true counts (no rows fetched), the same shape
  * fetchBookingStatusCounts uses.
  */
-export async function fetchCreditRequestStatusCounts(): Promise<CreditRequestStatusCounts> {
+export async function fetchCreditRequestStatusCounts(
+  locationId: LocationId | 'all',
+): Promise<CreditRequestStatusCounts> {
   const results = await Promise.all(
-    CREDIT_REQUEST_STATUSES.map((s) =>
-      supabase.from('credit_requests').select('id', { count: 'exact', head: true }).eq('status', s),
-    ),
+    CREDIT_REQUEST_STATUSES.map((s) => {
+      let q = supabase.from('credit_requests').select('id', { count: 'exact', head: true }).eq('status', s);
+      if (locationId !== 'all') q = q.eq('location_id', locationId);
+      return q;
+    }),
   );
   const counts: CreditRequestStatusCounts = { pending: 0, approved: 0, rejected: 0 };
   results.forEach((r, i) => {
@@ -420,9 +435,15 @@ const BOOKING_STATUSES: BookingStatus[] = ['booked', 'attended', 'cancelled', 'n
  * stay accurate across every booking, not just the page in view. 4 head:true
  * counts (no rows fetched) rather than a full select('*') aggregated client-side.
  */
-export async function fetchBookingStatusCounts(): Promise<BookingStatusCounts> {
+export async function fetchBookingStatusCounts(locationId: LocationId | 'all'): Promise<BookingStatusCounts> {
   const results = await Promise.all(
-    BOOKING_STATUSES.map((s) => supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('status', s)),
+    BOOKING_STATUSES.map((s) => {
+      // Still head:true counts over the WHOLE table — the branch filter narrows
+      // the population the cards describe, it does not narrow them to the page.
+      let q = supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('status', s);
+      if (locationId !== 'all') q = q.eq('location_id', locationId);
+      return q;
+    }),
   );
   const counts = { booked: 0, attended: 0, cancelled: 0, no_show: 0 } as BookingStatusCounts;
   results.forEach((r, i) => {
@@ -529,11 +550,97 @@ export async function adminBookPlayerRpc(
     : { ok: false, reason: d.reason as AdminBookReason };
 }
 
-export type GrantReason = 'not_admin' | 'player_missing' | 'reason_required' | 'quantity_below_one';
-export type GrantResult = { ok: true; creditBatchId: string } | { ok: false; reason: GrantReason };
-export async function grantCreditsRpc(playerId: PlayerId, trainingType: TrainingType, quantity: number, note: string): Promise<GrantResult> {
-  const d = await callRpc('grant_credits', { p_player_id: playerId, p_training_type: trainingType, p_quantity: quantity, p_note: note });
-  return d.ok ? { ok: true, creditBatchId: d.credit_batch_id as string } : { ok: false, reason: d.reason as GrantReason };
+// 065 added location_unavailable: comping at a closed branch would mint value
+// nobody can spend.
+export type GrantReason =
+  | 'not_admin' | 'player_missing' | 'reason_required' | 'quantity_below_one' | 'location_unavailable';
+export type GrantResult = { ok: true; creditBatchId: string; locationId: LocationId } | { ok: false; reason: GrantReason };
+/** `locationId` is REQUIRED here even though the RPC defaults it: the admin picks a branch. */
+export async function grantCreditsRpc(playerId: PlayerId, trainingType: TrainingType, quantity: number, note: string, locationId: LocationId): Promise<GrantResult> {
+  const d = await callRpc('grant_credits', { p_player_id: playerId, p_training_type: trainingType, p_quantity: quantity, p_note: note, p_location_id: locationId });
+  return d.ok
+    ? { ok: true, creditBatchId: d.credit_batch_id as string, locationId: d.location_id as LocationId }
+    : { ok: false, reason: d.reason as GrantReason };
+}
+
+// ── credit transfer between branches (067) ───────────────────────────────────
+export type TransferReason =
+  | 'not_admin' | 'reason_required' | 'quantity_below_one' | 'batch_missing' | 'expired'
+  | 'player_missing' | 'same_location' | 'location_missing' | 'location_inactive'
+  | 'quantity_above_remaining';
+export type TransferResult =
+  | { ok: true; creditBatchId: string; fromLocationId: LocationId; toLocationId: LocationId; quantity: number }
+  | { ok: false; reason: TransferReason; remaining?: number };
+export async function transferCreditBatchRpc(
+  batchId: CreditBatch['id'], toLocationId: LocationId, quantity: number, note: string,
+): Promise<TransferResult> {
+  const d = await callRpc('transfer_credit_batch', {
+    p_batch_id: batchId, p_to_location_id: toLocationId, p_quantity: quantity, p_note: note,
+  });
+  return d.ok
+    ? { ok: true, creditBatchId: d.credit_batch_id as string, fromLocationId: d.from_location_id as LocationId,
+        toLocationId: d.to_location_id as LocationId, quantity: d.quantity as number }
+    : { ok: false, reason: d.reason as TransferReason, remaining: d.remaining as number | undefined };
+}
+
+// ── the refund queue (068) ───────────────────────────────────────────────────
+export type MarkRefundedReason =
+  | 'not_admin' | 'reason_required' | 'purchase_missing' | 'not_refund_required' | 'already_refunded';
+export type MarkRefundedResult =
+  | { ok: true; refundedAt: IsoInstant }
+  | { ok: false; reason: MarkRefundedReason };
+export async function markPurchaseRefundedRpc(purchaseId: PurchaseId, note: string): Promise<MarkRefundedResult> {
+  const d = await callRpc('mark_purchase_refunded', { p_purchase_id: purchaseId, p_note: note });
+  return d.ok
+    ? { ok: true, refundedAt: d.refunded_at as IsoInstant }
+    : { ok: false, reason: d.reason as MarkRefundedReason };
+}
+
+export interface RefundRow {
+  purchase: Purchase;
+  player: Player | undefined;
+  pkg: Package | undefined;
+}
+
+/**
+ * Money the gateway captured that could not be turned into credits (068). Bounded
+ * and embedded in one round trip, like every other list on this app.
+ *
+ * `refunded` picks the side: the outstanding queue (owed back, newest first) or
+ * the recently-settled tail. Both are driven by refunded_at, never by status —
+ * the row is `failed` either way, because that is the only vocabulary the
+ * un-updatable 1.2/1.3 builds have.
+ */
+export async function fetchRefunds(refunded: boolean, limit = 25): Promise<RefundRow[]> {
+  // Built as two whole chains rather than one reassigned builder: reassigning a
+  // PostgREST builder across a ternary makes TS widen the generic on every step
+  // and it trips "type instantiation is excessively deep".
+  const base = supabase.from('purchases').select('*, players(*), packages(*)').not('refund_required_at', 'is', null);
+  const { data, error } = refunded
+    ? await base.not('refunded_at', 'is', null).order('refunded_at', { ascending: false }).limit(limit)
+    : await base.is('refunded_at', null).order('refund_required_at', { ascending: false }).limit(limit);
+  if (error) throw new ApiError(`Failed to load refunds: ${error.message}`, error.code, error);
+  return (data ?? []).map((r) => {
+    const row = r as Record<string, unknown>;
+    const playerRow = row.players as Record<string, unknown> | null;
+    const pkgRow = row.packages as Record<string, unknown> | null;
+    return {
+      purchase: rowToPurchase(row),
+      player: playerRow ? rowToPlayer(playerRow) : undefined,
+      pkg: pkgRow ? rowToPackage(pkgRow) : undefined,
+    };
+  });
+}
+
+/** The sidebar badge — head:true, no rows, the same shape as the pending-requests count. */
+export async function fetchRefundPendingCount(): Promise<number> {
+  const { count, error } = await supabase
+    .from('purchases')
+    .select('id', { count: 'exact', head: true })
+    .not('refund_required_at', 'is', null)
+    .is('refunded_at', null);
+  if (error) throw new ApiError(`Failed to count refunds: ${error.message}`, error.code, error);
+  return count ?? 0;
 }
 
 export type SetPlayerCoachReason = 'not_admin' | 'player_missing' | 'coach_missing' | 'coach_taken';
@@ -796,7 +903,10 @@ export async function deletePackageRpc(id: PackageId): Promise<DeletePackageResu
     : { ok: false, reason: d.reason as DeletePackageReason };
 }
 
-export type DeleteCreditBatchReason = 'not_admin' | 'batch_missing' | 'batch_has_bookings' | 'batch_in_use';
+export type DeleteCreditBatchReason =
+  | 'not_admin' | 'batch_missing' | 'batch_has_bookings' | 'batch_in_use'
+  // 067: credits were moved out of this batch to another branch.
+  | 'batch_has_transfers';
 export type DeleteCreditBatchResult =
   | { ok: true; deletedRequests: number; deletedPurchases: number }
   | { ok: false; reason: DeleteCreditBatchReason; bookings: number };

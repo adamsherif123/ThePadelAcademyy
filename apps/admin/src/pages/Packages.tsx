@@ -12,10 +12,10 @@ import {
   perSessionPrice,
   setPackageSellable,
 } from '../data/packages';
-import { creationLocationId } from '../data/locations';
 import { combine, useAdminData, useCreditRequests } from '../data/queries';
+import { useSelectedLocation } from '../data/useSelectedLocation';
 import { PackageModal } from '../packages/PackageModal';
-import { Button, ErrorView, LoadingView, Modal, PageHeader, Toggle, TRAINING_LABEL, TYPE_PLAYERS } from '../ui';
+import { Button, ErrorView, LoadingView, Modal, PageHeader, Select, Toggle, TRAINING_LABEL, TYPE_PLAYERS } from '../ui';
 import styles from './Packages.module.css';
 
 const DELETE_ERROR_TEXT: Record<string, string> = {
@@ -30,29 +30,48 @@ export function Packages() {
   const data = useAdminData();
   const reqsQ = useCreditRequests();
   const gate = combine(reqsQ);
+  const loc = useSelectedLocation(data.locations);
   const [editing, setEditing] = useState<Package | 'new' | null>(null);
   const [deleting, setDeleting] = useState<Package | null>(null);
 
   if (data.isPending || gate.isPending) return <LoadingView />;
   if (data.isError || gate.isError) return <ErrorView onRetry={() => { data.refetch(); gate.refetch(); }} />;
 
-  // Packages have no branch picker yet (per-location pricing is its own
-  // session), so a new one is sold for the default branch — which is where every
-  // existing package was backfilled. It is sent explicitly rather than left to
-  // the DB's fill-default trigger, whose body cannot run as a client role.
-  const createAt = creationLocationId(data.locations);
+  // The same ?loc= the Schedule uses, so switching branch on one screen and
+  // navigating to the other keeps the branch. A package belongs to exactly one
+  // branch (062), so this page is scoped rather than filtered: everything on it —
+  // the stats, the sections, and what "New package" creates — is about one branch.
+  const createAt = loc.id;
 
   const creditRequests = reqsQ.data ?? [];
 
-  const stats = catalogStats(data.packages);
+  // Filtered in the client, not re-fetched per branch. `packages` is a small
+  // whole-table read that useAdminData already holds for the Players and Credit
+  // requests screens; giving it a per-branch query key would mean N cache entries
+  // and N round trips for a table of a few dozen rows, and would make the
+  // delete-guard (which needs the whole catalog) read a different cache than the
+  // list. The paged screens go the other way for the opposite reason.
+  const locPackages = data.packages.filter((p) => p.locationId === loc.id);
+  const stats = catalogStats(locPackages);
 
   return (
     <div>
       <PageHeader
         eyebrow="Catalog"
         title="Packages"
-        subtitle={`Session bundles players can buy. Each purchase adds credits of that training type to the player's wallet, valid for ${CREDIT_EXPIRY_DAYS} days.`}
+        subtitle={`Session bundles players can buy. Each purchase adds credits of that training type to the player's wallet, usable at the location it was bought for, valid for ${CREDIT_EXPIRY_DAYS} days.`}
       />
+
+      {/* Always rendered, even with one branch — a price list that silently
+          belonged to somewhere is how you end up selling the wrong one. */}
+      <div className={styles.locationRow}>
+        <Select
+          label="Location"
+          value={loc.id ?? ''}
+          onChange={(e) => loc.select(e.target.value as typeof loc.id & string)}
+          options={loc.options.map((l) => ({ value: l.id, label: l.name }))}
+        />
+      </div>
 
       <div className={styles.statRow}>
         <div className={styles.statCard}>
@@ -73,7 +92,7 @@ export function Packages() {
       </div>
 
       {SELLABLE_TYPES.map((type) => {
-        const list = packagesForType(data.packages, type);
+        const list = packagesForType(locPackages, type);
         if (list.length === 0) return null;
         return (
           <section key={type} className={styles.section}>
@@ -109,7 +128,12 @@ export function Packages() {
       </div>
 
       {editing && createAt ? (
-        <PackageModal pkg={editing === 'new' ? undefined : editing} locationId={createAt} onClose={() => setEditing(null)} />
+        <PackageModal
+          pkg={editing === 'new' ? undefined : editing}
+          locationId={createAt}
+          locationName={loc.location?.name ?? 'this location'}
+          onClose={() => setEditing(null)}
+        />
       ) : null}
 
       {deleting ? (

@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import type { BookingRow } from '../data/bookingList';
+import { ALL_LOCATIONS, locationFilterOptions, locationNameById, type LocationFilter } from '../data/locations';
 import { useAdminData, useBookingsPage, useBookingStatusCounts } from '../data/queries';
 import { PlayerDetailModal } from '../players/PlayerDetailModal';
 import {
@@ -43,6 +44,7 @@ export function Bookings() {
   const [status, setStatus] = useState<StatusFilter>('all');
   const [type, setType] = useState<TypeFilter>('all');
   const [page, setPage] = useState(0);
+  const [locationId, setLocationId] = useState<LocationFilter>(ALL_LOCATIONS);
   const [selected, setSelected] = useState<Player | null>(null);
 
   // Debounce the search box ~300ms before it becomes a query param.
@@ -55,14 +57,21 @@ export function Bookings() {
   // is meaningless (and may not even exist) against the new one. Adjusted during
   // render (React's "reset state when a prop changes" pattern) rather than an
   // effect, so the stale page never flashes through a fetch before resetting.
-  const [prevFilters, setPrevFilters] = useState({ search, status, type });
-  if (prevFilters.search !== search || prevFilters.status !== status || prevFilters.type !== type) {
-    setPrevFilters({ search, status, type });
+  const [prevFilters, setPrevFilters] = useState({ search, status, type, locationId });
+  if (
+    prevFilters.search !== search ||
+    prevFilters.status !== status ||
+    prevFilters.type !== type ||
+    prevFilters.locationId !== locationId
+  ) {
+    setPrevFilters({ search, status, type, locationId });
     setPage(0);
   }
 
-  const counts = useBookingStatusCounts();
-  const bookingsPage = useBookingsPage({ page, pageSize: PAGE_SIZE, search, status, type });
+  // The cards follow the branch filter too: "12 attended" has to mean twelve at
+  // the branch on screen, or the number beside a filtered list is just wrong.
+  const counts = useBookingStatusCounts(locationId);
+  const bookingsPage = useBookingsPage({ page, pageSize: PAGE_SIZE, search, status, type, locationId });
   // PlayerDetailModal shows a player's FULL booking history, independent of this
   // page's slice/filters — it still needs the whole-table monolith.
   const modalData = useAdminData();
@@ -73,7 +82,7 @@ export function Bookings() {
   const rangeTo = page * PAGE_SIZE + rows.length;
   const hasPrev = page > 0;
   const hasNext = rangeTo < total;
-  const isFiltered = search !== '' || status !== 'all' || type !== 'all';
+  const isFiltered = search !== '' || status !== 'all' || type !== 'all' || locationId !== ALL_LOCATIONS;
 
   const isPending = bookingsPage.isPending || counts.isPending || modalData.isPending;
   const isError = bookingsPage.isError || counts.isError || modalData.isError;
@@ -107,6 +116,13 @@ export function Bookings() {
       render: (r) => (r.slot ? <TypePill type={r.slot.trainingType} /> : <span className={styles.muted}>—</span>),
     },
     { key: 'coach', header: 'Coach', render: (r) => <span className={styles.muted}>{r.coach?.name ?? '—'}</span> },
+    {
+      key: 'location',
+      header: 'Location',
+      render: (r) => (
+        <span className={styles.muted}>{locationNameById(modalData.locations, r.booking.locationId)}</span>
+      ),
+    },
     {
       key: 'date',
       header: 'Date',
@@ -160,6 +176,11 @@ export function Bookings() {
             ...TRAINING_TYPES.map((t) => ({ value: t, label: TRAINING_LABEL[t] })),
           ]}
         />
+        <Select
+          value={locationId}
+          onChange={(e) => setLocationId(e.target.value as LocationFilter)}
+          options={locationFilterOptions(modalData.locations)}
+        />
       </div>
 
       {rows.length === 0 ? (
@@ -196,6 +217,7 @@ export function Bookings() {
       {selected ? (
         <PlayerDetailModal
           player={selected}
+          locations={modalData.locations}
           batches={modalData.batches}
           purchases={modalData.purchases}
           bookings={modalData.bookings}

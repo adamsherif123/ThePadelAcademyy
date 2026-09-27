@@ -42,6 +42,39 @@ export function creationLocationId(locations: readonly Location[]): LocationId |
   return (defaultLocation(locations) ?? locations[0])?.id ?? null;
 }
 
+/**
+ * The sentinel for "don't filter by branch". A string rather than null so it can
+ * sit in a <Select> value and in a query key without either having to model
+ * "absent" separately.
+ */
+export const ALL_LOCATIONS = 'all' as const;
+export type LocationFilter = LocationId | typeof ALL_LOCATIONS;
+
+/**
+ * A branch's display name, for a row that stores only its id.
+ *
+ * Falls back to a neutral word rather than the raw id: an id in a table cell is
+ * noise to the person reading it, and this mirrors tpa.location_name's own
+ * coalesce (068) so the admin and the notification copy never disagree about
+ * what an unresolvable branch is called.
+ */
+export function locationNameById(locations: readonly Location[], id: LocationId | null | undefined): string {
+  if (id == null) return 'the academy';
+  return locations.find((l) => l.id === id)?.name ?? 'the academy';
+}
+
+/**
+ * Options for a filter that can also mean "everywhere". INACTIVE branches stay in
+ * the list here, unlike activeLocations: you still need to read the history of a
+ * branch you have closed.
+ */
+export function locationFilterOptions(locations: readonly Location[]): { value: string; label: string }[] {
+  return [
+    { value: ALL_LOCATIONS, label: 'All locations' },
+    ...locations.map((l) => ({ value: l.id, label: l.isActive ? l.name : `${l.name} (closed)` })),
+  ];
+}
+
 /** Active branches first, then the rest — both already in (sort_order, name) order. */
 export function locationsForDisplay(locations: readonly Location[]): Location[] {
   return [...locations].sort((a, b) => Number(b.isActive) - Number(a.isActive));

@@ -43,3 +43,9 @@
   color: var(--color-text-muted);
   pointer-events: none;
 }
+
+/* Same role and same tokens as Input's hint — see Input.module.css. */
+.hint {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+}
