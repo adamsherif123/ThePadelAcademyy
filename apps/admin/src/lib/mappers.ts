@@ -96,6 +96,8 @@ export function rowToPurchase(r: Row): Purchase {
     gatewayOrderId: nstr(r.gateway_order_id),
     gatewayTransactionId: nstr(r.gateway_transaction_id),
     paid: r.paid === true,
+    refundRequiredAt: r.refund_required_at == null ? null : iso(r.refund_required_at),
+    refundedAt: r.refunded_at == null ? null : iso(r.refunded_at),
   };
 }
 

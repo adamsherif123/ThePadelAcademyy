@@ -185,6 +185,8 @@ describe('unusedCreditValue', () => {
     gatewayOrderId: null,
     gatewayTransactionId: null,
     paid: true,
+    refundRequiredAt: null,
+    refundedAt: null,
     locationId: LOC,
     ...over,
   });

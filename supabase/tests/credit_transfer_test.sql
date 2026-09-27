@@ -4,7 +4,7 @@
 -- Run with: supabase test db
 -- ============================================================================
 begin;
-select plan(50);
+select plan(51);
 
 insert into auth.users (id) values
   ('0a7a7a01-0000-0000-0000-0000000a7a01'),   -- admin
@@ -109,11 +109,14 @@ select is(
     where player_id = 'pl_ct_p1' and id <> 'cb_ct_exp'),
   5, 'CONSERVATION: the player has exactly as many credits as before, in two places');
 
+-- 068: credits_granted, not a new type — it is the only wallet-icon,
+-- wallet-deep-linking type the un-updatable 1.2/1.3 builds already render
+-- (notifications.tsx:21, deepLink.ts:23 in both).
 select is((select count(*)::int from public.notifications
-            where player_id = 'pl_ct_p1' and type = 'credits_transferred'), 1,
-  'the player is told');
-select is((select body from public.notifications where type = 'credits_transferred'),
-  '3 Group credits moved to QA Branch.', 'and the message names the branch');
+            where player_id = 'pl_ct_p1' and type = 'credits_granted'), 1,
+  'the player is told, via a type the legacy apps render');
+select is((select body from public.notifications where type = 'credits_granted'),
+  '3 Group credits moved to QA Branch.', 'and the message still says MOVED, and names the branch');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- The moved credits actually work at the target branch
@@ -214,19 +217,25 @@ select lives_ok(
 -- refuses a redelivered success.
 select is(public.settle_purchase('pu_ct_b', 'tx_ct_b')->>'reason', 'not_pending',
   'a redelivery of that callback is refused cleanly, not settled again');
-select is((select count(*)::int from public.notifications where type = 'owner_refund_required'), 1,
+select is((select count(*)::int from public.notifications
+            where type = 'owner_credit_request' and title = 'Refund required'), 1,
   'so the owners are told exactly once, however many times Paymob re-delivers');
-select is((select status from public.purchases where id = 'pu_ct_b'), 'refund_required',
-  'the stranded purchase is parked in refund_required');
+-- 068: 'failed' + paid + refund_required_at, not a fourth status.
+select is((select status from public.purchases where id = 'pu_ct_b'), 'failed',
+  'the stranded purchase is parked as failed — a status 1.2/1.3 can render');
+select isnt((select refund_required_at from public.purchases where id = 'pu_ct_b'), null,
+  'with refund_required_at set, which is what makes it a held payment and not a decline');
 select is((select paid from public.purchases where id = 'pu_ct_b'), true,
   'marked PAID, because Paymob really did take the money');
 select is((select count(*)::int from public.credit_batches
             where player_id = 'pl_ct_p1' and training_type = 'trial' and source = 'purchase'), 1,
   'and the player still holds exactly one purchased trial');
-select isnt((select count(*)::int from public.notifications where type = 'owner_refund_required'), 0,
+select isnt((select count(*)::int from public.notifications
+              where type = 'owner_credit_request' and title = 'Refund required'), 0,
   'the owners were told, with the amount, so they can refund it in Paymob');
-select is((select count(*)::int from public.purchases where status = 'refund_required'), 1,
-  'and the row is queryable by status alone — what the Session 6 admin UI needs');
+select is((select count(*)::int from public.purchases
+            where refund_required_at is not null and refunded_at is null), 1,
+  'and the queue is queryable as refund_required_at is not null and refunded_at is null');
 
 select * from finish();
 rollback;

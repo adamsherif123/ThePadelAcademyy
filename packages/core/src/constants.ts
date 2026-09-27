@@ -159,9 +159,6 @@ export const PURCHASE_STATUSES = [
   'pending',
   'succeeded',
   'failed',
-  // 067: captured, undeliverable, owed back. Kept out of 'succeeded' so revenue
-  // sums never include it.
-  'refund_required',
 ] as const satisfies readonly PurchaseStatus[];
 
 export const BOOKING_STATUSES = [

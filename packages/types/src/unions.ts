@@ -17,11 +17,12 @@ export type Gender = 'men' | 'ladies';
 
 /** Client may only ever create `pending`; only a verified webhook advances it. */
 /**
- * `refund_required` (067): the gateway captured the money but the credits could
- * not be minted — today only a second trial. It is deliberately NOT 'succeeded',
- * so money owed back never lands in collected revenue.
+ * Three values, and it must STAY three: the 1.2 and 1.3 apps index a
+ * Record<PurchaseStatus, …> with no fallback (purchase-history.tsx:113) and can
+ * never be updated, so a fourth status crashes their Purchase History. Money
+ * captured but undeliverable is 'failed' + `paid` + `refundRequiredAt` (068).
  */
-export type PurchaseStatus = 'pending' | 'succeeded' | 'failed' | 'refund_required';
+export type PurchaseStatus = 'pending' | 'succeeded' | 'failed';
 
 /**
  * How the money reached the academy. `paymob` = the online card gateway (S7, mothballed).

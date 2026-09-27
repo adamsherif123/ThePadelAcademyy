@@ -27,11 +27,21 @@ const STATUS_META: Record<PurchaseStatus, { label: string; tone: BadgeTone }> = 
   succeeded: { label: 'Succeeded', tone: 'success' },
   pending: { label: 'Pending', tone: 'warning' },
   failed: { label: 'Failed', tone: 'danger' },
-  // 067: paid, but the credits could not be issued (today only a second free
-  // trial). 'warning', not 'danger' — nothing went wrong for the player and the
-  // money is coming back; saying "Failed" would read as "you lost it".
-  refund_required: { label: 'Refund on the way', tone: 'warning' },
 };
+
+/**
+ * The badge, which is NOT just the status. A purchase the gateway captured but
+ * that could not be turned into credits is stored as `failed` + `paid` +
+ * `refundRequiredAt` (068) — 'failed' because the 1.2/1.3 builds can only render
+ * three statuses and can never be updated. This build knows better, so it says
+ * what is actually happening rather than "Failed": nothing went wrong for the
+ * player and the money is coming back.
+ */
+function badgeFor(p: Purchase): { label: string; tone: BadgeTone } {
+  if (p.refundedAt !== null) return { label: 'Refunded', tone: 'neutral' };
+  if (p.refundRequiredAt !== null) return { label: 'Refund on the way', tone: 'warning' };
+  return STATUS_META[p.status];
+}
 
 /** How the player paid — cash at the desk, InstaPay transfer, or cards through Paymob. */
 const METHOD_LABEL: Record<PaymentMethod, string> = { paymob: 'Card', cash: 'Cash', instapay: 'InstaPay' };
@@ -114,7 +124,7 @@ export default function PurchaseHistoryScreen() {
 
 function PurchaseRow({ purchase, packages }: { purchase: Purchase; packages: Package[] }) {
   const pkg = packageForPurchase(packages, purchase);
-  const status = STATUS_META[purchase.status];
+  const status = badgeFor(purchase);
   return (
     <Card>
       <View style={styles.rowTop}>

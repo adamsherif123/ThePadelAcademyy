@@ -152,6 +152,16 @@ export interface Purchase {
    * a gateway (Paymob) settlement is paid automatically.
    */
   paid: boolean;
+  /**
+   * Set (068) when the gateway captured this money but no credits could be
+   * issued — today only a second free trial. Such a row is `status: 'failed'`
+   * with `paid: true`, because the card really was charged: 'failed' is one of
+   * the three statuses the un-updatable 1.2/1.3 builds can render, and every
+   * revenue figure is `succeeded AND paid`, so it still never counts as income.
+   */
+  refundRequiredAt: IsoInstant | null;
+  /** Set once an owner has actually refunded it in Paymob (mark_purchase_refunded). */
+  refundedAt: IsoInstant | null;
 }
 
 /**

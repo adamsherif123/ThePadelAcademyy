@@ -33,6 +33,8 @@ export function buildCashPurchase(
     paymentMethod: 'cash',
     gatewayOrderId: null,
     gatewayTransactionId: null,
+    refundRequiredAt: null,
+    refundedAt: null,
     // Mirrors record_cash_purchase: the sale succeeds and its credits are granted,
     // but it counts as revenue only once the admin marks it paid.
     paid: false,
