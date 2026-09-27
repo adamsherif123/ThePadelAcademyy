@@ -6,7 +6,8 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { cancelPreview } from '../data/booking';
-import { useBatches, useBookings, useCancelBooking, useCoaches, useSlotsByIds, combine } from '../data/queries';
+import { useBatches, useBookings, useCancelBooking, useCoaches, useLocations, useSlotsByIds, combine } from '../data/queries';
+import { placeFor } from '../location/slotLocation';
 import { haptics } from '../lib/haptics';
 import { useSession } from '../session/SessionProvider';
 import {
@@ -43,6 +44,7 @@ export default function CancelBookingScreen() {
   const batchesQ = useBatches();
   const bookingsQ = useBookings();
   const coachesQ = useCoaches();
+  const locationsQ = useLocations();
   const bookedSlotId = (bookingsQ.data ?? []).find((b) => b.id === (bookingId as BookingId))?.slotId;
   const slotsQ = useSlotsByIds(bookedSlotId ? [bookedSlotId] : []);
   const gate = combine(slotsQ, batchesQ, bookingsQ, coachesQ);
@@ -136,7 +138,7 @@ export default function CancelBookingScreen() {
         onBack={() => router.back()}
       />
 
-      <BookingCard variant="detail" slot={slot} coach={coach} />
+      <BookingCard variant="detail" slot={slot} coach={coach} place={placeFor(slot.locationId, locationsQ.data ?? [])} />
 
       {!refundable ? (
         <InfoCard

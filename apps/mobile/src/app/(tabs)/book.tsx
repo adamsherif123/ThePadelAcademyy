@@ -170,7 +170,12 @@ export default function BookScreen() {
   const bookings = bookingsQ.data ?? [];
   const coaches = coachesQ.data ?? [];
 
-  const days = dateStrip(templatesQ.data ?? [], allSlots, now, DAYS);
+  // The INPUTS are filtered, not isDayOpen (which stays branch-agnostic in
+  // @tpa/core and is shared with the admin). The slots arrive branch-scoped from
+  // the server; templates do not, so a recurring session at the OTHER branch
+  // would otherwise light up a day as open here.
+  const locTemplates = (templatesQ.data ?? []).filter((t) => t.locationId === selectedId);
+  const days = dateStrip(locTemplates, allSlots, now, DAYS);
   const firstOpen = days.find((d) => !d.closed) ?? days[0]!;
   const selectedDay = days.find((d) => d.key === dayKey) ?? firstOpen;
   const isToday = selectedDay.key === days[0]!.key;

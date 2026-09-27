@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { packageById, perSessionPiastres } from '../data/catalog';
-import { usePackages } from '../data/queries';
+import { useLocations, usePackages } from '../data/queries';
 import { haptics } from '../lib/haptics';
 import { payForPackage } from '../data/payments';
 import { useSession } from '../session/SessionProvider';
@@ -37,6 +37,7 @@ export default function CheckoutScreen() {
   const { color } = useTheme();
   const { player } = useSession();
   const packagesQ = usePackages();
+  const locationsQ = useLocations();
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { packageId } = useLocalSearchParams<{ packageId: string }>();
@@ -51,6 +52,7 @@ export default function CheckoutScreen() {
   }
 
   const pkg = packageById(packagesQ.data ?? [], packageId as PackageId);
+  const pkgLocationName = (locationsQ.data ?? []).find((l) => l.id === pkg?.locationId)?.name ?? null;
 
   if (!pkg || !player) {
     return (
@@ -119,6 +121,17 @@ export default function CheckoutScreen() {
           <Money amount={pkg.price} tone="accent" variant="h1" />
         </View>
       </Card>
+
+      {/* Before the payment reassurance: WHERE the credits work is the thing a
+          player can get wrong by paying. Omitted rather than guessed if the
+          branch row has not loaded. */}
+      {pkgLocationName ? (
+        <InfoCard
+          variant="neutral"
+          icon="location-outline"
+          text={`Credits for ${pkgLocationName}. They can only be used at this location.`}
+        />
+      ) : null}
 
       <InfoCard
         variant="neutral"

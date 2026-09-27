@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { PLAYER_COUNT, packageById, packageIncludes, perSessionPiastres } from '../../data/catalog';
-import { usePackages, useTrialEligible } from '../../data/queries';
+import { useLocations, usePackages, useTrialEligible } from '../../data/queries';
 import { PAYMOB_ENABLED } from '../../lib/featureFlags';
 import {
   Button,
@@ -28,6 +28,10 @@ export default function PackageDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const packagesQ = usePackages();
   const trialEligibleQ = useTrialEligible();
+  // NOT branch-filtered: this screen is reachable directly by id (a share, a
+  // bookmark), and a package that exists should resolve. It states its branch
+  // instead — which is the thing the player needs to know before paying.
+  const locationsQ = useLocations();
 
   if (packagesQ.isPending || packagesQ.isError) {
     return (
@@ -52,6 +56,9 @@ export default function PackageDetailScreen() {
   }
 
   const isTrial = pkg.trainingType === 'trial';
+  // Null while locations load, or if the branch row is gone — the card is simply
+  // omitted rather than asserting a place we cannot name.
+  const pkgLocationName = (locationsQ.data ?? []).find((l) => l.id === pkg.locationId)?.name ?? null;
 
   // A package's own listing (buy-credits, home) already hides the trial from an ineligible
   // player, but this screen is reachable directly by id (a stale link, a share, a bookmark),
@@ -118,6 +125,16 @@ export default function PackageDetailScreen() {
             <CheckList items={packageIncludes(pkg)} />
           </Card>
         </View>
+
+      {/* Before the expiry note, because WHERE the credits work is the thing a
+          player can get wrong by paying — expiry only bites later. */}
+      {pkgLocationName ? (
+        <InfoCard
+          variant="neutral"
+          icon="location-outline"
+          text={`Credits for ${pkgLocationName}. They can only be used at this location.`}
+        />
+      ) : null}
 
       <InfoCard
         variant="amber"

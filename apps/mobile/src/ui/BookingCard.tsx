@@ -6,7 +6,7 @@ import { useMemo } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
-import { ACADEMY } from './AcademyCard';
+import type { PlaceFacts } from '../location/slotLocation';
 import { Avatar } from './Avatar';
 import { Badge, type BadgeTone } from './Badge';
 import { Button } from './Button';
@@ -25,6 +25,12 @@ const PAST_STATUS: Record<BookingStatus, { label: string; tone: BadgeTone }> = {
 type BookingCardProps = {
   slot: SessionSlot;
   coach: Coach | undefined;
+  /**
+   * Where this session actually is — the SLOT's branch, not the one on the
+   * toggle. A booking at another branch must show that branch's address, or the
+   * card sends the player to the wrong place.
+   */
+  place: PlaceFacts;
 } & (
   | {
       /** Future court time: green/red cancellation strip + a CANCEL BOOKING button. */
@@ -52,6 +58,7 @@ type BookingCardProps = {
  * verdict and deadline (from @tpa/core). RTL-safe / tokens only.
  */
 export function BookingCard(props: BookingCardProps) {
+  const { place } = props;
   const { color } = useTheme();
   const styles = useMemo(
     () => StyleSheet.create({
@@ -104,10 +111,10 @@ export function BookingCard(props: BookingCardProps) {
         )}
       </View>
 
-      <Pressable style={styles.locationRow} onPress={() => Linking.openURL(ACADEMY.mapsUrl)}>
+      <Pressable style={styles.locationRow} onPress={() => Linking.openURL(place.mapsUrl)}>
         <Ionicons name="location-outline" size={15} color={color.text.muted} />
         <Text variant="caption" tone="muted" style={styles.locationText}>
-          {ACADEMY.locationLine}
+          {place.line}
         </Text>
         <Ionicons name="chevron-forward" size={13} color={color.text.muted} />
       </Pressable>

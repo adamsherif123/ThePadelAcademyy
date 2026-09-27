@@ -1,5 +1,5 @@
 import { TRAINING_TYPES, creditExpiryState, isBatchUsable } from '@tpa/core';
-import type { CreditBatch, IsoInstant, TrainingType } from '@tpa/types';
+import type { CreditBatch, IsoInstant, TrainingType , LocationId } from '@tpa/types';
 
 /**
  * Wallet selectors — pure functions of a credit-batch list and `now`. The list is
@@ -64,6 +64,23 @@ export function visibleBalanceTypes(balance: Record<TrainingType, number>): Trai
 }
 
 /** Total credits ready to book now. */
+/**
+ * The batches spendable at ONE branch.
+ *
+ * Home's "ready to book" number answers "can I book something here, now", so it
+ * has to be branch-scoped: a total that includes credits usable only across town
+ * would send a player to a session they cannot pay for. The wallet is the
+ * opposite — it shows everything, grouped, because that screen is the ledger.
+ * `null` means the branch hasn't resolved yet; nothing is spendable until it has.
+ */
+export function batchesAtLocation(
+  batches: readonly CreditBatch[],
+  locationId: LocationId | null,
+): CreditBatch[] {
+  if (locationId === null) return [];
+  return batches.filter((b) => b.locationId === locationId);
+}
+
 export function totalReadyToBook(batches: CreditBatch[], now: IsoInstant): number {
   return Object.values(balanceByType(batches, now)).reduce((sum, n) => sum + n, 0);
 }

@@ -46,3 +46,6 @@ pnpm-debug.log*
 apps/admin/src/tokens.generated.css
 .vercel
 .env*.local
+
+# Local record of what scripts/dev/s7-fixture.mjs created on hosted dev.
+scripts/dev/.s7-fixture.json

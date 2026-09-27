@@ -2,6 +2,7 @@ import { space } from '@tpa/theme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
+import { useLocation } from '../location/LocationProvider';
 import { Button, InfoCard, Screen, ScreenHeader, Text } from '../ui';
 
 /**
@@ -30,6 +31,7 @@ const COPY: Record<'no_credit' | 'credits_expired', { title: string; body: strin
 
 export default function NeedsCreditsScreen() {
   const router = useRouter();
+  const { selected } = useLocation();
   const { reason } = useLocalSearchParams<{ slotId?: string; reason?: string }>();
   // Default to the generic no-credit copy for any unexpected/missing reason — the
   // prompt should never render blank, and "you need credits" is always true here.
@@ -50,7 +52,15 @@ export default function NeedsCreditsScreen() {
       }
     >
       <ScreenHeader eyebrow="Almost there" title={copy.title} onBack={() => router.back()} />
-      <InfoCard variant="neutral" icon="wallet-outline" text={copy.body} />
+      <InfoCard
+        variant="neutral"
+        icon="wallet-outline"
+        text={
+          selected
+            ? `${copy.body} Credits you buy will be for ${selected.name}.`
+            : copy.body
+        }
+      />
       {/* Eats the remaining space so the note below lands right above the
           footer's own divider (Screen's borderTopWidth) — the divider then
           separates the note from the buttons, not from the InfoCard. */}

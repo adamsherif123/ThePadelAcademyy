@@ -14,12 +14,12 @@ import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { bookingPreview } from '../data/booking';
 import { haptics } from '../lib/haptics';
-import { useBatches, useBookSlot, useBookings, useCoaches, useSlotsByIds, combine } from '../data/queries';
+import { useBatches, useBookSlot, useBookings, useCoaches, useLocations, useSlotsByIds, combine } from '../data/queries';
 import { useLocation } from '../location/LocationProvider';
+import { placeFor } from '../location/slotLocation';
 import { useSession } from '../session/SessionProvider';
 import { useTheme } from '../theme/ThemeProvider';
 import {
-  ACADEMY,
   Avatar,
   Badge,
   Button,
@@ -71,6 +71,7 @@ export default function ConfirmBookingScreen() {
   const { color } = useTheme();
   const { player, now } = useSession();
   const { options, select } = useLocation();
+  const locationsQ = useLocations();
   // BY ID, not the branch feed: this screen is reachable for a booking at any
   // branch — from Sessions, or from a notification deep link — and a
   // location-filtered feed would simply not contain that slot.
@@ -122,6 +123,9 @@ export default function ConfirmBookingScreen() {
   }
 
   const { slot, coach, verdict, batch, typeBalance, alreadyBooked } = preview;
+  // The SLOT's branch, not the toggle's — this screen is reachable for a session
+  // anywhere, and the address has to be the one the player should drive to.
+  const place = placeFor(slot.locationId, locationsQ.data ?? []);
   // The RESOLVED type — the slot's own if already typed, else the picker's
   // pick — never slot.trainingType directly (still null for an open block).
   const resolvedType = verdict.ok ? verdict.trainingType : (slot.trainingType ?? chosenType);
@@ -246,8 +250,8 @@ export default function ConfirmBookingScreen() {
             value={`${formatInstantTime(slot.startsAt)} – ${formatInstantTime(slot.endsAt)}`}
           />
           {/* Location taps through to Maps. */}
-          <Pressable onPress={() => Linking.openURL(ACADEMY.mapsUrl)}>
-            <IconRow chip icon="location-outline" label="Location" value={ACADEMY.locationLine} />
+          <Pressable onPress={() => Linking.openURL(place.mapsUrl)}>
+            <IconRow chip icon="location-outline" label="Location" value={place.line} />
           </Pressable>
         </View>
 

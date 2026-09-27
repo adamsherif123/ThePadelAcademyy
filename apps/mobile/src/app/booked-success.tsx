@@ -11,12 +11,12 @@ import { useLocalSearchParams } from 'expo-router';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { coachById, slotById } from '../data/booking';
-import { useBatches, useBookings, useCoaches, useSlotsByIds, combine } from '../data/queries';
+import { useBatches, useBookings, useCoaches, useLocations, useSlotsByIds, combine } from '../data/queries';
+import { placeFor } from '../location/slotLocation';
 import { balanceByType } from '../data/wallet';
 import { resetToTab } from '../lib/nav';
 import { useSession } from '../session/SessionProvider';
 import {
-  ACADEMY,
   Avatar,
   Badge,
   Card,
@@ -39,6 +39,7 @@ export default function BookedSuccessScreen() {
   const batchesQ = useBatches();
   const bookingsQ = useBookings();
   const coachesQ = useCoaches();
+  const locationsQ = useLocations();
   const bookedSlotId = (bookingsQ.data ?? []).find((b) => b.id === (bookingId as BookingId))?.slotId;
   const slotsQ = useSlotsByIds(bookedSlotId ? [bookedSlotId] : []);
   const gate = combine(slotsQ, batchesQ, bookingsQ, coachesQ);
@@ -53,6 +54,7 @@ export default function BookedSuccessScreen() {
 
   const booking = (bookingsQ.data ?? []).find((b) => b.id === (bookingId as BookingId));
   const slot = booking ? slotById(slotsQ.data ?? [], booking.slotId) : undefined;
+  const place = placeFor(slot?.locationId, locationsQ.data ?? []);
   if (!player || !booking || !slot) return <Screen />;
 
   const coach = coachById(coachesQ.data ?? [], slot.coachId);
@@ -98,8 +100,8 @@ export default function BookedSuccessScreen() {
           </View>
           <View style={styles.rows}>
             {/* Location taps through to Maps — the one thing a player needs at 6pm. */}
-            <Pressable onPress={() => Linking.openURL(ACADEMY.mapsUrl)}>
-              <IconRow icon="location-outline" title={ACADEMY.locationLine} subtitle="Tap for directions" />
+            <Pressable onPress={() => Linking.openURL(place.mapsUrl)}>
+              <IconRow icon="location-outline" title={place.line} subtitle="Tap for directions" />
             </Pressable>
             <IconRow
               icon="time-outline"

@@ -8,7 +8,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { packageById } from '../data/catalog';
-import { usePackages } from '../data/queries';
+import { useLocations, usePackages } from '../data/queries';
 import { requestCreditsRpc, uploadProof, type RequestCreditsReason } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { resetTo, resetToTab } from '../lib/nav';
@@ -101,6 +101,7 @@ export default function RequestCreditsScreen() {
   const { packageId } = useLocalSearchParams<{ packageId: string }>();
   const { player } = useSession();
   const packagesQ = usePackages();
+  const locationsQ = useLocations();
 
   const [method, setMethod] = useState<Method>('instapay');
   const [proofPath, setProofPath] = useState<string | null>(null);
@@ -126,6 +127,8 @@ export default function RequestCreditsScreen() {
   }
 
   const pkg = packageById(packagesQ.data ?? [], packageId as PackageId);
+  // The package's OWN branch, not the toggle's: this flow is about one package.
+  const pkgLocationName = (locationsQ.data ?? []).find((l) => l.id === pkg?.locationId)?.name ?? null;
   if (!pkg || !player) {
     return (
       <Screen>
@@ -212,8 +215,11 @@ export default function RequestCreditsScreen() {
           <Card>
             <Text variant="body" tone="secondary">
               {pending
-                ? 'You have a credit request awaiting the academy’s confirmation. Track it in your wallet.'
-                : 'Your credits will be added once the academy confirms your payment — this isn’t instant. You’ll get a notification, and you can track the status in your wallet.'}
+                ? // 066 made the limit PER BRANCH, so the copy has to say which one —
+                  // otherwise a player with a pending request at Oro reads this as
+                  // "I can't request anywhere", which is no longer true.
+                  `You have a credit request for ${pkgLocationName ?? 'this location'} awaiting the academy’s confirmation. Track it in your wallet — you can still request credits for another location.`
+                : `Your credits${pkgLocationName ? ` for ${pkgLocationName}` : ''} will be added once the academy confirms your payment — this isn’t instant. You’ll get a notification, and you can track the status in your wallet.`}
             </Text>
           </Card>
         </SuccessView>

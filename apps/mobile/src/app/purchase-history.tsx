@@ -7,7 +7,8 @@ import { StyleSheet, View } from 'react-native';
 
 import { daysBefore } from '../lib/api';
 import { packageForPurchase, playerPurchases } from '../data/purchases';
-import { usePackages, usePurchases, combine } from '../data/queries';
+import { useLocations, usePackages, usePurchases, combine } from '../data/queries';
+import { BranchLabel } from '../location/BranchLabel';
 import { useSession } from '../session/SessionProvider';
 import {
   Badge,
@@ -74,6 +75,7 @@ export default function PurchaseHistoryScreen() {
   const days = RANGE_DAYS[range];
   const purchasesQ = usePurchases(days === null ? null : daysBefore(now, days));
   const packagesQ = usePackages();
+  const locationsQ = useLocations();
   const gate = combine(purchasesQ, packagesQ);
   if (!player) return null;
 
@@ -88,6 +90,8 @@ export default function PurchaseHistoryScreen() {
 
   const purchases = playerPurchases(purchasesQ.data ?? []);
   const packages = packagesQ.data ?? [];
+  const locationNameFor = (id: Purchase['locationId']) =>
+    (locationsQ.data ?? []).find((l) => l.id === id)?.name ?? null;
 
   return (
     <Screen scroll contentContainerStyle={styles.content}>
@@ -115,14 +119,28 @@ export default function PurchaseHistoryScreen() {
           )
         ) : (
           purchases.map((purchase) => (
-            <PurchaseRow key={purchase.id} purchase={purchase} packages={packages} />
+            <PurchaseRow
+              key={purchase.id}
+              purchase={purchase}
+              packages={packages}
+              locationName={locationNameFor(purchase.locationId)}
+            />
           ))
         )}
     </Screen>
   );
 }
 
-function PurchaseRow({ purchase, packages }: { purchase: Purchase; packages: Package[] }) {
+function PurchaseRow({
+  purchase,
+  packages,
+  locationName,
+}: {
+  purchase: Purchase;
+  packages: Package[];
+  /** Null when there is only one branch — BranchLabel hides itself either way. */
+  locationName: string | null;
+}) {
   const pkg = packageForPurchase(packages, purchase);
   const status = badgeFor(purchase);
   return (
@@ -131,6 +149,7 @@ function PurchaseRow({ purchase, packages }: { purchase: Purchase; packages: Pac
         <Text variant="body" weight="bold">
           {pkg?.name ?? 'Package'}
         </Text>
+        <BranchLabel name={locationName} />
         <Badge label={status.label} tone={status.tone} />
       </View>
       <View style={styles.rowBottom}>

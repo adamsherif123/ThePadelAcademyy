@@ -6,8 +6,9 @@ import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { TabView } from 'react-native-tab-view';
 
 import { hasOlderSessions, pastSessions, upcomingSessions, withOlderSessions } from '../../data/booking';
-import { useBookings, useCoaches, usePastSessionsOlder, useSlotsForBookings, combine } from '../../data/queries';
+import { useBookings, useCoaches, useLocations, usePastSessionsOlder, useSlotsForBookings, combine } from '../../data/queries';
 import { useLocation } from '../../location/LocationProvider';
+import { placeFor } from '../../location/slotLocation';
 import { useSession } from '../../session/SessionProvider';
 import {
   BookingCard,
@@ -56,9 +57,11 @@ export default function SessionsScreen() {
   // the slots your bookings point at elsewhere (see useSlotsForBookings).
   const slots = useSlotsForBookings(now, selectedId, bookings.data ?? []);
   const coaches = useCoaches();
+  const locationsQ = useLocations();
   // Sessions older than the slot window — nothing is fetched until "Load older" is
   // tapped, so the common case (recent history) costs no extra round trip.
   const older = usePastSessionsOlder(now);
+  const locations = locationsQ.data ?? [];
   const gate = combine(bookings, coaches);
   const { width } = useWindowDimensions();
   const [index, setIndex] = useState(0);
@@ -102,6 +105,7 @@ export default function SessionsScreen() {
             <View style={styles.list}>
               {upcoming.map(({ booking, slot, coach }) => (
                 <BookingCard
+                  place={placeFor(slot.locationId, locations)}
                   key={booking.id}
                   variant="upcoming"
                   slot={slot}
@@ -129,7 +133,14 @@ export default function SessionsScreen() {
         ) : (
           <View style={styles.list}>
             {past.map(({ booking, slot, coach }) => (
-              <BookingCard key={booking.id} variant="past" slot={slot} coach={coach} status={booking.status} />
+              <BookingCard
+                key={booking.id}
+                variant="past"
+                slot={slot}
+                coach={coach}
+                status={booking.status}
+                place={placeFor(slot.locationId, locations)}
+              />
             ))}
             {canLoadOlder ? (
               <LoadMore loading={older.isLoadingMore} onPress={older.loadMore} />

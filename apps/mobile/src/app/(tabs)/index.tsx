@@ -10,21 +10,22 @@ import {
   useBatches,
   useBookings,
   useCoaches,
+  useLocations,
   usePackages,
   useSlotsForBookings,
   useTrialEligible,
   combine,
 } from '../../data/queries';
 import { useLocation } from '../../location/LocationProvider';
+import { placeFor } from '../../location/slotLocation';
 import { queryKeys } from '../../lib/queryClient';
 import { nextSession } from '../../data/schedule';
-import { soonestExpiringBatch, totalReadyToBook } from '../../data/wallet';
+import { batchesAtLocation, soonestExpiringBatch, totalReadyToBook } from '../../data/wallet';
 import { NewsButton } from '../../notifications/NewsButton';
 import { NotificationBell } from '../../notifications/NotificationBell';
 import { useSession } from '../../session/SessionProvider';
 import { useTheme } from '../../theme/ThemeProvider';
 import {
-  ACADEMY,
   AcademyCard,
   Avatar,
   Badge,
@@ -80,6 +81,7 @@ export default function HomeScreen() {
   // Home's Upcoming list spans every branch, for the same reason Sessions does.
   const slots = useSlotsForBookings(now, selectedId, bookings.data ?? []);
   const coaches = useCoaches();
+  const locationsQ = useLocations();
   const packagesQ = usePackages();
   const trialEligibleQ = useTrialEligible();
   const gate = combine(batches, bookings, coaches, packagesQ, trialEligibleQ);
@@ -119,8 +121,12 @@ export default function HomeScreen() {
     );
   }
 
-  const total = totalReadyToBook(batches.data ?? [], now);
-  const expiring = soonestExpiringBatch(batches.data ?? [], now);
+  // Scoped to the branch on the toggle: "ready to book" has to mean "here".
+  // The wallet still shows every branch, grouped — that screen is the ledger.
+  const locations = locationsQ.data ?? [];
+  const locBatches = batchesAtLocation(batches.data ?? [], selectedId);
+  const total = totalReadyToBook(locBatches, now);
+  const expiring = soonestExpiringBatch(locBatches, now);
   const next = nextSession(bookings.data ?? [], slots.slots, coaches.data ?? [], now);
   // A5: only surface the trial while the player can still buy it (never used one) and one
   // exists — a player who has used their trial never sees it in their options anywhere.
@@ -191,7 +197,9 @@ export default function HomeScreen() {
               <Badge label={trainingMetaFor(next.slot.trainingType).label} icon={trainingMetaFor(next.slot.trainingType).icon} />
             </View>
             <View style={styles.divider} />
-            <IconRow icon="location-outline" title={ACADEMY.locationLine} />
+            {/* The NEXT session's own branch — Home spans branches, so this line
+                must follow the session, not the toggle. */}
+            <IconRow icon="location-outline" title={placeFor(next.slot.locationId, locations).line} />
           </Card>
         </View>
       ) : null}

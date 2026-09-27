@@ -17,6 +17,24 @@ import type { Href } from 'expo-router';
  * alternative, falling through to the slotId branch below, would focus the Sessions
  * tab on a slot the owner has no booking on — a dead end that looks like a bug.
  */
+/**
+ * ── branches and deep links (S7) ──
+ * A tap on a notification for a session at ANOTHER branch opens that session
+ * correctly, and it needed no change here: the slot screens fetch by id
+ * (useSlotsByIds), so they never depend on the branch-filtered feed, and they
+ * render the SLOT's own location — right address, right name.
+ *
+ * The toggle deliberately does NOT follow the link. It describes what you are
+ * BROWSING; a deep link is about one specific session. Moving it would mean
+ * returning to the Book tab later and silently finding a different branch than
+ * you left it on, with nothing to explain why. Since the session screen already
+ * names its own branch, there is no ambiguity to resolve — and if the player does
+ * want to browse there, the toggle is one explicit, reversible tap away.
+ *
+ * `credits_granted` covers the credits-moved notification too (068 routes
+ * transfers through that type precisely because it already lands on the wallet,
+ * which is where moved credits are visible).
+ */
 export function notificationHref(n: { type: string; slotId: string | null; newsId?: string | null }): Href {
   // Credit outcomes (approved grant, or a rejection the player should read) → the wallet,
   // where the request status card explains what happened.
