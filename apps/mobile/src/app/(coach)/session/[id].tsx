@@ -2,10 +2,11 @@ import { spotsUntilConfirmed } from '@tpa/core';
 import { space } from '@tpa/theme';
 import type { SlotId } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { sessionState, startsInLabel } from '../../../data/coachSchedule';
 import { useCoachRoster, useCoachSlots } from '../../../data/queries';
+import { useBranchPlace } from '../../../location/useBranchPlace';
 import { useSession } from '../../../session/SessionProvider';
 import {
   Badge,
@@ -14,6 +15,7 @@ import {
   CoachSessionCard,
   EmptyState,
   ErrorView,
+  IconRow,
   LEVEL_LABEL,
   LoadingView,
   Screen,
@@ -40,7 +42,11 @@ export default function CoachSessionDetailScreen() {
   // opening a session is one request (the roster), not two.
   const slotsQ = useCoachSlots(coachId, now);
   const rosterQ = useCoachRoster(slotId);
+  const branchPlace = useBranchPlace();
   const slot = (slotsQ.data ?? []).find((s) => s.id === slotId);
+  // Read before the early returns below, so the hook order is the same on every
+  // render regardless of which state the screen is in.
+  const place = branchPlace(slot?.locationId);
 
   // Compact: this is a pushed screen, and the card directly below already says
   // which session it is. A full display heading here out-shouts the roster it is
@@ -105,12 +111,23 @@ export default function CoachSessionDetailScreen() {
           thing a coach opening a session actually wants to know. */}
       <CoachSessionCard
         slot={slot}
+        place={place}
         variant="hero"
         dimmed={state === 'done'}
         eyebrow={
           state === 'done' ? 'Completed' : state === 'live' ? 'On court now' : `Starts ${startsInLabel(slot.startsAt, now)}`
         }
       />
+
+      {/* The full address, and a tap through to Maps. The card above names the
+          branch; this is the screen a coach opens on the way there, so it is the
+          one place that owes them the street, not just the name. Rendered only
+          when there is more than one branch to be at — see useBranchPlace. */}
+      {place ? (
+        <Pressable onPress={() => Linking.openURL(place.mapsUrl)}>
+          <IconRow icon="location-outline" title={place.line} subtitle="Tap for directions" />
+        </Pressable>
+      ) : null}
 
       {/* The one fact this screen can add that the card cannot: what it would take
           for a pending session to go ahead. A statement of what fills it — never a

@@ -78,8 +78,10 @@ select is(
   2, 'a player self-cancel pings BOTH owners — one row each');
 select is(
   (select distinct body from public.notifications where type = 'owner_cancellation'),
-  'Peter cancelled 10pm slot with Abdelrahman',
-  'the exact required string: "Peter cancelled 10pm slot with Abdelrahman"');
+  -- 069: " at <branch>", matching owner_booking's shape exactly (065) so the two
+  -- owner pings read as one pair rather than two conventions.
+  'Peter cancelled 10pm slot with Abdelrahman at Oro Plaza Hotel',
+  'the exact required string: "Peter cancelled 10pm slot with Abdelrahman at Oro Plaza Hotel"');
 select is(
   (select count(*)::int from public.notifications where type = 'owner_cancellation' and slot_id is not null),
   0, 'the ping carries NO slot id — every shipped build would focus Sessions on a slot the owner has no booking on');

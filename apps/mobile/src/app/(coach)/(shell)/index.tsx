@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { cairoGreeting, coachSchedule, startsInLabel, typeSlices, weekStrip } from '../../../data/coachSchedule';
 import { useCoachDashboard, useCoachSlots } from '../../../data/queries';
+import { useBranchPlace } from '../../../location/useBranchPlace';
 import { queryKeys } from '../../../lib/queryClient';
 import { NewsButton } from '../../../notifications/NewsButton';
 import { useSession } from '../../../session/SessionProvider';
@@ -50,6 +51,7 @@ export default function CoachDashboardScreen() {
   const { now, coachId, player } = useSession();
   const dash = useCoachDashboard(coachId != null);
   const slotsQ = useCoachSlots(coachId, now);
+  const branchPlace = useBranchPlace();
   const refreshControl = useRefreshControl([queryKeys.coachDashboard, queryKeys.coachSlots]);
 
   const firstName = player?.name.split(' ')[0] ?? 'Coach';
@@ -141,6 +143,7 @@ export default function CoachDashboardScreen() {
           <Text variant="label">{heroInProgress ? 'On court now' : 'Up next'}</Text>
           <CoachSessionCard
             slot={hero}
+            place={branchPlace(hero.locationId)}
             variant="hero"
             eyebrow={heroInProgress ? 'On court now' : `Starts ${startsInLabel(hero.startsAt, now)}`}
             onPress={() => router.push({ pathname: '/(coach)/session/[id]', params: { id: hero.id } })}

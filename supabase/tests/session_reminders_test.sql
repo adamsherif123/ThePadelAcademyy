@@ -111,8 +111,9 @@ select is(
   (select distinct body from public.notifications where type = 'session_reminder'),
   'Your Group session starts in 30 minutes — '
     || (select tpa.cairo_time_short(starts_at) from public.session_slots where id = 'sl_soon')
-    || ' with Nour.',
-  'the reminder body reads: "Your Group session starts in 30 minutes — <time> with Nour."');
+    || ' with Nour at Oro Plaza Hotel.',
+  -- 069: the branch, for the same reason the booking confirmation already carries it.
+  'the reminder body reads: "Your Group session starts in 30 minutes — <time> with Nour at <branch>."');
 select is(
   (select distinct title from public.notifications where type = 'session_reminder'),
   'Starting soon', 'the reminder title is "Starting soon"');

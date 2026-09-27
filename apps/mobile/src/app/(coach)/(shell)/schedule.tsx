@@ -5,6 +5,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { coachDays, sessionState } from '../../../data/coachSchedule';
 import { useCoachSlots } from '../../../data/queries';
+import { useBranchPlace } from '../../../location/useBranchPlace';
 import { queryKeys } from '../../../lib/queryClient';
 import { useSession } from '../../../session/SessionProvider';
 import {
@@ -33,6 +34,10 @@ export default function CoachScheduleScreen() {
   const router = useRouter();
   const { now, coachId } = useSession();
   const slotsQ = useCoachSlots(coachId, now);
+  // The schedule is NOT branch-filtered and must not be: a coach's day can run
+  // across two branches, and hiding half of it would be the worst possible bug.
+  // Each card says which one instead.
+  const branchPlace = useBranchPlace();
   const refreshControl = useRefreshControl([queryKeys.coachSlots]);
 
   const header = <ScreenHeader eyebrow="Your week on court" title="Schedule" />;
@@ -86,6 +91,7 @@ export default function CoachScheduleScreen() {
               <CoachSessionCard
                 key={s.id}
                 slot={s}
+                place={branchPlace(s.locationId)}
                 showDate={false}
                 eyebrow={sessionState(s, now) === 'live' ? 'On court now' : undefined}
                 onPress={() => open(s.id)}

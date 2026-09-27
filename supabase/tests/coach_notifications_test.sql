@@ -132,9 +132,11 @@ select is(
   'sl_rm_linked', '…for their own session');
 select is(
   (select body from public.notifications where type = 'coach_session_reminder'),
+  -- 069: a coach works across branches, so the reminder says which court to be at.
   'You''re teaching a Group session in 30 minutes — '
-    || (select tpa.cairo_time_short(starts_at) from public.session_slots where id = 'sl_rm_linked') || '.',
-  'the body is written from the COACH''s side — "you''re teaching", not "your session starts"');
+    || (select tpa.cairo_time_short(starts_at) from public.session_slots where id = 'sl_rm_linked')
+    || ' at Oro Plaza Hotel.',
+  'the body is written from the COACH''s side — "you''re teaching", not "your session starts" — and names the branch');
 select is(
   (select count(*)::int from public.notifications where type = 'coach_session_reminder' and slot_id = 'sl_rm_unlinked'),
   0, 'the unlinked coach''s slot produces no coach reminder');

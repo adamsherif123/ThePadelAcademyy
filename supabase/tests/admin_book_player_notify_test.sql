@@ -68,8 +68,10 @@ select is((select count(*)::int from public.notifications where type='admin_book
 select is((select slot_id from public.notifications where type='admin_booked'), 'sl_abn_win', 'deep-links to the session that was booked');
 select is(
   (select body from public.notifications where type='admin_booked'),
-  'You''ve been added to a Duo session on ' || tpa.cairo_when((select starts_at from public.session_slots where id='sl_abn_win')) || '.',
-  'body reads as a reassuring confirmation, in Cairo time, naming the resolved type'
+  -- 069: and the BRANCH. A player added to a session needs to know which one.
+  'You''ve been added to a Duo session on ' || tpa.cairo_when((select starts_at from public.session_slots where id='sl_abn_win'))
+    || ' at Oro Plaza Hotel.',
+  'body reads as a reassuring confirmation, in Cairo time, naming the resolved type and the branch'
 );
 
 -- ════════════════════════════════════════════════════════════════════════════

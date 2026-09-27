@@ -17,7 +17,7 @@
 -- Run with: supabase test db
 -- ============================================================================
 begin;
-select plan(55);
+select plan(56);
 
 insert into auth.users (id) values
   ('0e0e0e01-0000-0000-0000-00000000e001'),   -- admin
@@ -203,11 +203,22 @@ select throws_ok(
 reset role;
 
 -- reschedule_session moves the time; it must not be able to move the branch.
+--
+-- This used to assert the source never MENTIONED location_id. 069 made that too
+-- strong: the rescheduled-session notification now names the branch, which is a
+-- READ. The claim that matters was never "never mentions" — it is "never
+-- assigns", so that is what is asserted now, in both forms an assignment can
+-- take (an UPDATE ... set, and a PL/pgSQL :=).
 select is(
   (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'reschedule_session'
-      and p.prosrc like '%location_id%'),
-  0, 'reschedule_session does not mention location_id at all');
+      and p.prosrc ~ '(location_id\s*:=|location_id\s*=[^=])'),
+  0, 'reschedule_session never ASSIGNS location_id — it cannot move a session between branches');
+select is(
+  (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'reschedule_session'
+      and p.prosrc like '%tpa.location_name(v_slot.location_id)%'),
+  1, 'the only mention is the read that names the branch in the notification (069)');
 select ok(
   not has_column_privilege('authenticated', 'public.session_slots', 'location_id', 'update'),
   'authenticated holds NO update on session_slots.location_id — reschedule cannot move a branch');

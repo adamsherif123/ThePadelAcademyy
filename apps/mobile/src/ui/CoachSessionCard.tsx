@@ -1,9 +1,11 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { formatInstantDate, formatInstantTime, isSessionConfirmed } from '@tpa/core';
 import { radius, space } from '@tpa/theme';
 import type { SessionSlot } from '@tpa/types';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useMemo } from 'react';
 
+import type { PlaceFacts } from '../location/slotLocation';
 import { shadow } from '../theme/shadow';
 import { useTheme } from '../theme/ThemeProvider';
 import { Badge } from './Badge';
@@ -32,6 +34,7 @@ import { LEVEL_LABEL, trainingMetaFor } from './trainingMeta';
  */
 export function CoachSessionCard({
   slot,
+  place = null,
   variant = 'row',
   eyebrow,
   showDate = true,
@@ -39,6 +42,12 @@ export function CoachSessionCard({
   onPress,
 }: {
   slot: SessionSlot;
+  /**
+   * Which branch this session is at, or null to say nothing — see useBranchPlace.
+   * A coach teaches across branches, so on a list of sessions this is the fact
+   * that decides where they drive. It is the SLOT's own branch, always.
+   */
+  place?: PlaceFacts | null;
   variant?: 'hero' | 'row';
   /** "On court now" / "Starts in 25 minutes" — supplied by the screen. */
   eyebrow?: string;
@@ -85,6 +94,10 @@ export function CoachSessionCard({
         // keeps the pill inside the card when the left side runs long.
         metaRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
         metaText: { flex: 1 },
+        // Its own row rather than another item in the meta line: for a coach this
+        // is the one fact that changes where they physically go, and buried at
+        // the end of "Mon 29 Sep · Group · Beginner" it would be scanned past.
+        branchRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
         footRow: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -146,6 +159,15 @@ export function CoachSessionCard({
           .filter(Boolean)
           .join(' · ')}
       </Text>
+
+      {place ? (
+        <View style={styles.branchRow}>
+          <Ionicons name="location-outline" size={13} color={color.text.muted} />
+          <Text variant="caption" tone="muted">
+            {place.name}
+          </Text>
+        </View>
+      ) : null}
 
       {/* 4 — occupancy. No divider above it: the line was drawing a box around four
           short rows that already read as one block. */}

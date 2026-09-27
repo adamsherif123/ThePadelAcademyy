@@ -5,6 +5,11 @@
 //   node scripts/dev/s7-fixture.mjs down    # take it down
 //   node scripts/dev/s7-fixture.mjs status  # show what is there now
 //
+// S8 added the coach half: a real coach LOGIN, made the way a coach's login is
+// actually made — sign up through GoTrue like any player, complete_signup, then
+// an admin links that player row to a coaches row. Its credentials are appended
+// to .env.test.local (gitignored) and never printed.
+//
 // WHY A SCRIPT AND NOT A SEED: this has to run against the hosted dev project the
 // phone actually talks to, as a REAL ADMIN SESSION — the same JWT, the same RLS,
 // the same RPCs the admin app uses. A `supabase db` seed would run as postgres and
@@ -27,6 +32,7 @@ const STATE_FILE = path.join(ROOT, 'scripts', 'dev', '.s7-fixture.json');
 
 const BRANCH_NAME = 'S7 QA Branch';
 const PACKAGE_NAME = 'S7 QA · Group 4-Pack';
+const COACH_NAME = 'S8 QA Coach';
 
 const die = (msg) => { console.error(`\n✖ ${msg}\n`); process.exit(1); };
 const say = (msg) => console.log(msg);
@@ -49,6 +55,26 @@ function readEnvFile(rel, required) {
 }
 
 const creds = readEnvFile('.env.test.local', true);
+
+/**
+ * Append (or replace) keys in .env.test.local, preserving everything else and
+ * the file's comments. Values are never echoed — the console only ever names the
+ * KEY, so a shared terminal or a pasted log cannot leak the password.
+ */
+function writeCreds(pairs) {
+  const file = path.join(ROOT, '.env.test.local');
+  const lines = fs.readFileSync(file, 'utf8').replace(/\n+$/, '').split('\n');
+  const appended = [];
+  for (const [k, v] of Object.entries(pairs)) {
+    const i = lines.findIndex((l) => l.trim().startsWith(`${k}=`));
+    if (i >= 0) lines[i] = `${k}=${v}`;
+    else appended.push(`${k}=${v}`);
+    creds[k] = v;
+  }
+  if (appended.length) lines.push('', '# Added by scripts/dev/s7-fixture.mjs (S8 coach fixture).', ...appended);
+  fs.writeFileSync(file, `${lines.join('\n')}\n`);
+  say(`✓ wrote ${Object.keys(pairs).join(' and ')} to .env.test.local (values not printed)`);
+}
 const mobileEnv = readEnvFile('apps/mobile/.env', true);
 
 const SUPABASE_URL = mobileEnv.EXPO_PUBLIC_SUPABASE_URL;
@@ -161,6 +187,92 @@ async function activeCoaches() {
   return rows;
 }
 
+// ── the dev COACH, through the real signup path ─────────────────────────────
+/**
+ * A coach login is not a separate kind of account. It is a player row that an
+ * admin has pointed at a `coaches` record (migration 049), and the app decides
+ * which shell to show from `players.coach_id`. So this makes one the same way a
+ * real one is made — GoTrue signup, complete_signup, then set_player_coach —
+ * rather than inserting rows. A fixture that took a shortcut here would prove
+ * nothing about the screen Adam is about to open.
+ *
+ * Idempotent: if .env.test.local already names a coach that still signs in, it
+ * is reused and no second account is created.
+ */
+async function ensureCoachAccount() {
+  // 1) The coaches record the login will point at.
+  let coachRow = (await select(`coaches?select=id,name,is_active&name=eq.${encodeURIComponent(COACH_NAME)}`))[0];
+  if (!coachRow) {
+    [coachRow] = await insert('coaches', [{
+      id: `co_${uuid()}`, name: COACH_NAME,
+      bio: 'Created by scripts/dev/s7-fixture.mjs for branch testing.', is_active: true,
+    }]);
+    say(`✓ created coach record "${COACH_NAME}" (${coachRow.id})`);
+  } else {
+    say(`· coach record "${COACH_NAME}" already exists (${coachRow.id})`);
+  }
+
+  // 2) The login. Reuse the one in .env.test.local if it still works.
+  const adminToken = token;
+  const signIn = async (email, password) => {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST', headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) return null;
+    const b = await res.json();
+    return b.access_token ?? null;
+  };
+
+  let email = creds.DEV_COACH_EMAIL;
+  let password = creds.DEV_COACH_PASSWORD;
+  let coachToken = email && password ? await signIn(email, password) : null;
+
+  if (coachToken) {
+    say(`· reusing the coach login already in .env.test.local (${email})`);
+  } else {
+    if (email) say(`· DEV_COACH_EMAIL is set but does not sign in — creating a fresh one`);
+    const stamp = Date.now();
+    email = `s8-coach-${stamp}@example.com`;
+    // 24 hex chars. Never printed, never committed — .env.test.local is gitignored.
+    password = `Qa${crypto.randomUUID().replace(/-/g, '').slice(0, 22)}`;
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+      method: 'POST', headers: { apikey: ANON_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) die(`coach signup failed (${res.status}) — see the Auth settings on dev.`);
+    coachToken = await signIn(email, password);
+    if (!coachToken) die('the coach account was created but will not sign in. Email confirmation may be ON for this project.');
+    say(`✓ signed up a new coach login (${email})`);
+  }
+
+  // 3) complete_signup, as the coach's OWN session — the same RPC the app calls
+  //    on the profile-setup screen. Idempotent server-side (already_completed).
+  const csRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/complete_signup`, {
+    method: 'POST',
+    headers: { apikey: ANON_KEY, Authorization: `Bearer ${coachToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      p_name: COACH_NAME, p_gender: 'men', p_level: 'beginner',
+      p_phone: `+2019${String(Date.now()).slice(-8)}`, p_trained_before: true,
+    }),
+  });
+  const cs = await csRes.json();
+  if (!cs.ok) die(`complete_signup for the coach returned ${cs.reason}`);
+  const coachPlayerId = cs.player_id;
+  say(`✓ the coach's player row is ${coachPlayerId}${cs.already_completed ? ' (already completed)' : ''}`);
+
+  // 4) Link it, as the ADMIN — the only role that can.
+  token = adminToken;
+  const link = await rpc('set_player_coach', { p_player_id: coachPlayerId, p_coach_id: coachRow.id });
+  if (!link.ok) die(`set_player_coach failed: ${link.reason}`);
+  say(`✓ linked the login to "${COACH_NAME}" — signing in now lands on the COACH shell`);
+
+  if (creds.DEV_COACH_EMAIL !== email || creds.DEV_COACH_PASSWORD !== password) {
+    writeCreds({ DEV_COACH_EMAIL: email, DEV_COACH_PASSWORD: password });
+  }
+  return { coachId: coachRow.id, coachPlayerId, email };
+}
+
 // ── up ───────────────────────────────────────────────────────────────────────
 async function up() {
   const player = await findPlayer();
@@ -217,24 +329,42 @@ async function up() {
     say(`✓ created package "${PACKAGE_NAME}" (${pkg.id})`);
   }
 
-  // 3) Published, bookable slots at BOTH branches — matched to DEV_PLAYER's
+  // 3) The coach login (S8), before the slots — one of the slots at each branch
+  //    is handed to them, which is the whole point of the coach half.
+  const coach = await ensureCoachAccount();
+
+  // 4) Published, bookable slots at BOTH branches — matched to DEV_PLAYER's
   //    gender/level so they are actually bookable, not merely visible.
+  //
+  //    The FIRST slot of each branch belongs to the QA coach. That is deliberate
+  //    and is the thing Part A has to be tested against: one coach, one
+  //    schedule, two branches, on different days so the coach-overlap exclusion
+  //    constraint is never in play.
   const coaches = await activeCoaches();
   const prior = readState();
   const priorSlots = new Set(prior?.slotIds ?? []);
+  const coachSlotIds = new Set();
   const slotRows = [];
   const plan = [
-    { loc: oro, coach: coaches[0], day: 2 },
-    { loc: qa, coach: coaches[1], day: 3 },
+    { loc: oro, fill: coaches[0], day: 2 },
+    { loc: qa, fill: coaches[1], day: 3 },
   ];
-  for (const { loc, coach, day } of plan) {
-    for (const { startsAt, endsAt } of slotTimes(day)) {
+  for (const { loc, fill, day } of plan) {
+    const times = slotTimes(day).map((t, i) => ({ ...t, coachId: i === 0 ? coach.coachId : fill.id }));
+    for (const { startsAt, endsAt, coachId } of times) {
       const clash = await select(
-        `session_slots?select=id&coach_id=eq.${coach.id}&starts_at=eq.${encodeURIComponent(startsAt)}&status=eq.published`,
+        `session_slots?select=id&coach_id=eq.${coachId}&starts_at=eq.${encodeURIComponent(startsAt)}&status=eq.published`,
       );
-      if (clash.length) { say(`· slot at ${startsAt} for ${coach.name} already exists (${clash[0].id})`); priorSlots.add(clash[0].id); continue; }
+      if (clash.length) {
+        say(`· slot at ${startsAt} already exists (${clash[0].id})`);
+        priorSlots.add(clash[0].id);
+        if (coachId === coach.coachId) coachSlotIds.add(clash[0].id);
+        continue;
+      }
+      const id = `sl_${uuid()}`;
+      if (coachId === coach.coachId) coachSlotIds.add(id);
       slotRows.push({
-        id: `sl_${uuid()}`, location_id: loc.id, coach_id: coach.id,
+        id, location_id: loc.id, coach_id: coachId,
         starts_at: startsAt, ends_at: endsAt, training_type: 'group',
         capacity: 4, gender: player.gender, level: player.level,
         status: 'published', template_id: null,
@@ -248,8 +378,9 @@ async function up() {
   } else {
     say('· all fixture slots already published');
   }
+  say(`✓ "${COACH_NAME}" now teaches ${coachSlotIds.size} session${coachSlotIds.size === 1 ? '' : 's'} — one at each branch`);
 
-  // 4) The wallet: EXACTLY 1 group credit at the original branch, 0 at the QA one.
+  // 5) The wallet: EXACTLY 1 group credit at the original branch, 0 at the QA one.
   //    Spent-out batches (quantity_remaining = 0) are left alone — they are history,
   //    they contribute nothing to a balance, and delete_credit_batch rightly refuses
   //    any batch that was booked against.
@@ -282,6 +413,9 @@ async function up() {
     packageId: pkg.id,
     slotIds: [...priorSlots],
     creditBatchId: grant.credit_batch_id,
+    coachId: coach.coachId,
+    coachPlayerId: coach.coachPlayerId,
+    coachSlotIds: [...coachSlotIds],
   });
   await status();
 }
@@ -328,6 +462,21 @@ async function down() {
     say(r.ok ? `✓ removed the granted credit batch` : `· kept credit batch ${state.creditBatchId} (${r.reason})`);
   }
 
+  // The coach LOGIN is never deleted. An account is a person's credentials, and
+  // deleting one to tidy up a fixture is not tidying up — it is destroying the
+  // thing Adam signs in with. `down` only undoes the LINK, which is exactly what
+  // an admin would do in the app: the shell goes back to the player one, the
+  // coaches row stays for its history, and a later `up` re-links in one call.
+  if (state.coachPlayerId) {
+    const r = await rpc('set_player_coach', { p_player_id: state.coachPlayerId, p_coach_id: null });
+    say(r.ok
+      ? `✓ unlinked the QA coach login (the account and its credentials are kept)`
+      : `· could not unlink the QA coach login: ${r.reason}`);
+  }
+  if ((state.coachSlotIds ?? []).length) {
+    say(`· the ${state.coachSlotIds.length} sessions that were the QA coach's are cancelled above, so nothing is left assigned`);
+  }
+
   if (state.qaLocationId) {
     // A branch is never deleted — slots, templates and packages reference it. It is
     // retired, exactly as a coach or a package is.
@@ -364,6 +513,24 @@ async function status() {
   say(`${player.name}'s usable credits:`);
   if (batches.length === 0) say('  (none)');
   for (const b of batches) say(`  ${String(b.quantity_remaining).padStart(2)} × ${b.training_type.padEnd(11)} @ ${nameOf(b.location_id)}`);
+
+  // The coach half. Read back from the database, not from the state file, so
+  // `status` reports what is actually true rather than what `up` intended.
+  const coachRow = (await select(`coaches?select=id,name&name=eq.${encodeURIComponent(COACH_NAME)}`))[0];
+  if (!coachRow) {
+    say(`coach           : "${COACH_NAME}" does not exist`);
+  } else {
+    const linked = await select(`players?select=id,name&coach_id=eq.${coachRow.id}`);
+    const theirs = await select(
+      `session_slots?select=id,location_id&coach_id=eq.${coachRow.id}&status=eq.published&starts_at=gt.${encodeURIComponent(nowIso)}`,
+    );
+    say(`coach           : ${coachRow.name} — login ${linked.length ? 'LINKED' : 'not linked'}${creds.DEV_COACH_EMAIL ? ` (${creds.DEV_COACH_EMAIL})` : ''}`);
+    if (theirs.length === 0) say('  no upcoming sessions');
+    for (const l of active) {
+      const n = theirs.filter((t) => t.location_id === l.id).length;
+      if (n) say(`  ${String(n).padStart(2)} upcoming @ ${l.name}`);
+    }
+  }
   say('─────────────────────────────────────────────────────────────\n');
 }
 
