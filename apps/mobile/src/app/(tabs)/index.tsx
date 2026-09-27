@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
-import { activePackages } from '../../data/catalog';
+import { packagesAtLocation } from '../../data/catalog';
 import {
   useBatches,
   useBookings,
@@ -78,7 +78,7 @@ export default function HomeScreen() {
   const { player, now } = useSession();
   const batches = useBatches();
   const bookings = useBookings();
-  const { selectedId } = useLocation();
+  const { selectedId, selected } = useLocation();
   // Home's Upcoming list spans every branch, for the same reason Sessions does.
   const slots = useSlotsForBookings(now, selectedId, bookings.data ?? []);
   const coaches = useCoaches();
@@ -134,15 +134,24 @@ export default function HomeScreen() {
   const locations = locationsQ.data ?? [];
   const locBatches = batchesAtLocation(batches.data ?? [], selectedId);
   const total = totalReadyToBook(locBatches, now);
+  // What they hold at the OTHER branches. Only used to keep the empty state
+  // honest: "you have no credits yet" is false for a player who has some, just
+  // not here, and that is precisely the player this whole feature exists for.
+  const elsewhere = totalReadyToBook(batches.data ?? [], now) - total;
   const expiring = soonestExpiringBatch(locBatches, now);
   const next = nextSession(bookings.data ?? [], slots.slots, coaches.data ?? [], now);
   // A5: only surface the trial while the player can still buy it (never used one) and one
   // exists — a player who has used their trial never sees it in their options anywhere.
-  const trialActive = (packagesQ.data ?? []).some((p) => p.trainingType === 'trial' && p.isActive);
+  // SCOPED to the branch on the toggle, exactly like buy-credits (which "See all"
+  // opens) and like the balance above. A package's credits are only spendable
+  // where it was bought (065), so an unscoped strip here offered a player standing
+  // at one branch a package for another — with nothing on the card to say so, and
+  // a headline of 0 credits right above it. packagesAtLocation answers empty while
+  // the branch is unresolved, which is the safe way round.
+  const locPackages = packagesAtLocation(packagesQ.data ?? [], selectedId);
+  const trialActive = locPackages.some((p) => p.trainingType === 'trial');
   const canGetTrial = Boolean(trialEligibleQ.data) && trialActive;
-  const packages = activePackages(packagesQ.data ?? []).filter(
-    (p) => p.trainingType !== 'trial' || canGetTrial,
-  );
+  const packages = locPackages.filter((p) => p.trainingType !== 'trial' || canGetTrial);
 
   const expiryText = expiring
     ? `${expiring.quantityRemaining} ${TRAINING_META[expiring.trainingType].label} credit${
@@ -172,12 +181,18 @@ export default function HomeScreen() {
       {total === 0 ? (
         <Card style={styles.emptyCredits}>
           <Text variant="body" weight="bold">
-            You have no credits yet
+            {elsewhere > 0 && selected ? `No credits at ${selected.name}` : 'You have no credits yet'}
           </Text>
           <Text variant="caption" tone="secondary">
-            {canGetTrial
-              ? 'Grab your one-time discounted trial session to book your first class on court.'
-              : 'Add a credit package — a credit is what reserves your spot in a session.'}
+            {/* Three different players, three different true things. Someone with
+                credits at another branch is NOT starting from scratch and must not
+                be told they are — they need to know the credits exist and that
+                switching is a tap, not a purchase. */}
+            {elsewhere > 0
+              ? `You have ${elsewhere} credit${elsewhere === 1 ? '' : 's'} at another location. Buy credits for here, or switch location above to use them.`
+              : canGetTrial
+                ? 'Grab your one-time discounted trial session to book your first class on court.'
+                : 'Add a credit package — a credit is what reserves your spot in a session.'}
           </Text>
           <Button
             label={canGetTrial ? 'Get your trial session' : 'Browse packages'}

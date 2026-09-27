@@ -48,6 +48,20 @@ describe('batchesAtLocation — credits are location-locked, so the wallet must 
     expect(batchesAtLocation(BATCHES, null)).toEqual([]);
   });
 
+  // Home's empty state subtracts these two to answer "you have credits, just not
+  // here". Getting it wrong tells a player with a full wallet that they have none.
+  it('the credits-elsewhere figure is the difference, not a guess', () => {
+    const here = totalReadyToBook(batchesAtLocation(BATCHES, ORO), NOW);
+    const everywhere = totalReadyToBook(BATCHES, NOW);
+    expect(everywhere - here).toBe(7);
+    expect(totalReadyToBook(BATCHES, NOW) - totalReadyToBook(batchesAtLocation(BATCHES, QA), NOW)).toBe(1);
+  });
+
+  it('is zero when the only credits are the ones here — no false "you have some elsewhere"', () => {
+    const onlyOro = [b('cb_1', 'group', 1, ORO)];
+    expect(totalReadyToBook(onlyOro, NOW) - totalReadyToBook(batchesAtLocation(onlyOro, ORO), NOW)).toBe(0);
+  });
+
   it('does not mutate the input', () => {
     batchesAtLocation(BATCHES, QA);
     expect(BATCHES.map((x) => x.id)).toEqual(['cb_1', 'cb_2', 'cb_3']);

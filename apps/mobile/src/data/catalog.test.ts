@@ -43,3 +43,28 @@ describe('packagesAtLocation', () => {
     expect(packagesByType(scoped, 'group').map((p) => p.id)).toEqual(['g']);
   });
 });
+
+// Home used to read `trialActive` from the WHOLE catalog while showing a
+// branch-scoped strip, so a player standing at a branch with no trial was still
+// offered "Get your trial session" — for a package sold somewhere else.
+describe('the trial offer follows the branch, like every other package', () => {
+  const ORO = 'loc_oro' as Package['locationId'];
+  const QA = 'loc_qa' as Package['locationId'];
+  const trialAtOro = at('pk_trial', 'loc_oro', { trainingType: 'trial' });
+  const groupAtQa = at('pk_group_qa', 'loc_qa');
+
+  const trialOffered = (locationId: Package['locationId'] | null) =>
+    packagesAtLocation([trialAtOro, groupAtQa], locationId).some((p) => p.trainingType === 'trial');
+
+  it('is offered at the branch that sells it', () => {
+    expect(trialOffered(ORO)).toBe(true);
+  });
+
+  it('is NOT offered at a branch that does not', () => {
+    expect(trialOffered(QA)).toBe(false);
+  });
+
+  it('is not offered before a branch has resolved', () => {
+    expect(trialOffered(null)).toBe(false);
+  });
+});
