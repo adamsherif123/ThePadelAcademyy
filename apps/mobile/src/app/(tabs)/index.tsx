@@ -52,6 +52,10 @@ const HOME_KEYS = [
   queryKeys.creditBatches,
   queryKeys.bookings,
   queryKeys.slots,
+  // Home's Upcoming spans branches via useSlotsForBookings, which fetches the
+  // slots the branch feed does not hold BY ID. A pull that refreshed only the
+  // feed left those cards on yesterday's data.
+  queryKeys.slotsByIds,
   queryKeys.coaches,
   queryKeys.packages,
   queryKeys.trialEligible,
