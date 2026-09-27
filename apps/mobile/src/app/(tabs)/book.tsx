@@ -17,6 +17,7 @@ import { useBatches, useBookings, useCoaches, useSlots, useTemplates, combine } 
 import { totalReadyToBook } from '../../data/wallet';
 import { queryKeys } from '../../lib/queryClient';
 import { useLocation } from '../../location/LocationProvider';
+import { LocationToggle } from '../../location/LocationToggle';
 import { useSession } from '../../session/SessionProvider';
 import {
   DateChip,
@@ -159,6 +160,7 @@ export default function BookScreen() {
         contentContainerStyle={styles.content}
         refreshControl={gate.isError ? refreshControl : undefined}
       >
+        <LocationToggle />
         <ScreenHeader eyebrow="Book your session" title="Find your next session" />
         {gate.isPending ? <LoadingView /> : <ErrorView onRetry={gate.refetch} />}
       </Screen>
@@ -201,6 +203,7 @@ export default function BookScreen() {
 
   return (
     <Screen scroll tabBar contentContainerStyle={styles.content} refreshControl={refreshControl}>
+      <LocationToggle />
       <ScreenHeader eyebrow="Book your session" title="Find your next session" />
 
       <InfoCard variant="neutral" icon="calendar-outline" text={weekBannerText(weekSummary, now)} />

@@ -17,6 +17,7 @@ import {
   combine,
 } from '../../data/queries';
 import { useLocation } from '../../location/LocationProvider';
+import { LocationToggle } from '../../location/LocationToggle';
 import { placeFor } from '../../location/slotLocation';
 import { queryKeys } from '../../lib/queryClient';
 import { nextSession } from '../../data/schedule';
@@ -92,17 +93,24 @@ export default function HomeScreen() {
   if (!player) return null;
 
   const firstName = player.name.split(' ')[0] ?? player.name;
+  // The toggle rides WITH the header rather than being added to each Screen
+  // separately: Home has three of them (loading, error, loaded) and they must
+  // not drift apart. Its trailing slot is already the bell and news, so the pill
+  // sits above rather than beside.
   const header = (
-    <ScreenHeader
-      eyebrow="The Padel Academy"
-      title={`Hey, ${firstName}`}
-      trailing={
-        <View style={styles.headerTrailing}>
-          <NotificationBell />
-          <NewsButton />
-        </View>
-      }
-    />
+    <>
+      <LocationToggle />
+      <ScreenHeader
+        eyebrow="The Padel Academy"
+        title={`Hey, ${firstName}`}
+        trailing={
+          <View style={styles.headerTrailing}>
+            <NotificationBell />
+            <NewsButton />
+          </View>
+        }
+      />
+    </>
   );
   if (slots.isPending || gate.isPending) {
     return (

@@ -5,6 +5,7 @@ import { Linking, StyleSheet, View } from 'react-native';
 import { useBatches, useCoaches, usePurchaseCount, combine } from '../../data/queries';
 import { totalReadyToBook } from '../../data/wallet';
 import { PRIVACY_POLICY_URL } from '../../lib/legal';
+import { LocationToggle } from '../../location/LocationToggle';
 import { useSession } from '../../session/SessionProvider';
 import { useTheme, type ThemePreference } from '../../theme/ThemeProvider';
 import {
@@ -45,7 +46,8 @@ export default function ProfileScreen() {
   if (gate.isPending || gate.isError) {
     return (
       <Screen scroll tabBar contentContainerStyle={styles.content}>
-        <ScreenHeader eyebrow="Your account" title="Profile" />
+        <LocationToggle />
+      <ScreenHeader eyebrow="Your account" title="Profile" />
         {gate.isPending ? <LoadingView /> : <ErrorView onRetry={gate.refetch} />}
       </Screen>
     );
@@ -59,6 +61,7 @@ export default function ProfileScreen() {
 
   return (
     <Screen scroll tabBar contentContainerStyle={styles.content}>
+      <LocationToggle />
       <ScreenHeader eyebrow="Your account" title="Profile" />
 
       <Card>
