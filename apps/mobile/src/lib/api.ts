@@ -213,7 +213,12 @@ export async function fetchPastSessionsPage(params: {
   const size = params.pageSize ?? HISTORY_PAGE_SIZE;
   const { data, error } = await supabase
     .from('bookings')
-    .select('*, session_slots!inner(*)')
+    // NAMED relationship: 065's bookings_slot_same_location made a bare
+    // `session_slots` embed ambiguous (300 PGRST201) — see the admin's
+    // BOOKINGS_PAGE_SELECT for the whole story. The composite constraint is the
+    // one named because it is the one that survives the fix for the shipped
+    // 1.2/1.3 binaries, which carry this exact query and cannot be updated.
+    .select('*, session_slots!bookings_slot_same_location!inner(*)')
     .lt('session_slots.starts_at', params.before)
     .order('session_slots(starts_at)', { ascending: false })
     .limit(size + 1);

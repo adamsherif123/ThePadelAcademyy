@@ -205,7 +205,22 @@ export interface BookingsPageResult {
 // .ilike('players.name', …) below actually restrict the OUTER bookings rows —
 // PostgREST embeds are left joins by default, which would only filter the nested
 // object and leave every booking row in the result.
-const BOOKINGS_PAGE_SELECT = '*, players!inner(*), session_slots!inner(*, coaches(*))';
+//
+// ── why the relationship is NAMED ──
+// 065 added bookings_slot_same_location (slot_id, location_id) → session_slots
+// (id, location_id) alongside the original bookings_slot_id_fkey. That gave
+// PostgREST TWO ways to embed session_slots from bookings, and it refuses to
+// guess: the whole page died with 300 PGRST201 "more than one relationship was
+// found". The hint picks one.
+//
+// It names the COMPOSITE constraint, not the single-column one, deliberately. The
+// same ambiguity breaks the un-updatable 1.2/1.3 mobile binaries, whose fix can
+// only be to drop the now-redundant single-column FK (see the session report). A
+// hint naming bookings_slot_id_fkey would work today and break the day that lands;
+// this one is correct either way, and joining on both columns returns the same row
+// because the constraint is what makes them agree.
+const BOOKINGS_PAGE_SELECT =
+  '*, players!inner(*), session_slots!bookings_slot_same_location!inner(*, coaches(*))';
 
 function rowToBookingPageRow(r: Record<string, unknown>): BookingRow {
   const playerRow = r.players as Record<string, unknown> | null;
