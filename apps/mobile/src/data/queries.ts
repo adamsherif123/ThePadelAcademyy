@@ -1,4 +1,4 @@
-import type { BookingId, CoachId, IsoInstant, News, NewsId, Notification, NotificationId, PlayerId, Purchase, SessionSlot, SlotId, TrainingType } from '@tpa/types';
+import type { Booking, BookingId, CoachId, IsoInstant, LocationId, News, NewsId, Notification, NotificationId, PlayerId, Purchase, SessionSlot, SlotId, TrainingType } from '@tpa/types';
 import { SLOT_WINDOW_TRAILING_DAYS } from '@tpa/core';
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -23,9 +23,11 @@ import {
   fetchUnreadNotificationCount,
   fetchVisibleNews,
   trialEligibleRpc,
+  fetchLocations,
   fetchPackages,
   fetchPurchases,
   fetchSlots,
+  fetchSlotsByIds,
   fetchTemplates,
   markAllNotificationsRead,
   markNewsSeen,
@@ -36,6 +38,7 @@ import {
   type RosterEntry,
   type CancelReason,
 } from '../lib/api';
+import { mergeSlots, missingSlotIds } from './slotSet';
 import { BOOKING_TOUCHED_KEYS, queryClient, queryKeys } from '../lib/queryClient';
 
 /**
@@ -123,8 +126,67 @@ export const usePackages = () =>
  * of the key, exactly like `useNews(now)`: the key stays stable so a ticking clock
  * never causes a refetch, and each real fetch computes a fresh cutoff.
  */
-export const useSlots = (now: IsoInstant) =>
-  toResource(useQuery({ queryKey: queryKeys.slots, queryFn: () => fetchSlots(now) }));
+/**
+ * The slot feed for ONE branch. The location is part of the key, so switching
+ * branches is a different cache entry rather than a refetch that clobbers the
+ * other one — going back is instant.
+ */
+export const useSlots = (now: IsoInstant, locationId: LocationId | null) =>
+  toResource(
+    useQuery({
+      queryKey: [...queryKeys.slots, locationId],
+      queryFn: () => fetchSlots(now, locationId),
+    }),
+  );
+
+/**
+ * Slots the filtered feed does not contain — a player's bookings at another
+ * branch. Enabled only when there is something to fetch, so the common
+ * single-branch case costs nothing.
+ */
+export const useSlotsByIds = (ids: readonly SlotId[]) =>
+  toResource(
+    useQuery({
+      queryKey: [...queryKeys.slotsByIds, [...ids].sort().join(',')],
+      queryFn: () => fetchSlotsByIds(ids),
+      enabled: ids.length > 0,
+    }),
+  );
+
+/**
+ * Every slot the player's own screens need: the selected branch's feed, PLUS the
+ * slots their bookings point at elsewhere.
+ *
+ * Sessions and Home both need this and must agree, so the rule lives here once
+ * rather than being re-derived on two screens. The second query is disabled
+ * whenever nothing is missing — which is always, until a player books at a
+ * branch and then switches away from it.
+ */
+export function useSlotsForBookings(
+  now: IsoInstant,
+  locationId: LocationId | null,
+  bookings: readonly Booking[],
+): { slots: SessionSlot[]; isPending: boolean; isError: boolean; refetch: () => void } {
+  const feedQ = useSlots(now, locationId);
+  const feed = feedQ.data ?? [];
+  const extraQ = useSlotsByIds(missingSlotIds(bookings, feed));
+  return {
+    slots: mergeSlots(feed, extraQ.data ?? []),
+    // The gap-filler never blocks first paint: the feed is what the screen is
+    // mostly made of, and a cross-branch booking appearing a beat later is far
+    // better than the whole list waiting on a query that usually fetches nothing.
+    isPending: feedQ.isPending,
+    isError: feedQ.isError || extraQ.isError,
+    refetch: () => {
+      feedQ.refetch();
+      extraQ.refetch();
+    },
+  };
+}
+
+/** Active branches. Authenticated-only — see LocationProvider. */
+export const useLocations = () =>
+  toResource(useQuery({ queryKey: queryKeys.locations, queryFn: fetchLocations }));
 
 export const useTemplates = () =>
   toResource(useQuery({ queryKey: queryKeys.templates, queryFn: fetchTemplates }));
@@ -401,7 +463,9 @@ async function refetchBookingTouched(): Promise<void> {
  */
 export type BookOutcome =
   | { status: 'booked'; reconciled: boolean; bookingId: BookingId }
-  | { status: 'rejected'; reason: BookReason }
+  // The branch rides along for credit_wrong_location — the one refusal the screen
+  // can offer a way out of (065).
+  | { status: 'rejected'; reason: BookReason; locationId?: LocationId; locationName?: string }
   | { status: 'unconfirmed' };
 
 /** The id of a non-cancelled booking for this slot, if one landed. Reads fresh. */
@@ -424,7 +488,7 @@ export function useBookSlot() {
         await refetchBookingTouched();
         return res.ok
           ? { status: 'booked', reconciled: false, bookingId: res.bookingId }
-          : { status: 'rejected', reason: res.reason };
+          : { status: 'rejected', reason: res.reason, locationId: res.locationId, locationName: res.locationName };
       } catch {
         // Transport failure — the spend may have committed. Reconcile against truth.
         const landed = await bookedBookingId(slotId).catch(() => null);

@@ -6,7 +6,8 @@ import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { TabView } from 'react-native-tab-view';
 
 import { hasOlderSessions, pastSessions, upcomingSessions, withOlderSessions } from '../../data/booking';
-import { useBookings, useCoaches, usePastSessionsOlder, useSlots, combine } from '../../data/queries';
+import { useBookings, useCoaches, usePastSessionsOlder, useSlotsForBookings, combine } from '../../data/queries';
+import { useLocation } from '../../location/LocationProvider';
 import { useSession } from '../../session/SessionProvider';
 import {
   BookingCard,
@@ -49,17 +50,21 @@ export default function SessionsScreen() {
   const router = useRouter();
   const { player, now } = useSession();
   const bookings = useBookings();
-  const slots = useSlots(now);
+  const { selectedId } = useLocation();
+  // Sessions shows EVERY branch: "your sessions" must not depend on which branch
+  // the toggle happens to be on. The hook merges the selected branch's feed with
+  // the slots your bookings point at elsewhere (see useSlotsForBookings).
+  const slots = useSlotsForBookings(now, selectedId, bookings.data ?? []);
   const coaches = useCoaches();
   // Sessions older than the slot window — nothing is fetched until "Load older" is
   // tapped, so the common case (recent history) costs no extra round trip.
   const older = usePastSessionsOlder(now);
-  const gate = combine(bookings, slots, coaches);
+  const gate = combine(bookings, coaches);
   const { width } = useWindowDimensions();
   const [index, setIndex] = useState(0);
   if (!player) return null;
 
-  if (gate.isPending || gate.isError) {
+  if (slots.isPending || gate.isPending || gate.isError) {
     return (
       <Screen scroll tabBar contentContainerStyle={styles.content}>
         <ScreenHeader eyebrow="Your court time" title="Sessions" />
@@ -68,19 +73,19 @@ export default function SessionsScreen() {
     );
   }
 
-  const upcoming = upcomingSessions(bookings.data ?? [], slots.data ?? [], coaches.data ?? [], now);
+  const upcoming = upcomingSessions(bookings.data ?? [], slots.slots, coaches.data ?? [], now);
   // Recent past comes free from the slots already in hand; older pages are appended
   // as the player asks for them (see `withOlderSessions` for the disjointness rule).
   const coachList = coaches.data ?? [];
   const past = withOlderSessions(
-    pastSessions(bookings.data ?? [], slots.data ?? [], coachList, now),
+    pastSessions(bookings.data ?? [], slots.slots, coachList, now),
     older.items,
     coachList,
   );
   // Exact, and free: the player's whole booking list is already in hand, so a booking
   // with no slot in the window IS an older session. No button for someone who has
   // never played; no hidden history for someone who has.
-  const canLoadOlder = older.hasMore && hasOlderSessions(bookings.data ?? [], slots.data ?? []);
+  const canLoadOlder = older.hasMore && hasOlderSessions(bookings.data ?? [], slots.slots);
 
   const renderScene = ({ route }: { route: TabRoute }) => {
     if (route.key === 'upcoming') {

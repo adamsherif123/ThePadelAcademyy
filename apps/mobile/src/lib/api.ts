@@ -26,6 +26,8 @@ import type {
   Gender,
   IsoInstant,
   Level,
+  Location,
+  LocationId,
   News,
   NewsId,
   NewsSeen,
@@ -50,6 +52,7 @@ import {
   rowToCoach,
   rowToCreditBatch,
   rowToCreditRequest,
+  rowToLocation,
   rowToNews,
   rowToNewsSeen,
   rowToNotification,
@@ -119,6 +122,17 @@ export const fetchCoaches = (): Promise<Coach[]> => selectAll('coaches', rowToCo
 export const fetchTemplates = (): Promise<AvailabilityTemplate[]> =>
   selectAll('availability_templates', rowToAvailabilityTemplate);
 export const fetchPackages = (): Promise<Package[]> => selectAll('packages', rowToPackage);
+
+/**
+ * The branches this client may see. RLS already hides non-default ones from a
+ * pre-1.4 client, so a legacy build gets exactly one row back and the toggle
+ * never appears — the header does the work, not a flag in the app.
+ *
+ * Authenticated-only: `locations` grants SELECT to `authenticated`, not `anon`.
+ * Every screen that reads it is behind the session gate (see LocationProvider).
+ */
+export const fetchLocations = (): Promise<Location[]> =>
+  selectAll('locations', rowToLocation);
 /**
  * Published slots from `now - SLOT_WINDOW_TRAILING_DAYS` onwards — bounded below,
  * open-ended above (every future slot the academy has scheduled).
@@ -131,12 +145,37 @@ export const fetchPackages = (): Promise<Package[]> => selectAll('packages', row
  *
  * `session_slots(starts_at)` is indexed, so the bound is a cheap range scan.
  */
-export async function fetchSlots(now: IsoInstant): Promise<SessionSlot[]> {
-  const { data, error } = await supabase
+export async function fetchSlots(now: IsoInstant, locationId: LocationId | null): Promise<SessionSlot[]> {
+  let query = supabase
     .from('session_slots')
     .select('*')
     .gte('starts_at', daysBefore(now, SLOT_WINDOW_TRAILING_DAYS));
+  // SERVER-side, not a client filter. session_slots is the one table RLS
+  // publishes in full to every player, and it is already the app's largest read;
+  // with N branches a client-side filter would fetch N times the rows and discard
+  // (N-1)/N of them, on every screen that reads slots. The branch is in the query
+  // key, so each one caches separately and switching is a bounded fetch rather
+  // than a bigger one. The cost of this choice is that a booking at ANOTHER
+  // branch falls outside the feed — fetchSlotsByIds below is the answer to that.
+  if (locationId !== null) query = query.eq('location_id', locationId);
+  const { data, error } = await query;
   if (error) throw new ApiError(`Failed to load session_slots: ${error.message}`, error);
+  return (data ?? []).map(rowToSlot);
+}
+
+/**
+ * Specific slots by id, whatever branch they are at.
+ *
+ * The companion to the server-side filter above: a player who booked at Branch B
+ * and then switched to Branch A must still see that session in Sessions and on
+ * Home. Those slots are, by construction, missing from the filtered feed, so they
+ * are fetched by id — a small, bounded read (a player has a handful of live
+ * bookings) that runs only when the booking list mentions a slot the feed lacks.
+ */
+export async function fetchSlotsByIds(ids: readonly SlotId[]): Promise<SessionSlot[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase.from('session_slots').select('*').in('id', ids);
+  if (error) throw new ApiError(`Failed to load session_slots by id: ${error.message}`, error);
   return (data ?? []).map(rowToSlot);
 }
 export const fetchCreditBatches = (): Promise<CreditBatch[]> =>
@@ -625,7 +664,10 @@ export type BookReason =
 
 export type BookRpcResult =
   | { ok: true; bookingId: BookingId; creditBatchId: string }
-  | { ok: false; reason: BookReason };
+  // 065 sends location_id + location_name with credit_wrong_location, so the
+  // refusal can name the branch the player's credits ARE at without a second
+  // lookup — and can offer to switch to it.
+  | { ok: false; reason: BookReason; locationId?: LocationId; locationName?: string };
 
 export type CancelReason =
   | 'booking_missing'
@@ -744,7 +786,12 @@ export async function bookSlotRpc(slotId: SlotId, trainingType: TrainingType | n
   if (d.ok) {
     return { ok: true, bookingId: d.booking_id as BookingId, creditBatchId: d.credit_batch_id as string };
   }
-  return { ok: false, reason: d.reason as BookReason };
+  return {
+    ok: false,
+    reason: d.reason as BookReason,
+    locationId: d.location_id as LocationId | undefined,
+    locationName: d.location_name as string | undefined,
+  };
 }
 
 export async function cancelBookingRpc(bookingId: BookingId): Promise<CancelRpcResult> {

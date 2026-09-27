@@ -64,6 +64,8 @@ const lightColor = {
     border: p.ON_NAVY_PILL_BORDER,
     text: p.ON_NAVY_PILL_TEXT,
   },
+  /** The dim behind a modal sheet (the location picker is the first one). */
+  scrim: p.SCRIM,
 } as const;
 
 /**
@@ -111,6 +113,7 @@ const darkColor = {
     border: p.ON_NAVY_PILL_BORDER,
     text: p.ON_NAVY_PILL_TEXT,
   },
+  scrim: p.DARK_SCRIM,
 } as const satisfies Record<keyof typeof lightColor, unknown>;
 
 /** The light scheme — kept as the plain `color` export (byte-identical to

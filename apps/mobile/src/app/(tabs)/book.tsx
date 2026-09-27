@@ -16,6 +16,7 @@ import {
 import { useBatches, useBookings, useCoaches, useSlots, useTemplates, combine } from '../../data/queries';
 import { totalReadyToBook } from '../../data/wallet';
 import { queryKeys } from '../../lib/queryClient';
+import { useLocation } from '../../location/LocationProvider';
 import { useSession } from '../../session/SessionProvider';
 import {
   DateChip,
@@ -137,8 +138,10 @@ function weekBannerText(summary: WeekAvailabilitySummary, now: IsoInstant): stri
 export default function BookScreen() {
   const router = useRouter();
   const { player, now } = useSession();
+  const { selectedId } = useLocation();
   const refreshControl = useRefreshControl(BOOK_KEYS);
-  const slotsQ = useSlots(now);
+  // The feed is SCOPED to the selected branch, server-side (see fetchSlots).
+  const slotsQ = useSlots(now, selectedId);
   const batchesQ = useBatches();
   const bookingsQ = useBookings();
   const coachesQ = useCoaches();

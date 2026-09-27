@@ -11,10 +11,11 @@ import {
   useBookings,
   useCoaches,
   usePackages,
-  useSlots,
+  useSlotsForBookings,
   useTrialEligible,
   combine,
 } from '../../data/queries';
+import { useLocation } from '../../location/LocationProvider';
 import { queryKeys } from '../../lib/queryClient';
 import { nextSession } from '../../data/schedule';
 import { soonestExpiringBatch, totalReadyToBook } from '../../data/wallet';
@@ -75,11 +76,13 @@ export default function HomeScreen() {
   const { player, now } = useSession();
   const batches = useBatches();
   const bookings = useBookings();
-  const slots = useSlots(now);
+  const { selectedId } = useLocation();
+  // Home's Upcoming list spans every branch, for the same reason Sessions does.
+  const slots = useSlotsForBookings(now, selectedId, bookings.data ?? []);
   const coaches = useCoaches();
   const packagesQ = usePackages();
   const trialEligibleQ = useTrialEligible();
-  const gate = combine(batches, bookings, slots, coaches, packagesQ, trialEligibleQ);
+  const gate = combine(batches, bookings, coaches, packagesQ, trialEligibleQ);
   // Session-scoped, in-memory dismissals, keyed by batch id — a nag by design:
   // pure view state, resets on relaunch, and keying by id means dismissing one
   // batch's notice doesn't suppress a different batch's later.
@@ -99,7 +102,7 @@ export default function HomeScreen() {
       }
     />
   );
-  if (gate.isPending) {
+  if (slots.isPending || gate.isPending) {
     return (
       <Screen scroll tabBar contentContainerStyle={styles.content}>
         {header}
@@ -118,7 +121,7 @@ export default function HomeScreen() {
 
   const total = totalReadyToBook(batches.data ?? [], now);
   const expiring = soonestExpiringBatch(batches.data ?? [], now);
-  const next = nextSession(bookings.data ?? [], slots.data ?? [], coaches.data ?? [], now);
+  const next = nextSession(bookings.data ?? [], slots.slots, coaches.data ?? [], now);
   // A5: only surface the trial while the player can still buy it (never used one) and one
   // exists — a player who has used their trial never sees it in their options anywhere.
   const trialActive = (packagesQ.data ?? []).some((p) => p.trainingType === 'trial' && p.isActive);

@@ -39,9 +39,18 @@ export const queryClient = new QueryClient({
 export const queryKeys = {
   player: ['player'] as const,
   coaches: ['coaches'] as const,
+  /** Branches. Not location-scoped, obviously — this IS the list. */
+  locations: ['locations'] as const,
+  /**
+   * Prefix keys. `packages` and `slots` are read PER BRANCH, so the selected
+   * location is appended at the call site and each branch caches separately;
+   * invalidating the prefix still refreshes whichever branch is mounted.
+   */
   packages: ['packages'] as const,
   templates: ['templates'] as const,
   slots: ['slots'] as const,
+  /** Slots fetched BY ID for bookings at a branch the feed is not showing. */
+  slotsByIds: ['slotsByIds'] as const,
   creditBatches: ['creditBatches'] as const,
   bookings: ['bookings'] as const,
   /** Prefix key. The windowed list is ['purchases', {since}], the lifetime count

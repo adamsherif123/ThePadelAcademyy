@@ -20,6 +20,7 @@ import { HardUpdateGate } from '../update/HardUpdateGate';
 import { UpdatePromptBridge } from '../update/UpdatePromptBridge';
 import { NotificationsBridge } from '../notifications/NotificationsBridge';
 import { nextRoute } from '../session/authMachine';
+import { LocationProvider } from '../location/LocationProvider';
 import { SessionProvider, useSession } from '../session/SessionProvider';
 import { interFonts } from '../theme/fonts';
 import { ThemeProvider, useTheme } from '../theme/ThemeProvider';
@@ -192,7 +193,11 @@ export default function RootLayout() {
             when the lookup fails. */}
         <HardUpdateGate>
           <SessionProvider>
-            <RootNavigator />
+            {/* INSIDE the session: `locations` is an authenticated read, so the
+                branch list does not exist for a signed-out player. */}
+            <LocationProvider>
+              <RootNavigator />
+            </LocationProvider>
           </SessionProvider>
         </HardUpdateGate>
       </QueryClientProvider>

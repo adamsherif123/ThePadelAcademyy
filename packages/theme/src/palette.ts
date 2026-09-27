@@ -41,6 +41,11 @@ export const ON_NAVY_PILL_BG = 'rgba(255,255,255,0.08)'; // .coach-badges small 
 export const ON_NAVY_PILL_BORDER = 'rgba(255,255,255,0.16)'; // #ffffff29
 export const ON_NAVY_PILL_TEXT = 'rgba(255,255,255,0.82)'; //  #ffffffd1
 
+// The dim behind a modal sheet. Darker in dark mode, because a scrim that reads
+// as "the page is behind this" needs more contrast against an already-dark canvas.
+export const SCRIM = 'rgba(11,18,38,0.45)'; //      NAVY at 45%
+export const DARK_SCRIM = 'rgba(0,0,0,0.6)'; //     near-black, dark scheme
+
 // --- DERIVED (not on the site; chosen here — flagged in the S2 report) ---
 export const WARNING_FG = '#92600a'; //  amber; site has no warning role
 export const WARNING_BG = '#fbeccb'; //  amber tint

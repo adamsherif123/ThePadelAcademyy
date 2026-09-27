@@ -58,6 +58,11 @@ export {
 } from './time';
 
 export { isDayOpen, templateCoveredWeekdays } from './availability';
+export {
+  groupBatchesByLocation,
+  transferredFromName,
+  type LocationGroup,
+} from './locations';
 
 export {
   formatCompactEgp,

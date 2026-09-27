@@ -11,6 +11,7 @@ import type {
   CreditRequest,
   IsoInstant,
   LocalTime,
+  Location,
   News,
   NewsSeen,
   Notification,
@@ -63,6 +64,21 @@ export function rowToPackage(r: Row): Package {
     price: num(r.price) as Package['price'],
     name: str(r.name),
     isActive: bool(r.is_active),
+  };
+}
+
+/** A branch. Mirrors the admin's rowToLocation — same table, same shape. */
+export function rowToLocation(r: Row): Location {
+  return {
+    id: str(r.id) as Location['id'],
+    name: str(r.name),
+    address: str(r.address),
+    mapsUrl: str(r.maps_url),
+    hoursText: str(r.hours_text),
+    sortOrder: num(r.sort_order),
+    isActive: bool(r.is_active),
+    isDefault: bool(r.is_default),
+    createdAt: iso(r.created_at),
   };
 }
 

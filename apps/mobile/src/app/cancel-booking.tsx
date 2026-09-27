@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { cancelPreview } from '../data/booking';
-import { useBatches, useBookings, useCancelBooking, useCoaches, useSlots, combine } from '../data/queries';
+import { useBatches, useBookings, useCancelBooking, useCoaches, useSlotsByIds, combine } from '../data/queries';
 import { haptics } from '../lib/haptics';
 import { useSession } from '../session/SessionProvider';
 import {
@@ -36,14 +36,18 @@ import {
 export default function CancelBookingScreen() {
   const router = useRouter();
   const { player, now } = useSession();
-  const slotsQ = useSlots(now);
+  // BY ID, not the branch feed: this screen is reachable for a booking at any
+  // branch — from Sessions, or from a notification deep link — and a
+  // location-filtered feed would simply not contain that slot.
+  const { bookingId } = useLocalSearchParams<{ bookingId: string }>();
   const batchesQ = useBatches();
   const bookingsQ = useBookings();
   const coachesQ = useCoaches();
+  const bookedSlotId = (bookingsQ.data ?? []).find((b) => b.id === (bookingId as BookingId))?.slotId;
+  const slotsQ = useSlotsByIds(bookedSlotId ? [bookedSlotId] : []);
   const gate = combine(slotsQ, batchesQ, bookingsQ, coachesQ);
   const cancelMutation = useCancelBooking();
   const [error, setError] = useState<string | null>(null);
-  const { bookingId } = useLocalSearchParams<{ bookingId: string }>();
   if (!player) return null;
 
   if (gate.isPending || gate.isError) {

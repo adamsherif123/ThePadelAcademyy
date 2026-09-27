@@ -1,5 +1,5 @@
 import { TRAINING_TYPES } from '@tpa/core';
-import type { Package, PackageId, TrainingType } from '@tpa/types';
+import type { LocationId, Package, PackageId, TrainingType } from '@tpa/types';
 
 /**
  * Catalog selectors — pure functions of a package list. The list is the active
@@ -21,6 +21,20 @@ export const PLAYER_COUNT: Record<TrainingType, string> = {
 
 export function activePackages(packages: Package[]): Package[] {
   return packages.filter((p) => p.isActive);
+}
+
+/**
+ * Active packages sold at ONE branch.
+ *
+ * Load-bearing, not cosmetic. A 1.4 client can see every branch's catalog, and a
+ * package's credits are only spendable where it was bought (065) — so an unfiltered
+ * list would let a player standing at Branch A buy credits for Branch B, with
+ * nothing on the row to warn them. `locationId` null means "not resolved yet";
+ * showing nothing is the safe answer for the instant before locations load.
+ */
+export function packagesAtLocation(packages: Package[], locationId: LocationId | null): Package[] {
+  if (locationId === null) return [];
+  return activePackages(packages).filter((p) => p.locationId === locationId);
 }
 
 /** Active packages for one training type, cheapest first. */

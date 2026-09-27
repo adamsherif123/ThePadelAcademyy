@@ -7,14 +7,15 @@ import {
   spotsUntilConfirmed,
 } from '@tpa/core';
 import { space } from '@tpa/theme';
-import type { Level, SlotId, TrainingType } from '@tpa/types';
+import type { Level, SlotId, TrainingType , LocationId } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { bookingPreview } from '../data/booking';
 import { haptics } from '../lib/haptics';
-import { useBatches, useBookSlot, useBookings, useCoaches, useSlots, combine } from '../data/queries';
+import { useBatches, useBookSlot, useBookings, useCoaches, useSlotsByIds, combine } from '../data/queries';
+import { useLocation } from '../location/LocationProvider';
 import { useSession } from '../session/SessionProvider';
 import { useTheme } from '../theme/ThemeProvider';
 import {
@@ -69,14 +70,22 @@ export default function ConfirmBookingScreen() {
   const router = useRouter();
   const { color } = useTheme();
   const { player, now } = useSession();
-  const slotsQ = useSlots(now);
+  const { options, select } = useLocation();
+  // BY ID, not the branch feed: this screen is reachable for a booking at any
+  // branch — from Sessions, or from a notification deep link — and a
+  // location-filtered feed would simply not contain that slot.
+  const { slotId, trainingType } = useLocalSearchParams<{ slotId: string; trainingType?: string }>();
+  const slotsQ = useSlotsByIds(slotId ? [slotId as SlotId] : []);
   const batchesQ = useBatches();
   const bookingsQ = useBookings();
   const coachesQ = useCoaches();
   const gate = combine(slotsQ, batchesQ, bookingsQ, coachesQ);
   const bookMutation = useBookSlot();
   const [error, setError] = useState<string | null>(null);
-  const { slotId, trainingType } = useLocalSearchParams<{ slotId: string; trainingType?: string }>();
+  // credit_wrong_location is the one refusal with somewhere to GO, so it is held
+  // as structure rather than a sentence: the screen offers the two things that
+  // actually resolve it instead of just explaining the problem.
+  const [wrongLocation, setWrongLocation] = useState<{ id: LocationId | null; name: string } | null>(null);
   const chosenType = (trainingType as TrainingType | undefined) ?? null;
   if (!player) return null;
 
@@ -172,7 +181,19 @@ export default function ConfirmBookingScreen() {
           chosenType: asType,
         });
       }
-      setError(UNBOOKABLE_MESSAGE[outcome.reason] ?? 'This session is unavailable.');
+      if (outcome.reason === 'credit_wrong_location') {
+        const name = outcome.locationName ?? 'another location';
+        // `asType` is null only for an open block the server resolved itself; in
+        // that case say "credits" rather than inventing a type.
+        const kind = asType ? `${TRAINING_META[asType].label.toLowerCase()} credits` : 'credits';
+        setWrongLocation({ id: outcome.locationId ?? null, name });
+        setError(
+          `Your ${kind} are for ${name}. Credits can only be used at the location they were bought for.`,
+        );
+      } else {
+        setWrongLocation(null);
+        setError(UNBOOKABLE_MESSAGE[outcome.reason] ?? 'This session is unavailable.');
+      }
     } else {
       // Lost response after a possible success — never claim failure. The wallet /
       // sessions were just re-read; tell them to check, offer a safe retry.
@@ -311,6 +332,30 @@ export default function ConfirmBookingScreen() {
       {/* Runtime booking error (RPC rejection or an unconfirmed/lost response) */}
       {error ? <InfoCard variant="amber" icon="alert-circle-outline" text={error} /> : null}
 
+      {/* Two ways out, because "your credits are elsewhere" has two real answers:
+          go and use them there, or buy credits for the branch you're standing in.
+          Switching is offered only when the branch is still selectable — a closed
+          one would leave them staring at an empty feed. */}
+      {wrongLocation ? (
+        <View style={styles.wrongLocationActions}>
+          {wrongLocation.id && options.some((l) => l.id === wrongLocation.id) ? (
+            <Button
+              label={`Switch to ${wrongLocation.name}`}
+              variant="secondary"
+              onPress={() => {
+                select(wrongLocation.id as LocationId);
+                router.replace('/(tabs)/book');
+              }}
+            />
+          ) : null}
+          <Button
+            label="Buy credits for here"
+            variant="secondary"
+            onPress={() => router.push('/buy-credits')}
+          />
+        </View>
+      ) : null}
+
       {/* Cancellation policy */}
       <InfoCard
         variant="neutral"
@@ -322,6 +367,8 @@ export default function ConfirmBookingScreen() {
 }
 
 const styles = StyleSheet.create({
+  // Stacked, not side by side: both labels are sentences, not verbs.
+  wrongLocationActions: { gap: space.sm },
   content: { gap: space.lg },
   pad: { marginTop: space.lg },
   coachRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },

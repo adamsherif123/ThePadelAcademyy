@@ -1,13 +1,15 @@
-import { CREDIT_EXPIRY_DAYS, formatInstantDate } from '@tpa/core';
+import { CREDIT_EXPIRY_DAYS, formatInstantDate, groupBatchesByLocation, transferredFromName } from '@tpa/core';
 import { space } from '@tpa/theme';
-import type { CreditBatch, CreditRequest, Package } from '@tpa/types';
+import type { CreditBatch, CreditRequest, Location, Package } from '@tpa/types';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { packageById } from '../data/catalog';
-import { useBatches, useMyCreditRequests, usePackages, useTrialEligible } from '../data/queries';
+import { useBatches,
+  useLocations, useMyCreditRequests, usePackages, useTrialEligible } from '../data/queries';
 import { activeBatches, balanceByType, totalReadyToBook } from '../data/wallet';
 import { queryKeys } from '../lib/queryClient';
+
 import { useSession } from '../session/SessionProvider';
 import { useTheme } from '../theme/ThemeProvider';
 import {
@@ -45,8 +47,22 @@ function batchName(b: CreditBatch): string {
   return `${TRAINING_META[b.trainingType].label} ${b.quantityTotal}-Pack`;
 }
 
-function batchOrigin(b: CreditBatch): string {
+/**
+ * Where a batch came from, in one line.
+ *
+ * A transfer names the branch it was MOVED FROM (067): "Moved branch" on its own
+ * raises exactly the question it should answer, and the parent batch is the only
+ * place that answer lives.
+ */
+function batchOrigin(
+  b: CreditBatch,
+  allBatches: readonly CreditBatch[],
+  locations: readonly Location[],
+): string {
   const date = formatInstantDate(b.createdAt);
+  const movedFrom = transferredFromName(b, allBatches, locations);
+  if (movedFrom !== null) return `Moved from ${movedFrom} · ${date}`;
+  if (b.source === 'transfer') return `Moved here · ${date}`;
   return b.source === 'signup_grant' ? `Free at signup · ${date}` : `Purchased · ${date}`;
 }
 
@@ -55,6 +71,7 @@ export default function WalletScreen() {
   const { player, now } = useSession();
   const refreshControl = useRefreshControl(WALLET_KEYS);
   const batchesQ = useBatches();
+  const locationsQ = useLocations();
   const requestsQ = useMyCreditRequests();
   const packagesQ = usePackages();
   const trialEligibleQ = useTrialEligible();
@@ -74,6 +91,7 @@ export default function WalletScreen() {
   }
 
   const batches = batchesQ.data ?? [];
+  const locations = locationsQ.data ?? [];
   const total = totalReadyToBook(batches, now);
   const balance = balanceByType(batches, now);
   const active = activeBatches(batches, now);
@@ -145,9 +163,17 @@ export default function WalletScreen() {
           </Card>
         ) : (
           <>
-            <Text variant="label">Active batches</Text>
-            {active.map((b) => (
-              <BatchCard key={b.id} batch={b} now={now} />
+            {/* Grouped by branch, because a credit is only spendable where it was
+                bought (065) — a flat list of "4 left" cannot answer the only
+                question the wallet exists to answer. With one branch the heading
+                is still shown: it is the thing that makes the rule visible. */}
+            {groupBatchesByLocation(active, locations).map((group) => (
+              <View key={group.locationId} style={styles.walletGroup}>
+                <Text variant="label">{group.locationName}</Text>
+                {group.items.map((b) => (
+                  <BatchCard key={b.id} batch={b} now={now} allBatches={batches} locations={locations} />
+                ))}
+              </View>
             ))}
           </>
         )}
@@ -204,7 +230,18 @@ function RequestStatusCard({
 
 /** One ACTIVE batch — the only kind the wallet lists, so there is no
  *  expired/spent variant to render. */
-function BatchCard({ batch, now }: { batch: CreditBatch; now: CreditBatch['expiresAt'] }) {
+function BatchCard({
+  batch,
+  now,
+  allBatches,
+  locations,
+}: {
+  batch: CreditBatch;
+  now: CreditBatch['expiresAt'];
+  /** Every batch, so a transfer can name the branch its parent was at. */
+  allBatches: readonly CreditBatch[];
+  locations: readonly Location[];
+}) {
   const meta = TRAINING_META[batch.trainingType];
   const fraction = batch.quantityTotal === 0 ? 0 : batch.quantityRemaining / batch.quantityTotal;
 
@@ -221,7 +258,7 @@ function BatchCard({ batch, now }: { batch: CreditBatch; now: CreditBatch['expir
             {batchName(batch)}
           </Text>
           <Text variant="caption" tone="muted">
-            {batchOrigin(batch)}
+            {batchOrigin(batch, allBatches, locations)}
           </Text>
         </View>
         <View style={styles.fraction}>
@@ -244,6 +281,8 @@ function BatchCard({ batch, now }: { batch: CreditBatch; now: CreditBatch['expir
 }
 
 const styles = StyleSheet.create({
+  // A little air between branch groups so the headings read as sections.
+  walletGroup: { gap: space.sm },
   content: { gap: space.md },
   emptyCard: { gap: space.sm, alignItems: 'flex-start' },
   reqHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

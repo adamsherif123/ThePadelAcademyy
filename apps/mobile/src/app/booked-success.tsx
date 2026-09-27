@@ -11,7 +11,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { coachById, slotById } from '../data/booking';
-import { useBatches, useBookings, useCoaches, useSlots, combine } from '../data/queries';
+import { useBatches, useBookings, useCoaches, useSlotsByIds, combine } from '../data/queries';
 import { balanceByType } from '../data/wallet';
 import { resetToTab } from '../lib/nav';
 import { useSession } from '../session/SessionProvider';
@@ -32,12 +32,16 @@ import {
 /** 13 — Booked success. Shared SuccessView; every number computed from live data. */
 export default function BookedSuccessScreen() {
   const { player, now } = useSession();
-  const slotsQ = useSlots(now);
+  // BY ID, not the branch feed: this screen is reachable for a booking at any
+  // branch — from Sessions, or from a notification deep link — and a
+  // location-filtered feed would simply not contain that slot.
+  const { bookingId } = useLocalSearchParams<{ bookingId: string }>();
   const batchesQ = useBatches();
   const bookingsQ = useBookings();
   const coachesQ = useCoaches();
+  const bookedSlotId = (bookingsQ.data ?? []).find((b) => b.id === (bookingId as BookingId))?.slotId;
+  const slotsQ = useSlotsByIds(bookedSlotId ? [bookedSlotId] : []);
   const gate = combine(slotsQ, batchesQ, bookingsQ, coachesQ);
-  const { bookingId } = useLocalSearchParams<{ bookingId: string }>();
 
   if (gate.isPending) {
     return (

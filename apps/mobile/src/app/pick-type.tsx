@@ -8,6 +8,7 @@ import { StyleSheet, View } from 'react-native';
 import { coachById, slotById } from '../data/booking';
 import { useBatches, useCoaches, useSlots, combine } from '../data/queries';
 import { haptics } from '../lib/haptics';
+import { useLocation } from '../location/LocationProvider';
 import { useSession } from '../session/SessionProvider';
 import {
   Avatar,
@@ -57,7 +58,9 @@ function pickerSubtitle(trainingType: TrainingType): string {
 export default function PickTypeScreen() {
   const router = useRouter();
   const { player, now } = useSession();
-  const slotsQ = useSlots(now);
+  const { selectedId } = useLocation();
+  // Reached from the Book feed, so the slot is at the selected branch.
+  const slotsQ = useSlots(now, selectedId);
   const batchesQ = useBatches();
   const coachesQ = useCoaches();
   const gate = combine(slotsQ, batchesQ, coachesQ);
