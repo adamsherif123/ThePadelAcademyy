@@ -24,5 +24,8 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Typechecked by tsconfig.node.json instead — it needs node types, and app
+  // code must not have them.
+  "exclude": ["src/ui/cssModules.test.ts"]
 }

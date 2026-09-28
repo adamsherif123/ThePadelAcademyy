@@ -236,7 +236,7 @@ export function PlayerDetailModal({
                     of what a credit IS, so it should never be implied. */}
                 <div className={styles.walletGroupHead}>
                   <MapPin size={13} aria-hidden />
-                  <span>{group.locationName}</span>
+                  <span className={styles.walletGroupName}>{group.locationName}</span>
                   <span className={styles.walletGroupCount}>
                     {group.items.reduce((n, b) => n + b.quantityRemaining, 0)} left
                   </span>

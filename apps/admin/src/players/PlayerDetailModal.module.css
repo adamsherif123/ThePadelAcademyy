@@ -175,6 +175,45 @@
   gap: var(--space-sm);
 }
 
+/* The per-branch wallet group and its heading.
+   These three rules were referenced by PlayerDetailModal but never written, so
+   styles.walletGroup* resolved to undefined and the heading rendered as three
+   unstyled inline nodes at body size — "Oro Plaza Hotel1 left", with the pin
+   welded to the name and no space before the count. */
+.walletGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.walletGroupHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding-inline: 2px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+}
+/* The pin never shrinks, and the branch name yields before the count does: a
+   long name truncates here rather than pushing "N left" off the row. */
+.walletGroupHead > svg {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+.walletGroupName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Pushed to the far edge, where it reads as the total FOR the list beneath it
+   rather than as part of the branch's name. */
+.walletGroupCount {
+  margin-inline-start: auto;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-regular);
+}
+
 .value {
   display: flex;
   align-items: center;

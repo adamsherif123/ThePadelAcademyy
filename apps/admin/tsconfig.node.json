@@ -19,5 +19,7 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts"]
+  // cssModules.test.ts reads the filesystem, so it is typechecked HERE (node
+  // types) rather than by tsconfig.app.json, which has none on purpose.
+  "include": ["vite.config.ts", "src/ui/cssModules.test.ts"]
 }

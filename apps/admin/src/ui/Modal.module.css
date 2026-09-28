@@ -29,6 +29,16 @@
   border-block-end: 1px solid var(--color-border-subtle);
 }
 
+/* The eyebrow + title column, beside the close button. It was referenced by
+   Modal.tsx but never written; unstyled it happened to look right, because
+   .title carries its own top margin. The rule is still worth having: min-width
+   lets a long title wrap or ellipsise instead of pushing the close button out of
+   the header. */
+.heading {
+  flex: 1;
+  min-width: 0;
+}
+
 .eyebrow {
   color: var(--color-text-label);
   font-size: var(--font-size-caption);
