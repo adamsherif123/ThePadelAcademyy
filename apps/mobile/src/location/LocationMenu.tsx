@@ -30,7 +30,7 @@ const GUTTER = space.lg;
 /** The hairline of air between the trigger and the card, so they read as attached. */
 const OFFSET = 6;
 /** Enough per row to choose a side without measuring the card and costing a frame. */
-const ROW_HEIGHT = 54;
+const ROW_HEIGHT = 40;
 
 /**
  * A branch dropdown that falls out of the control you tapped.
@@ -127,7 +127,7 @@ export function LocationMenu({
         rowPressed: { backgroundColor: color.bg.canvas },
         // The name yields and the tick never does, so a long branch name
         // truncates rather than pushing the tick out of the card.
-        rowText: { flex: 1, gap: 1 },
+        rowName: { flex: 1 },
       }),
     [color],
   );
@@ -179,14 +179,18 @@ export function LocationMenu({
                 accessibilityRole="button"
                 accessibilityState={{ selected: isCurrent }}
               >
-                <View style={styles.rowText}>
-                  <Text variant="body" weight={isCurrent ? 'semibold' : 'regular'} numberOfLines={1}>
-                    {l.name}
-                  </Text>
-                  <Text variant="micro" tone="muted" numberOfLines={1}>
-                    {l.hoursText}
-                  </Text>
-                </View>
+                {/* The name, and nothing else. Opening hours were here and
+                    truncated to "5:00 PM – 11:…" at this width; they are also
+                    not what you are choosing on — the branch is. The selected
+                    branch's hours are on Home's academy card, in full. */}
+                <Text
+                  variant="body"
+                  weight={isCurrent ? 'semibold' : 'regular'}
+                  style={styles.rowName}
+                  numberOfLines={1}
+                >
+                  {l.name}
+                </Text>
                 {isCurrent ? <Ionicons name="checkmark" size={18} color={color.accent.default} /> : null}
               </Pressable>
             );
