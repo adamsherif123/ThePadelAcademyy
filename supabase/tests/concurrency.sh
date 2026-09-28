@@ -153,15 +153,6 @@ racer_transfer() { # $1=admin_uuid $2=batch $3=to_location $4=qty $5=target_iso 
     > "$6" 2>&1 &
 }
 
-# A racer that SETTLES a Paymob purchase. settle_purchase is service_role-only,
-# so this one runs as the superuser the webhook's service client stands in for.
-racer_settle() { # $1=purchase $2=txn $3=target_iso $4=outfile
-  "${PSQL[@]}" \
-    -c "select pg_sleep(greatest(0, extract(epoch from (timestamptz '$3' - clock_timestamp()))))" \
-    -c "with r as (select public.settle_purchase('$1','$2') j) select case when (j->>'refund_required')='true' then 'REFUND' when (j->>'ok')='true' then 'MINTED' else coalesce(j->>'reason','?') end from r" \
-    > "$4" 2>&1 &
-}
-
 cleanup_rows() {
   # book_slot mints bookings with 'bk_<uuid>' ids, so delete bookings by their
   # slot/player, not by an id prefix (FK-safe order: bookings → batches → slots → players → coaches).
@@ -898,96 +889,6 @@ check "S: never over-subtracted — every source batch still has 1 left"        
 check "S: exactly one child batch per source"                                 "$(sql "select count(*) from public.credit_batches where transferred_from like 'cbr_s%'")" "$S_K"
 check "S: credits conserved — 3 per player across source and child"           "$(sql "select count(*) from (select player_id, sum(quantity_remaining) tot from public.credit_batches where player_id like 'plr_s%' group by player_id) t where tot <> 3")" "0"
 check "S: zero deadlocks"                                                     "$(cat "$TMP"/s1_*.txt "$TMP"/s2_*.txt 2>/dev/null | grep -ci deadlock | tr -d ' ')" "0"
-
-# ── Scenario T: two TRIAL purchases settled simultaneously ──────────────────
-# 066 stops a second trial checkout being OPENED once the trial is used, but two
-# can be opened before either is paid. Both then settle together. Exactly one
-# mints; the other must be recorded as refund_required rather than raising 23505
-# out of the webhook (which is what happened before 067 — money taken, purchase
-# left pending, nothing but a log line).
-echo "Scenario T — two trial purchases settled simultaneously (K=20):"
-T_K=20
-TSETUP="insert into public.locations (id,name,address,maps_url,hours_text,sort_order,is_active,is_default) values ('loc_qa_t','QA T','x','https://a.b','h',13,true,false);
-insert into public.packages (id,training_type,session_count,price,name,is_active,location_id) values
-  ('pkr_t_def','trial',1,5000,'Trial Oro',true,'loc_oro_plaza'),
-  ('pkr_t_qa','trial',1,5000,'Trial QA',true,'loc_qa_t');
-insert into auth.users (id) values ('$(uuid 4199)');
-insert into public.players (id,phone,name,gender,level,created_at,auth_user_id,is_owner) values ('plr_towner','+20100towner','Owner','men','beginner',now(),'$(uuid 4199)',true);"
-for k in $(seq 1 $T_K); do
-  TSETUP+="insert into auth.users (id) values ('$(uuid $((4200+k)))');"
-  TSETUP+="insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_t$k','+20100t$k','T','men','beginner',now(),'$(uuid $((4200+k)))');"
-  TSETUP+="insert into public.purchases (id,player_id,package_id,status,amount,created_at,payment_method,paid) values ('pur_t${k}a','plr_t$k','pkr_t_def','pending',5000,now(),'paymob',false),('pur_t${k}b','plr_t$k','pkr_t_qa','pending',5000,now(),'paymob',false);"
-done
-sql "$TSETUP" >/dev/null
-
-T=$(target 4)
-for k in $(seq 1 $T_K); do
-  racer_settle "pur_t${k}a" "txr_t${k}a" "$T" "$TMP/ta_$k.txt"
-  racer_settle "pur_t${k}b" "txr_t${k}b" "$T" "$TMP/tb_$k.txt"
-done
-wait
-
-T_MINTED=$(grep -lFx MINTED "$TMP"/ta_*.txt "$TMP"/tb_*.txt 2>/dev/null | wc -l | tr -d ' ')
-T_REFUND=$(grep -lFx REFUND "$TMP"/ta_*.txt "$TMP"/tb_*.txt 2>/dev/null | wc -l | tr -d ' ')
-T_RAISED=$(cat "$TMP"/ta_*.txt "$TMP"/tb_*.txt 2>/dev/null | grep -ci "ERROR\|duplicate key" | tr -d ' ')
-check "T: exactly one settle per player MINTED the trial"                     "$T_MINTED" "$T_K"
-check "T: and the other was recorded refund_required — it RAN"                "$T_REFUND" "$T_K"
-check "T: zero raised errors — the webhook never sees an exception"           "$T_RAISED" "0"
-check "T: exactly one trial batch per player"                                 "$(sql "select count(*) from public.credit_batches where player_id like 'plr_t%' and training_type='trial'")" "$T_K"
-check "T: every captured payment is recorded paid — none left pending"        "$(sql "select count(*) from public.purchases where id like 'pur_t%' and status = 'pending'")" "0"
-# 068: the state is 'failed' + paid + refund_required_at, NOT a fourth status —
-# the 1.2/1.3 builds index STATUS_META with no fallback and can never be updated.
-# All three parts are asserted, because any one of them alone would let the state
-# be mistaken for an ordinary decline.
-check "T: the stranded rows are status=failed (a value 1.2/1.3 can render)"   "$(sql "select count(*) from public.purchases where id like 'pur_t%' and status='failed'")" "$T_K"
-check "T: ... and paid=true, because the card really was charged"            "$(sql "select count(*) from public.purchases where id like 'pur_t%' and status='failed' and paid")" "$T_K"
-check "T: ... and refund_required_at is set, which is what the owner works from" "$(sql "select count(*) from public.purchases where id like 'pur_t%' and refund_required_at is not null")" "$T_K"
-check "T: none of them is marked refunded yet"                               "$(sql "select count(*) from public.purchases where id like 'pur_t%' and refunded_at is not null")" "0"
-check "T: no status outside the three the legacy apps know"                  "$(sql "select count(*) from public.purchases where id like 'pur_t%' and status not in ('pending','succeeded','failed')")" "0"
-# One owner is seeded above, so one notification per stranded payment.
-# 068: owner_credit_request, not 067's owner_refund_required — the legacy apps
-# have no icon or deep link for the latter.
-check "T: the owners were told once per stranded payment"                     "$(sql "select count(*) from public.notifications where type='owner_credit_request' and title='Refund required'")" "$T_K"
-
-# ── Scenario U: mark_purchase_refunded racing ITSELF ───────────────────────
-# Two owners clicking "refunded" on the same row at the same moment. Exactly one
-# may record it; the other must be told it is already done rather than silently
-# overwriting the timestamp (which would lose when the money actually went back).
-echo "Scenario U — two admins marking the SAME purchase refunded (K=$T_K):"
-racer_refund() { # $1=admin_uuid $2=purchase $3=target $4=out
-  "${PSQL[@]}" -c "set role authenticated" \
-    -c "select set_config('request.jwt.claims','{\"sub\":\"$1\",\"role\":\"authenticated\"}',false)" \
-    -c "select pg_sleep(greatest(0, extract(epoch from (timestamptz '$3' - clock_timestamp()))))" \
-    -c "with r as (select public.mark_purchase_refunded('$2','race note') j) select case when (j->>'ok')='true' then 'WIN' else coalesce(j->>'reason','?') end from r" > "$4" 2>&1 &
-}
-USETUP="insert into auth.users (id) values ('$(uuid 4500)');
-insert into public.players (id,phone,name,gender,level,created_at,auth_user_id) values ('plr_uadm','+20100uadm','Adm','men','beginner',now(),'$(uuid 4500)');
-insert into public.admins (id,auth_user_id,display_name,created_at) values ('adr_u','$(uuid 4500)','Adm',now());"
-sql "$USETUP" >/dev/null
-UBEFORE=$(sql "select count(*) from public.notifications where title='Refund recorded'")
-
-# WHICH of the two purchases got stranded is decided by T's race, not by us, so
-# the targets are read back rather than assumed.
-U_IDS=$(sql "select id from public.purchases where id like 'pur_t%' and refund_required_at is not null order by id")
-U_N=$(printf '%s\n' "$U_IDS" | grep -c . | tr -d ' ')
-T=$(target 4)
-ui=0
-for pid in $U_IDS; do
-  ui=$((ui+1))
-  racer_refund "$(uuid 4500)" "$pid" "$T" "$TMP/u1_$ui.txt"
-  racer_refund "$(uuid 4500)" "$pid" "$T" "$TMP/u2_$ui.txt"
-done
-wait
-
-U_WIN=$(grep -lFx WIN "$TMP"/u1_*.txt "$TMP"/u2_*.txt 2>/dev/null | wc -l | tr -d ' ')
-U_DUP=$(cat "$TMP"/u1_*.txt "$TMP"/u2_*.txt 2>/dev/null | grep -cFx already_refunded | tr -d ' ')
-check "U: precondition — one stranded purchase per player to refund"          "$U_N" "$T_K"
-check "U: exactly one of the two records the refund"                          "$U_WIN" "$U_N"
-check "U: and the other is told already_refunded — it RAN"                    "$U_DUP" "$U_N"
-check "U: refunded_at is set exactly once per purchase"                       "$(sql "select count(*) from public.purchases where id like 'pur_t%' and refunded_at is not null")" "$U_N"
-check "U: a refund is only ever recorded against a refund-required row"       "$(sql "select count(*) from public.purchases where refunded_at is not null and refund_required_at is null")" "0"
-check "U: one owner notification per refund, never two"                       "$(($(sql "select count(*) from public.notifications where title='Refund recorded'") - UBEFORE))" "$U_N"
-check "U: zero deadlocks"                                                     "$(cat "$TMP"/u1_*.txt "$TMP"/u2_*.txt 2>/dev/null | grep -ci deadlock | tr -d ' ')" "0"
 
 # ── teardown ─────────────────────────────────────────────────────────────────
 cleanup_rows

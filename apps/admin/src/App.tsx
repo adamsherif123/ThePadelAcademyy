@@ -4,7 +4,6 @@ import { Bookings } from './pages/Bookings';
 import { Coaches } from './pages/Coaches';
 import { Locations } from './pages/Locations';
 import { CreditRequests } from './pages/CreditRequests';
-import { Refunds } from './pages/Refunds';
 import { Dashboard } from './pages/Dashboard';
 import { Gallery } from './pages/Gallery';
 import { Login } from './pages/Login';
@@ -53,7 +52,6 @@ export function App() {
         <Route path="/bookings" element={<Bookings />} />
         <Route path="/players" element={<Players />} />
         <Route path="/credit-requests" element={<CreditRequests />} />
-        <Route path="/refunds" element={<Refunds />} />
         <Route path="/packages" element={<Packages />} />
         <Route path="/gallery" element={<Gallery />} />
         <Route path="/news" element={<News />} />

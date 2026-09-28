@@ -4,7 +4,7 @@
 -- Run with: supabase test db
 -- ============================================================================
 begin;
-select plan(51);
+select plan(41);
 
 insert into auth.users (id) values
   ('0a7a7a01-0000-0000-0000-0000000a7a01'),   -- admin
@@ -188,54 +188,29 @@ select is(tpa.trial_used('pl_ct_p1'), false,
   'and moving it does not invent a used trial (source=transfer is not source=purchase)');
 
 -- ════════════════════════════════════════════════════════════════════════════
--- PART B — the trial settle race, sequentially
+-- PART B — the 066 trial-CHECKOUT policy, which 071 kept
 -- ════════════════════════════════════════════════════════════════════════════
--- Two trial checkouts can both be OPENED before either is paid: 066's policy can
--- only see the state at insert time. Concurrency T covers them settling at the
--- same instant; this covers them settling one after the other, which is the same
--- unique violation arriving by a different route.
+-- What used to be here was the trial SETTLE race: two trial checkouts opened
+-- before either was paid, both settling, the second parked as refund-required.
+-- 071 removed that feature with the Paymob integration it existed for, so what
+-- remains to prove is the guard that still runs — 066's policy refusing a second
+-- trial checkout once the player already holds a purchased trial.
+insert into public.purchases (id, player_id, package_id, status, amount, created_at, payment_method, paid)
+  values ('pu_ct_used', 'pl_ct_p1', 'pk_ct_t_def', 'succeeded', 5000, now(), 'cash', true);
+insert into public.credit_batches (id, player_id, source, purchase_id, training_type, quantity_total, quantity_remaining, expires_at, created_at, location_id)
+  values ('cb_ct_used', 'pl_ct_p1', 'purchase', 'pu_ct_used', 'trial', 1, 1, now() + interval '30 days', now(), 'loc_oro_plaza');
+
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"0a7a7a02-0000-0000-0000-0000000a7a02"}', true);
 select set_config('request.headers', '{"x-tpa-client":"mobile/1.4.0"}', true);
-select lives_ok(
+select throws_ok(
   $$ insert into public.purchases (id, player_id, package_id, status, amount, created_at, payment_method, paid)
-     values ('pu_ct_a', 'pl_ct_p1', 'pk_ct_t_def', 'pending', 5000, now(), 'paymob', false) $$,
-  'checkout A for the Oro trial opens');
-select lives_ok(
-  $$ insert into public.purchases (id, player_id, package_id, status, amount, created_at, payment_method, paid)
-     values ('pu_ct_b', 'pl_ct_p1', 'pk_ct_t_b', 'pending', 5000, now(), 'paymob', false) $$,
-  'and checkout B for the QA trial opens too — neither is paid yet, so 066 sees nothing wrong');
+     values ('pu_ct_second', 'pl_ct_p1', 'pk_ct_t_b', 'pending', 5000, now(), 'paymob', false) $$,
+  '42501', null,
+  '066 still refuses a SECOND trial checkout once one is purchased — at another branch too');
 reset role;
-
-select is(public.settle_purchase('pu_ct_a', 'tx_ct_a')->>'credit_batch_id' is not null, true,
-  'the first settle mints the trial');
-select lives_ok(
-  $$ select public.settle_purchase('pu_ct_b', 'tx_ct_b') $$,
-  'the second settle does NOT raise — before 067 this threw 23505 out of the webhook');
--- A Paymob redelivery of the SAME callback must not notify the owners twice.
--- The row is no longer pending, so the guarded update refuses it the same way it
--- refuses a redelivered success.
-select is(public.settle_purchase('pu_ct_b', 'tx_ct_b')->>'reason', 'not_pending',
-  'a redelivery of that callback is refused cleanly, not settled again');
-select is((select count(*)::int from public.notifications
-            where type = 'owner_credit_request' and title = 'Refund required'), 1,
-  'so the owners are told exactly once, however many times Paymob re-delivers');
--- 068: 'failed' + paid + refund_required_at, not a fourth status.
-select is((select status from public.purchases where id = 'pu_ct_b'), 'failed',
-  'the stranded purchase is parked as failed — a status 1.2/1.3 can render');
-select isnt((select refund_required_at from public.purchases where id = 'pu_ct_b'), null,
-  'with refund_required_at set, which is what makes it a held payment and not a decline');
-select is((select paid from public.purchases where id = 'pu_ct_b'), true,
-  'marked PAID, because Paymob really did take the money');
-select is((select count(*)::int from public.credit_batches
-            where player_id = 'pl_ct_p1' and training_type = 'trial' and source = 'purchase'), 1,
-  'and the player still holds exactly one purchased trial');
-select isnt((select count(*)::int from public.notifications
-              where type = 'owner_credit_request' and title = 'Refund required'), 0,
-  'the owners were told, with the amount, so they can refund it in Paymob');
-select is((select count(*)::int from public.purchases
-            where refund_required_at is not null and refunded_at is null), 1,
-  'and the queue is queryable as refund_required_at is not null and refunded_at is null');
+select is(tpa.trial_used('pl_ct_p1'), true,
+  'and trial_used agrees, which is what that policy reads');
 
 select * from finish();
 rollback;

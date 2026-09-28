@@ -17,7 +17,6 @@ import type {
   CreditBatch,
   CreditRequest,
   Gender,
-  IsoInstant,
   Level,
   Location,
   LocationId,
@@ -28,7 +27,6 @@ import type {
   Player,
   PlayerId,
   Purchase,
-  PurchaseId,
   SessionSlot,
   SlotId,
   TrainingType,
@@ -596,66 +594,6 @@ export async function transferCreditBatchRpc(
     ? { ok: true, creditBatchId: d.credit_batch_id as string, fromLocationId: d.from_location_id as LocationId,
         toLocationId: d.to_location_id as LocationId, quantity: d.quantity as number }
     : { ok: false, reason: d.reason as TransferReason, remaining: d.remaining as number | undefined };
-}
-
-// ── the refund queue (068) ───────────────────────────────────────────────────
-export type MarkRefundedReason =
-  | 'not_admin' | 'reason_required' | 'purchase_missing' | 'not_refund_required' | 'already_refunded';
-export type MarkRefundedResult =
-  | { ok: true; refundedAt: IsoInstant }
-  | { ok: false; reason: MarkRefundedReason };
-export async function markPurchaseRefundedRpc(purchaseId: PurchaseId, note: string): Promise<MarkRefundedResult> {
-  const d = await callRpc('mark_purchase_refunded', { p_purchase_id: purchaseId, p_note: note });
-  return d.ok
-    ? { ok: true, refundedAt: d.refunded_at as IsoInstant }
-    : { ok: false, reason: d.reason as MarkRefundedReason };
-}
-
-export interface RefundRow {
-  purchase: Purchase;
-  player: Player | undefined;
-  pkg: Package | undefined;
-}
-
-/**
- * Money the gateway captured that could not be turned into credits (068). Bounded
- * and embedded in one round trip, like every other list on this app.
- *
- * `refunded` picks the side: the outstanding queue (owed back, newest first) or
- * the recently-settled tail. Both are driven by refunded_at, never by status —
- * the row is `failed` either way, because that is the only vocabulary the
- * un-updatable 1.2/1.3 builds have.
- */
-export async function fetchRefunds(refunded: boolean, limit = 25): Promise<RefundRow[]> {
-  // Built as two whole chains rather than one reassigned builder: reassigning a
-  // PostgREST builder across a ternary makes TS widen the generic on every step
-  // and it trips "type instantiation is excessively deep".
-  const base = supabase.from('purchases').select('*, players(*), packages(*)').not('refund_required_at', 'is', null);
-  const { data, error } = refunded
-    ? await base.not('refunded_at', 'is', null).order('refunded_at', { ascending: false }).limit(limit)
-    : await base.is('refunded_at', null).order('refund_required_at', { ascending: false }).limit(limit);
-  if (error) throw new ApiError(`Failed to load refunds: ${error.message}`, error.code, error);
-  return (data ?? []).map((r) => {
-    const row = r as Record<string, unknown>;
-    const playerRow = row.players as Record<string, unknown> | null;
-    const pkgRow = row.packages as Record<string, unknown> | null;
-    return {
-      purchase: rowToPurchase(row),
-      player: playerRow ? rowToPlayer(playerRow) : undefined,
-      pkg: pkgRow ? rowToPackage(pkgRow) : undefined,
-    };
-  });
-}
-
-/** The sidebar badge — head:true, no rows, the same shape as the pending-requests count. */
-export async function fetchRefundPendingCount(): Promise<number> {
-  const { count, error } = await supabase
-    .from('purchases')
-    .select('id', { count: 'exact', head: true })
-    .not('refund_required_at', 'is', null)
-    .is('refunded_at', null);
-  if (error) throw new ApiError(`Failed to count refunds: ${error.message}`, error.code, error);
-  return count ?? 0;
 }
 
 export type SetPlayerCoachReason = 'not_admin' | 'player_missing' | 'coach_missing' | 'coach_taken';

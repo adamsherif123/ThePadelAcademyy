@@ -19,8 +19,9 @@ export type Gender = 'men' | 'ladies';
 /**
  * Three values, and it must STAY three: the 1.2 and 1.3 apps index a
  * Record<PurchaseStatus, …> with no fallback (purchase-history.tsx:113) and can
- * never be updated, so a fourth status crashes their Purchase History. Money
- * captured but undeliverable is 'failed' + `paid` + `refundRequiredAt` (068).
+ * never be updated, so a fourth status crashes their Purchase History. 067 added
+ * a fourth ('refund_required') and 068 had to take it back out for exactly that
+ * reason; 071 removed the feature that wanted it.
  */
 export type PurchaseStatus = 'pending' | 'succeeded' | 'failed';
 

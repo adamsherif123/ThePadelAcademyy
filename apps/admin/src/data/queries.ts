@@ -22,7 +22,6 @@ import type {
   CreditRequestStatusCounts,
   PlayersPageParams,
   PlayersPageResult,
-  RefundRow,
 } from '../lib/api';
 import {
   ApiError,
@@ -41,8 +40,6 @@ import {
   fetchPackages,
   fetchPlayers,
   fetchPurchases,
-  fetchRefundPendingCount,
-  fetchRefunds,
   fetchSlots,
   fetchTemplates,
 } from '../lib/api';
@@ -178,11 +175,6 @@ export const useBookingStatusCounts = (locationId: LocationId | 'all'): Resource
     }),
   );
 
-/** The refund queue (068) and the sidebar badge that counts it. */
-export const useRefunds = (refunded: boolean): Resource<RefundRow[]> =>
-  toResource(useQuery({ queryKey: [...queryKeys.refundQueue, refunded], queryFn: () => fetchRefunds(refunded) }));
-export const useRefundPendingCount = (): Resource<number> =>
-  toResource(useQuery({ queryKey: queryKeys.refundPendingCount, queryFn: fetchRefundPendingCount }));
 
 /** Collapse several resources into one loading / error / retry gate for a page. */
 export function combine(...rs: Resource<unknown>[]): { isPending: boolean; isError: boolean; refetch: () => void } {

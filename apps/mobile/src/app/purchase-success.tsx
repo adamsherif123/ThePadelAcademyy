@@ -64,9 +64,6 @@ export default function PurchaseSuccessScreen() {
   });
   const settled = purchaseQ.data?.status === 'succeeded';
   const declined = knownDeclined || purchaseQ.data?.status === 'failed';
-  // 068: a 'failed' row that carries refundRequiredAt is captured money, not a
-  // decline. Polling already stops on 'failed', so this resolves on the same tick.
-  const refundRequired = (purchaseQ.data?.refundRequiredAt ?? null) !== null;
 
   // The webhook settled → the batch exists. Refresh the wallet + purchase history.
   useEffect(() => {
@@ -94,33 +91,6 @@ export default function PurchaseSuccessScreen() {
     }, 1000);
     return () => clearInterval(t);
   }, [settled, declined, timedOut, deadline]);
-
-  // ── captured, but undeliverable: the ONE case where "you were not charged" is
-  // a lie. 068 stores it as status 'failed' + paid + refundRequiredAt, so it
-  // arrives here as `declined`; this branch must come FIRST and tell the truth.
-  // (The 1.2/1.3 builds cannot make this distinction and will say "not charged"
-  // — which is exactly why the owners get an alert to refund by hand.)
-  if (refundRequired) {
-    return (
-      <Screen>
-        <SuccessView
-          tone="accent"
-          icon="arrow-undo-outline"
-          eyebrow="Refund on the way"
-          title="We couldn't add these credits"
-          primary={{ label: 'Done', onPress: () => resetToTab('/(tabs)') }}
-        >
-          <Card>
-            <Text variant="body" tone="secondary">
-              Your card was charged, but these credits couldn&apos;t be added — your free trial
-              has already been used. We&apos;ve been notified and will refund you. Nothing else
-              is needed from you.
-            </Text>
-          </Card>
-        </SuccessView>
-      </Screen>
-    );
-  }
 
   // ── declined: honest, non-alarming — no credits, no charge (a decline never captures) ──
   if (declined) {

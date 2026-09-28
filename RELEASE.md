@@ -77,6 +77,27 @@ has the full history.
 
 Always `cat supabase/.temp/project-ref` before any Supabase CLI command.
 
+## The refund feature, removed
+
+`067` and `068` built a refund queue: money a card gateway had captured that could
+not be turned into credits, an RPC to mark it repaid, an admin page, and two owner
+alerts. `071` removes all of it.
+
+It could never fire. There is no Paymob integration in this release, and every
+other route to credits — a credit request an admin approves, an admin grant, a
+recorded cash purchase — takes the money and issues the credits in one action, so
+there is no state where the academy holds money it owes back.
+
+`071` restores `settle_purchase`, `fail_purchase` and `set_purchase_paid` to their
+pre-`067` definitions byte-for-byte, drops `mark_purchase_refunded` and the two
+`purchases` columns, and refuses to run if any row actually carries one. Credit
+transfers (`067`), the transfer notification on `credits_granted` (`068`) and the
+`066` trial-checkout policy are untouched and asserted so.
+
+Note for the release session: `067` and `068` still have to be applied to
+production in order, and `071` then takes the refund parts back out. Nothing is
+edited retroactively — the columns exist for three migrations and then do not.
+
 ## The release session
 
 One session, in this order:

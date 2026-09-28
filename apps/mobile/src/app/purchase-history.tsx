@@ -31,16 +31,12 @@ const STATUS_META: Record<PurchaseStatus, { label: string; tone: BadgeTone }> = 
 };
 
 /**
- * The badge, which is NOT just the status. A purchase the gateway captured but
- * that could not be turned into credits is stored as `failed` + `paid` +
- * `refundRequiredAt` (068) — 'failed' because the 1.2/1.3 builds can only render
- * three statuses and can never be updated. This build knows better, so it says
- * what is actually happening rather than "Failed": nothing went wrong for the
- * player and the money is coming back.
+ * The badge is the status, and only the status. 068 gave it two extra outcomes
+ * for money the gateway had captured but could not turn into credits; 071
+ * removed that feature with the gateway it belonged to, so there are three
+ * statuses again and nothing to interpret.
  */
 function badgeFor(p: Purchase): { label: string; tone: BadgeTone } {
-  if (p.refundedAt !== null) return { label: 'Refunded', tone: 'neutral' };
-  if (p.refundRequiredAt !== null) return { label: 'Refund on the way', tone: 'warning' };
   return STATUS_META[p.status];
 }
 

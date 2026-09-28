@@ -271,17 +271,18 @@ describe('atLocation', () => {
   });
 
   // The property that matters most: revenue is computed from the FILTERED list,
-  // and a refund-required purchase (068: status 'failed' + paid) is excluded by
-  // revenueThisMonth's own succeeded-AND-paid rule at every branch.
-  it('cannot smuggle a refund-required payment into a branch’s revenue', () => {
-    const refundRequired = {
+  // and revenueThisMonth's succeeded-AND-paid rule keeps a failed-but-paid row out
+  // at every branch. 068 created such rows for captured-but-undeliverable money;
+  // 071 removed that feature, but `paid` can still be true on a failed row and the
+  // rule that excludes it is the one being asserted.
+  it('cannot smuggle a failed-but-paid payment into a branch’s revenue', () => {
+    const failedButPaid = {
       ...mockPurchases[0]!,
       status: 'failed' as const,
       paid: true,
-      refundRequiredAt: MOCK_NOW,
       locationId: 'loc_a' as LocationId,
     };
-    const scoped = atLocation([refundRequired], 'loc_a' as LocationId);
+    const scoped = atLocation([failedButPaid], 'loc_a' as LocationId);
     expect(revenueThisMonth(scoped, MOCK_NOW).current).toBe(0);
   });
 });

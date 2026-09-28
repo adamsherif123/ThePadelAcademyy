@@ -10,13 +10,12 @@ import {
   Users,
   Wallet,
   type LucideIcon,
-  Undo2,
 } from 'lucide-react';
 import { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 
 import { ALL_LOCATIONS } from '../data/locations';
-import { useCreditRequestStatusCounts, useRefundPendingCount } from '../data/queries';
+import { useCreditRequestStatusCounts } from '../data/queries';
 import { queryClient, queryKeys } from '../lib/queryClient';
 import { supabase } from '../lib/supabase';
 import { useSession } from '../session/SessionProvider';
@@ -32,7 +31,6 @@ const NAV: readonly { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/bookings', label: 'Bookings', icon: ClipboardList },
   { to: '/players', label: 'Players', icon: Users },
   { to: '/credit-requests', label: 'Credit requests', icon: Wallet },
-  { to: '/refunds', label: 'Refunds', icon: Undo2 },
   { to: '/packages', label: 'Packages', icon: Package },
   { to: '/news', label: 'News', icon: Newspaper },
 ];
@@ -57,9 +55,6 @@ export function Sidebar({ open = false, onNavigate }: { open?: boolean; onNaviga
   // academy, so it must not inherit whatever branch filter a page happens to be on.
   const countsQ = useCreditRequestStatusCounts(ALL_LOCATIONS);
   const pendingCount = countsQ.data?.pending ?? 0;
-  // The same shape for refunds (068): money captured that has not been given back.
-  const refundsQ = useRefundPendingCount();
-  const refundCount = refundsQ.data ?? 0;
 
   // Live: any insert/update on credit_requests (a player submits one, or another admin
   // resolves one) refreshes the query cache with no manual reload. Mounted once here,
@@ -78,14 +73,6 @@ export function Sidebar({ open = false, onNavigate }: { open?: boolean; onNaviga
         void queryClient.invalidateQueries({ queryKey: queryKeys.creditRequests });
         void queryClient.invalidateQueries({ queryKey: queryKeys.creditRequestsPage });
         void queryClient.invalidateQueries({ queryKey: queryKeys.creditRequestStatusCounts });
-      })
-      // A refund-required row is written by settle_purchase, which runs from the
-      // Paymob webhook — no admin action produces it, so without a subscription
-      // the badge would only appear on a manual reload. Same channel, since both
-      // are "something arrived that needs you".
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchases' }, () => {
-        void queryClient.invalidateQueries({ queryKey: queryKeys.refundQueue });
-        void queryClient.invalidateQueries({ queryKey: queryKeys.refundPendingCount });
       })
       .subscribe();
     return () => {
@@ -109,11 +96,6 @@ export function Sidebar({ open = false, onNavigate }: { open?: boolean; onNaviga
           >
             <Icon size={20} aria-hidden />
             {label}
-            {to === '/refunds' && refundCount > 0 ? (
-              <span className={styles.navBadge} aria-label={`${refundCount} refunds to process`}>
-                {refundCount > 99 ? '99+' : refundCount}
-              </span>
-            ) : null}
             {to === '/credit-requests' && pendingCount > 0 ? (
               <span className={styles.navBadge} aria-label={`${pendingCount} pending credit requests`}>
                 {pendingCount > 99 ? '99+' : pendingCount}
