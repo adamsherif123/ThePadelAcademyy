@@ -1,18 +1,7 @@
 import type { IsoInstant, Piastres } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
-import {
-  formatCompactEgp,
-  formatDayMonth,
-  formatExpiry,
-  formatHour,
-  formatInstantDate,
-  formatInstantTime,
-  formatMonthDay,
-  formatPiastres,
-  formatRelativeTime,
-  formatSessionTimeRange,
-} from './format';
+import { formatCompactEgp, formatDayMonth, formatExpiry, formatHour, formatInstantDate, formatInstantTime, formatMonthDay, formatPiastres, formatRelativeTime, formatSessionTimeRange, sessionCountLabel } from './format';
 
 const egp = (n: number) => (n * 100) as Piastres;
 
@@ -113,5 +102,24 @@ describe('formatRelativeTime', () => {
   });
   it('a future instant (clock skew) reads "just now", never negative', () => {
     expect(formatRelativeTime('2026-07-14T12:05:00.000Z' as IsoInstant, now)).toBe('just now');
+  });
+});
+
+describe('sessionCountLabel', () => {
+  // The bug it exists for: a trial is one session, and both the package detail
+  // and the request flow built this string by hand and rendered "1 Trial sessions".
+  it('is singular for one', () => {
+    expect(sessionCountLabel(1, 'Trial')).toBe('1 Trial session');
+  });
+
+  it('is plural for everything else', () => {
+    expect(sessionCountLabel(4, 'Group')).toBe('4 Group sessions');
+    expect(sessionCountLabel(8, 'Individual')).toBe('8 Individual sessions');
+  });
+
+  // Zero is plural in English, and a zero-session package should never exist —
+  // but if one did, "0 Group session" would read as a bug on top of a bug.
+  it('is plural for zero', () => {
+    expect(sessionCountLabel(0, 'Group')).toBe('0 Group sessions');
   });
 });

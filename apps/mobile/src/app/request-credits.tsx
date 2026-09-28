@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { sessionCountLabel } from '@tpa/core';
 import { radius, space } from '@tpa/theme';
 import type { LocationId, PackageId } from '@tpa/types';
 import * as Clipboard from 'expo-clipboard';
@@ -360,7 +361,7 @@ export default function RequestCreditsScreen() {
       <Card variant="inverse">
         <PillOnNavy label={meta.label} icon={meta.icon} />
         <Text variant="h2" tone="inverse" style={styles.gap}>
-          {`${pkg.sessionCount} ${meta.label} sessions`}
+          {sessionCountLabel(pkg.sessionCount, meta.label)}
         </Text>
         <View style={styles.priceRow}>
           <Money amount={pkg.price} tone="inverse" variant="h1" />

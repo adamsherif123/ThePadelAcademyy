@@ -66,6 +66,7 @@ export {
 
 export {
   formatCompactEgp,
+  sessionCountLabel,
   formatDayMonth,
   formatExpiry,
   formatHour,

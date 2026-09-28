@@ -175,3 +175,15 @@ export function formatRelativeTime(instant: IsoInstant, now: IsoInstant): string
   if (days < 7) return `${days}d ago`;
   return formatInstantDate(instant);
 }
+
+/**
+ * "4 Group sessions" / "1 Trial session".
+ *
+ * A trial is one session, and every screen that built this string by hand wrote
+ * "1 Trial sessions". It is here rather than in each screen because the same
+ * sentence appears on the package detail and in the request flow, and they were
+ * wrong in the same way.
+ */
+export function sessionCountLabel(count: number, typeLabel: string): string {
+  return `${count} ${typeLabel} session${count === 1 ? '' : 's'}`;
+}

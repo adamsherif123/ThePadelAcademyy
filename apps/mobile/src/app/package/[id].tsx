@@ -1,4 +1,4 @@
-import { CREDIT_EXPIRY_DAYS, formatPiastres } from '@tpa/core';
+import { CREDIT_EXPIRY_DAYS, formatPiastres, sessionCountLabel } from '@tpa/core';
 import { space } from '@tpa/theme';
 import type { PackageId, Piastres } from '@tpa/types';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -108,7 +108,7 @@ export default function PackageDetailScreen() {
         <Card variant="inverse">
           <PillOnNavy label={meta.label} icon={meta.icon} />
           <Text variant="display" tone="inverse" style={styles.title}>
-            {`${pkg.sessionCount} ${meta.label} sessions`}
+            {sessionCountLabel(pkg.sessionCount, meta.label)}
           </Text>
           <Text variant="caption" tone="inverse">
             {PLAYER_COUNT[pkg.trainingType]}
