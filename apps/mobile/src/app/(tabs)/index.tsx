@@ -1,5 +1,6 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { formatExpiry, formatInstantDate, formatInstantTime } from '@tpa/core';
-import { space } from '@tpa/theme';
+import { letterSpacing, space } from '@tpa/theme';
 import type { CreditBatchId } from '@tpa/types';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -20,7 +21,7 @@ import { useLocation } from '../../location/LocationProvider';
 import { LocationToggle } from '../../location/LocationToggle';
 import { placeFor } from '../../location/slotLocation';
 import { queryKeys } from '../../lib/queryClient';
-import { nextSession } from '../../data/schedule';
+import { nextSession, sessionCountdown } from '../../data/schedule';
 import { batchesAtLocation, soonestExpiringBatch, totalReadyToBook } from '../../data/wallet';
 import { NewsButton } from '../../notifications/NewsButton';
 import { NotificationBell } from '../../notifications/NotificationBell';
@@ -29,12 +30,10 @@ import { useTheme } from '../../theme/ThemeProvider';
 import {
   AcademyCard,
   Avatar,
-  Badge,
   Button,
   Card,
   CreditsSummaryCard,
   ErrorView,
-  IconRow,
   InfoCard,
   LoadingView,
   PackageCard,
@@ -72,8 +71,12 @@ export default function HomeScreen() {
       emptyCredits: { gap: space.sm, alignItems: 'flex-start' },
       section: { gap: space.sm },
       sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+      nextHead: { flexDirection: 'row', alignItems: 'center', gap: space.xs, marginBottom: space.md },
+      // The type yields and the countdown never does: the countdown is the point
+      // of the row, and a long type name must truncate rather than push it off.
+      nextType: { flex: 1, letterSpacing: letterSpacing.label },
       nextRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-      nextInfo: { flex: 1, gap: 2 },
+      nextInfo: { flex: 1, gap: 2, minWidth: 0 },
       divider: { height: 1, backgroundColor: color.border.subtle, marginVertical: space.md },
       packageScroll: { gap: space.md, paddingVertical: space.xs },
     }),
@@ -210,23 +213,51 @@ export default function HomeScreen() {
       {next ? (
         <View style={styles.section}>
           <Text variant="label">Next session</Text>
-          <Card>
+          {/* Tappable, to the same place a session notification goes: the Sessions
+              tab, focused on this one. The card says what is next; the tab is
+              where you do something about it. */}
+          <Card
+            onPress={() =>
+              router.push({ pathname: '/(tabs)/sessions', params: { focus: next.slot.id } })
+            }
+          >
+            {/* The type as a quiet label row, not a filled badge beside the time.
+                As a badge it competed with the date for the same row and won —
+                which is why "Wed 30 Sep · 7:30 PM" used to wrap mid-phrase. Up
+                here it costs nothing and the time gets the width it needs.
+                The countdown is the one thing the date does not tell you: whether
+                this needs you now or sits somewhere later in the week. */}
+            <View style={styles.nextHead}>
+              <Ionicons
+                name={trainingMetaFor(next.slot.trainingType).icon}
+                size={13}
+                color={color.text.muted}
+              />
+              <Text variant="micro" tone="muted" weight="bold" style={styles.nextType} numberOfLines={1}>
+                {trainingMetaFor(next.slot.trainingType).label.toUpperCase()}
+              </Text>
+              <Text variant="micro" tone="accent" weight="bold">
+                {sessionCountdown(next.slot.startsAt, now).toUpperCase()}
+              </Text>
+            </View>
+
             <View style={styles.nextRow}>
               <Avatar name={next.coach?.name ?? 'Coach'} imageUrl={next.coach?.photoUrl} size={48} />
               <View style={styles.nextInfo}>
-                <Text variant="body" weight="bold">
+                <Text variant="body" weight="bold" numberOfLines={1}>
                   {`${formatInstantDate(next.slot.startsAt)} · ${formatInstantTime(next.slot.startsAt)}`}
                 </Text>
-                <Text variant="caption" tone="secondary">
-                  {next.coach ? `with ${next.coach.name}` : ''}
+                {/* Coach and branch on one caption line. The full street was here
+                    at body weight and wrapped to two lines for a fact you only
+                    need on the way out the door — it is on the session itself. */}
+                <Text variant="caption" tone="secondary" numberOfLines={1}>
+                  {[next.coach ? `with ${next.coach.name}` : null, placeFor(next.slot.locationId, locations).name]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </Text>
               </View>
-              <Badge label={trainingMetaFor(next.slot.trainingType).label} icon={trainingMetaFor(next.slot.trainingType).icon} />
+              <Ionicons name="chevron-forward" size={18} color={color.text.muted} />
             </View>
-            <View style={styles.divider} />
-            {/* The NEXT session's own branch — Home spans branches, so this line
-                must follow the session, not the toggle. */}
-            <IconRow icon="location-outline" title={placeFor(next.slot.locationId, locations).line} />
           </Card>
         </View>
       ) : null}
