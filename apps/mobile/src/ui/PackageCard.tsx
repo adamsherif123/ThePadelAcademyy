@@ -1,7 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { formatPiastres } from '@tpa/core';
 import { letterSpacing, radius, space } from '@tpa/theme';
-import type { Package, Piastres } from '@tpa/types';
+import type { Package } from '@tpa/types';
 import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -19,10 +18,15 @@ import { TRAINING_META } from './trainingMeta';
  * filled badge and the standard card's generous padding, which made a shortcut
  * card look like a page. There is only one thing a player compares across a
  * horizontal strip, and it is the price: that is the single large element now,
- * and the type, the count and the per-session value are all small supporting
- * text. The card came down from 200dp wide with 24dp padding to 164/16, so two
- * and a bit are in view instead of one and a half, and the strip reads as a row
- * of options rather than a stack of cards.
+ * and the type and the count are small supporting text. The card came down from
+ * 200dp wide with 24dp padding to 164/16, so two and a bit are in view instead
+ * of one and a half, and the strip reads as a row of options rather than a stack
+ * of cards.
+ *
+ * Three facts, and no fourth. The per-session rate was tried here and truncated
+ * to "800 EG…" at this width, which is worse than omitting it — a money figure
+ * is the one thing that must never be cut off. It lives on the package detail
+ * and /buy-credits, where there is room for it and something to compare it to.
  *
  * ── a label row, not a filled pill ──
  * A badge is a status. The training type here is a category, and it sits above
@@ -38,8 +42,6 @@ import { TRAINING_META } from './trainingMeta';
 export function PackageCard({ pkg, onPress }: { pkg: Package; onPress?: () => void }) {
   const { color } = useTheme();
   const meta = TRAINING_META[pkg.trainingType];
-  const isSingle = pkg.sessionCount === 1;
-  const perSession = Math.round(pkg.price / pkg.sessionCount) as Piastres;
 
   const styles = useMemo(
     () =>
@@ -70,15 +72,13 @@ export function PackageCard({ pkg, onPress }: { pkg: Package; onPress?: () => vo
         <Money amount={pkg.price} tone="accent" variant="h2" weight="bold" numberOfLines={1} />
       </View>
 
-      {/* Count and unit value on ONE line. They are read together — "how many,
-          and is that a good rate" is a single question — and two lines of
-          caption under a price is the shape that made the old card tall.
-          `1 session` says it alone: "500 EGP each" for a single session is the
-          price restated, and the old card's "1 Sessions" was simply wrong. */}
+      {/* Just the count. The per-session rate was here and did not survive the
+          card's width — "800 EG…" is worse than nothing, and truncating a PRICE
+          is the one thing a money figure must never do. It belongs where there
+          is room to state it and something to compare it against: the package
+          detail and /buy-credits both show it in full. */}
       <Text variant="caption" tone="muted" numberOfLines={1}>
-        {isSingle
-          ? '1 session'
-          : `${pkg.sessionCount} sessions · ${formatPiastres(perSession)} each`}
+        {`${pkg.sessionCount} session${pkg.sessionCount === 1 ? '' : 's'}`}
       </Text>
     </Card>
   );
