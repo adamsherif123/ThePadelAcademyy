@@ -16,7 +16,7 @@ import { haptics } from '../lib/haptics';
 import { resetTo, resetToTab } from '../lib/nav';
 import { queryClient, queryKeys } from '../lib/queryClient';
 import { useLocation } from '../location/LocationProvider';
-import { LocationSheet } from '../location/LocationSheet';
+import { LocationMenu } from '../location/LocationMenu';
 import { useSession } from '../session/SessionProvider';
 import { useTheme } from '../theme/ThemeProvider';
 import {
@@ -115,6 +115,7 @@ export default function RequestCreditsScreen() {
         backgroundColor: color.bg.surface,
       },
       branchName: { flex: 1 },
+      branchAnchor: { alignSelf: 'stretch' },
     }),
     [color],
   );
@@ -137,7 +138,6 @@ export default function RequestCreditsScreen() {
   // The branch the TRIAL will be at. Null means "not chosen yet / not a trial";
   // the effective package below falls back to the one this screen was opened with.
   const [trialBranchId, setTrialBranchId] = useState<LocationId | null>(null);
-  const [branchSheetOpen, setBranchSheetOpen] = useState(false);
 
   const onCopyInstapay = async () => {
     await Clipboard.setStringAsync(INSTAPAY_PHONE);
@@ -328,33 +328,32 @@ export default function RequestCreditsScreen() {
       {showBranchPicker && chosenBranch ? (
         <View style={styles.field}>
           <Text variant="label">Where will you play?</Text>
-          <Pressable
-            style={styles.branchRow}
-            onPress={() => setBranchSheetOpen(true)}
-            accessibilityRole="button"
-            accessibilityLabel={`Trial location: ${chosenBranch.name}. Tap to change.`}
-          >
-            <Ionicons name="location-outline" size={18} color={color.text.secondary} />
-            <Text variant="body" weight="semibold" style={styles.branchName} numberOfLines={1}>
-              {chosenBranch.name}
-            </Text>
-            <Ionicons name="chevron-down" size={16} color={color.text.muted} />
-          </Pressable>
+          <LocationMenu
+            options={branches}
+            selectedId={chosenBranch.id}
+            onSelect={setTrialBranchId}
+            // The row is a form field and spans the screen; the menu matches it.
+            anchorStyle={styles.branchAnchor}
+            trigger={({ open, toggle }) => (
+              <Pressable
+                style={styles.branchRow}
+                onPress={toggle}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: open }}
+                accessibilityLabel={`Trial location: ${chosenBranch.name}. Tap to change.`}
+              >
+                <Ionicons name="location-outline" size={18} color={color.text.secondary} />
+                <Text variant="body" weight="semibold" style={styles.branchName} numberOfLines={1}>
+                  {chosenBranch.name}
+                </Text>
+                <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={16} color={color.text.muted} />
+              </Pressable>
+            )}
+          />
           <Text variant="caption" tone="muted">
             Your trial credit will only work at this location.
           </Text>
         </View>
-      ) : null}
-
-      {showBranchPicker && chosenBranch ? (
-        <LocationSheet
-          open={branchSheetOpen}
-          title="Where will you play?"
-          options={branches}
-          selectedId={chosenBranch.id}
-          onSelect={setTrialBranchId}
-          onClose={() => setBranchSheetOpen(false)}
-        />
       ) : null}
 
       {/* What they're requesting */}
