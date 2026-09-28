@@ -87,8 +87,10 @@ select is(
   0, 'the requester (a non-owner) is not pinged');
 select is(
   (select distinct body from public.notifications where type = 'owner_credit_request'),
-  'Hady requested 4 Group Credits',
-  'the exact required string: "Hady requested 4 Group Credits"');
+  -- 070: " for <branch>". The owner's next action is grant_credits, which takes a
+  -- branch as an argument — the alert that sends them there now supplies it.
+  'Hady requested 4 Group Credits for Oro Plaza Hotel',
+  'the exact required string: "Hady requested 4 Group Credits for Oro Plaza Hotel"');
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- CREDIT REQUEST — a REJECTED request pings nobody
