@@ -5,7 +5,8 @@ import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { usePackages, useTrialEligible } from '../../data/queries';
+import { trialBranches, trialPriceRange } from '../../data/catalog';
+import { useLocations, usePackages, useTrialEligible } from '../../data/queries';
 import { useTheme } from '../../theme/ThemeProvider';
 import { Button, LoadingView, NavyScreen, PillOnNavy, Text } from '../../ui';
 
@@ -46,9 +47,24 @@ export default function TrialOfferScreen() {
     [color],
   );
   const packagesQ = usePackages();
+  const locationsQ = useLocations();
   const trialEligibleQ = useTrialEligible();
   const eligible = Boolean(trialEligibleQ.data);
-  const trial = eligible ? (packagesQ.data ?? []).find((p) => p.trainingType === 'trial' && p.isActive) : undefined;
+  // ── the trial the CTA opens, and the price to quote before a branch is picked ──
+  // Which branch the trial is at is chosen on the next screen (S8.7), so this one
+  // opens the first eligible branch's package and the picker takes it from there.
+  // It is deliberately branch-AGNOSTIC: nothing has been decided yet, and opening
+  // on the toggle's branch would make the offer look like it was only for there.
+  const branches = eligible ? trialBranches(packagesQ.data ?? [], locationsQ.data ?? []) : [];
+  const trial = eligible
+    ? (packagesQ.data ?? []).find((p) => p.trainingType === 'trial' && p.isActive && p.locationId === branches[0]?.id)
+    : undefined;
+  // One price is stated flatly; two are not, because quoting either as THE price
+  // would be wrong for somebody who then picks the other branch.
+  const range = trialPriceRange(packagesQ.data ?? [], locationsQ.data ?? []);
+  const priceLabel = range
+    ? `Trial · ${range.varies ? 'from ' : ''}${formatPiastres(range.lowest)}`
+    : null;
 
   if (packagesQ.isPending || trialEligibleQ.isPending) {
     return (
@@ -80,7 +96,7 @@ export default function TrialOfferScreen() {
 
           {trial ? (
             <View style={styles.pills}>
-              <PillOnNavy label={`Trial · ${formatPiastres(trial.price)}`} icon="sparkles-outline" />
+              <PillOnNavy label={priceLabel ?? `Trial · ${formatPiastres(trial.price)}`} icon="sparkles-outline" />
               <PillOnNavy label="One per player" icon="person-outline" />
             </View>
           ) : null}

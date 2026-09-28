@@ -1,18 +1,21 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { radius, space } from '@tpa/theme';
-import type { PackageId } from '@tpa/types';
+import type { LocationId, PackageId } from '@tpa/types';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { packageById } from '../data/catalog';
-import { useLocations, usePackages } from '../data/queries';
+import { defaultTrialBranch, packageById, trialBranches, trialPackageAt } from '../data/catalog';
+import { useLocations, useMyCreditRequests, usePackages } from '../data/queries';
+import { pendingTrialBranchName, trialRefusalKind } from '../data/trialRequest';
 import { requestCreditsRpc, uploadProof, type RequestCreditsReason } from '../lib/api';
 import { haptics } from '../lib/haptics';
 import { resetTo, resetToTab } from '../lib/nav';
 import { queryClient, queryKeys } from '../lib/queryClient';
+import { useLocation } from '../location/LocationProvider';
+import { LocationSheet } from '../location/LocationSheet';
 import { useSession } from '../session/SessionProvider';
 import { useTheme } from '../theme/ThemeProvider';
 import {
@@ -95,6 +98,22 @@ export default function RequestCreditsScreen() {
       payeeNumber: { letterSpacing: 0.5 },
       copyHint: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
       center: { textAlign: 'center' },
+      // A full-width row, not the toggle's compact pill. On the Book tab the pill
+      // is an ambient label you may never touch; here it is a decision inside a
+      // form, sitting beside "How did you pay?", and it has to carry the same
+      // weight as the control below it or it reads as a caption.
+      branchRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.sm,
+        paddingVertical: space.md,
+        paddingHorizontal: space.md,
+        borderRadius: radius.lg,
+        borderWidth: 1,
+        borderColor: color.border.strong,
+        backgroundColor: color.bg.surface,
+      },
+      branchName: { flex: 1 },
     }),
     [color],
   );
@@ -102,6 +121,9 @@ export default function RequestCreditsScreen() {
   const { player } = useSession();
   const packagesQ = usePackages();
   const locationsQ = useLocations();
+  const { selectedId, select } = useLocation();
+  // Only to tell the two meanings of `trial_already_used` apart — see trialPending.
+  const myRequestsQ = useMyCreditRequests();
 
   const [method, setMethod] = useState<Method>('instapay');
   const [proofPath, setProofPath] = useState<string | null>(null);
@@ -109,8 +131,12 @@ export default function RequestCreditsScreen() {
   const [uploadNote, setUploadNote] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [outcome, setOutcome] = useState<'submitted' | 'already_pending' | null>(null);
+  const [outcome, setOutcome] = useState<'submitted' | 'already_pending' | 'trial_pending' | null>(null);
   const [copied, setCopied] = useState(false);
+  // The branch the TRIAL will be at. Null means "not chosen yet / not a trial";
+  // the effective package below falls back to the one this screen was opened with.
+  const [trialBranchId, setTrialBranchId] = useState<LocationId | null>(null);
+  const [branchSheetOpen, setBranchSheetOpen] = useState(false);
 
   const onCopyInstapay = async () => {
     await Clipboard.setStringAsync(INSTAPAY_PHONE);
@@ -126,9 +152,35 @@ export default function RequestCreditsScreen() {
     );
   }
 
-  const pkg = packageById(packagesQ.data ?? [], packageId as PackageId);
+  const openedWith = packageById(packagesQ.data ?? [], packageId as PackageId);
+  const isTrial = openedWith?.trainingType === 'trial';
+
+  // ── which branch will this trial be at ──────────────────────────────────────
+  // There is no branch field on a request: the PACKAGE decides where the credits
+  // work (tpa.force_location_from_package). So picking a branch means picking
+  // that branch's trial package, and everything below — the card, the price, the
+  // submit — follows from `pkg` rather than from a separate piece of state.
+  const branches = isTrial ? trialBranches(packagesQ.data ?? [], locationsQ.data ?? []) : [];
+  const chosenBranch = isTrial ? defaultTrialBranch(branches, trialBranchId ?? selectedId) : null;
+  const trialPkg = chosenBranch ? trialPackageAt(packagesQ.data ?? [], chosenBranch.id) : null;
+  const pkg = trialPkg ?? openedWith;
+  // Only shown when there is a real choice. One eligible branch and the screen is
+  // exactly the screen it was before this existed — same rule as the toggle.
+  const showBranchPicker = isTrial && branches.length > 1;
+
   // The package's OWN branch, not the toggle's: this flow is about one package.
   const pkgLocationName = (locationsQ.data ?? []).find((l) => l.id === pkg?.locationId)?.name ?? null;
+
+  // ── the two meanings of `trial_already_used` ────────────────────────────────
+  // The RPC returns one reason for two situations: a trial already PURCHASED, and
+  // a live trial request sitting at some branch (tpa.trial_used counts both). The
+  // second is the likely one here — a player picks a branch, submits, then comes
+  // back and picks another — and "you've already used your trial" is simply untrue
+  // for them. The client can tell them apart without a migration: it can read its
+  // own credit_requests. This is that read; the copy below uses it.
+  const pendingTrialBranch = pendingTrialBranchName(myRequestsQ.data ?? [], locationsQ.data ?? []);
+  const hasPendingTrial = (myRequestsQ.data ?? []).some((r) => r.isTrial && r.status === 'pending');
+
   if (!pkg || !player) {
     return (
       <Screen>
@@ -176,12 +228,27 @@ export default function RequestCreditsScreen() {
       const res = await requestCreditsRpc(pkg.id, method, proofPath);
       if (res.ok) {
         haptics.success();
+        // The trial will be usable at the branch they just chose, so point the app
+        // there: the Book tab is the next place they look, and it must be showing
+        // the branch their credit is coming to rather than wherever they browsed
+        // before. Only on success, and only for the trial — a normal request is
+        // for a package the player opened deliberately and implies no move.
+        if (isTrial && chosenBranch) select(chosenBranch.id);
         await queryClient.invalidateQueries({ queryKey: queryKeys.creditRequests });
         setOutcome('submitted');
         return;
       }
       if (res.reason === 'already_pending') {
         setOutcome('already_pending');
+        return;
+      }
+      // `trial_already_used` covers two different players. One has a trial request
+      // already waiting somewhere — nothing is wrong, they just cannot have two —
+      // and for them this is the same terminal "you have one pending" state as
+      // above, not a red error under the button. The other really has used their
+      // trial, and still gets the plain refusal.
+      if (trialRefusalKind(res.reason, hasPendingTrial) === 'trial_pending') {
+        setOutcome('trial_pending');
         return;
       }
       haptics.error();
@@ -201,25 +268,39 @@ export default function RequestCreditsScreen() {
   // ── Terminal states: submitted, or already-have-one-pending. These END the flow, so the
   // CTAs RESET the stack (a clean back path), never push onto the dead request flow.
   if (outcome) {
-    const pending = outcome === 'already_pending';
+    const pending = outcome !== 'submitted';
+    // Two different pendings. `already_pending` is the per-branch limit (066): a
+    // request for THIS branch is already waiting, and another branch is still open
+    // to them. `trial_pending` is the once-ever trial: the branch does not matter,
+    // there is one trial and it is already claimed — and saying "you can still
+    // request another location" there would be a straight lie.
+    const trialPending = outcome === 'trial_pending';
     return (
       <Screen>
         <SuccessView
           icon={pending ? 'time-outline' : 'checkmark'}
           tone={pending ? 'accent' : 'success'}
           eyebrow={pending ? 'Request pending' : 'Request submitted'}
-          title={pending ? 'You already have a request pending' : 'Thanks — request submitted'}
+          title={
+            trialPending
+              ? 'Your trial request is already in'
+              : pending
+                ? 'You already have a request pending'
+                : 'Thanks — request submitted'
+          }
           primary={{ label: 'Go to wallet', onPress: () => resetTo('/wallet') }}
           secondary={{ label: 'Go home', onPress: () => resetToTab('/(tabs)') }}
         >
           <Card>
             <Text variant="body" tone="secondary">
-              {pending
-                ? // 066 made the limit PER BRANCH, so the copy has to say which one —
-                  // otherwise a player with a pending request at Oro reads this as
-                  // "I can't request anywhere", which is no longer true.
-                  `You have a credit request for ${pkgLocationName ?? 'this location'} awaiting the academy’s confirmation. Track it in your wallet — you can still request credits for another location.`
-                : `Your credits${pkgLocationName ? ` for ${pkgLocationName}` : ''} will be added once the academy confirms your payment — this isn’t instant. You’ll get a notification, and you can track the status in your wallet.`}
+              {trialPending
+                ? `You already have a trial request pending for ${pendingTrialBranch ?? 'another location'}. There is one trial per player, so you can't request a second — if you meant a different location, ask the academy to decline the first one.`
+                : pending
+                  ? // 066 made the limit PER BRANCH, so the copy has to say which one —
+                    // otherwise a player with a pending request at Oro reads this as
+                    // "I can't request anywhere", which is no longer true.
+                    `You have a credit request for ${pkgLocationName ?? 'this location'} awaiting the academy’s confirmation. Track it in your wallet — you can still request credits for another location.`
+                  : `Your credits${pkgLocationName ? ` for ${pkgLocationName}` : ''} will be added once the academy confirms your payment — this isn’t instant. You’ll get a notification, and you can track the status in your wallet.`}
             </Text>
           </Card>
         </SuccessView>
@@ -240,6 +321,40 @@ export default function RequestCreditsScreen() {
       }
     >
       <ScreenHeader eyebrow="Add credits" title="Request Credits" onBack={() => router.back()} />
+
+      {/* ABOVE the package card, because the card is its consequence: change the
+          branch and the name, session count and price below all change with it. */}
+      {showBranchPicker && chosenBranch ? (
+        <View style={styles.field}>
+          <Text variant="label">Where will you play?</Text>
+          <Pressable
+            style={styles.branchRow}
+            onPress={() => setBranchSheetOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`Trial location: ${chosenBranch.name}. Tap to change.`}
+          >
+            <Ionicons name="location-outline" size={18} color={color.text.secondary} />
+            <Text variant="body" weight="semibold" style={styles.branchName} numberOfLines={1}>
+              {chosenBranch.name}
+            </Text>
+            <Ionicons name="chevron-down" size={16} color={color.text.muted} />
+          </Pressable>
+          <Text variant="caption" tone="muted">
+            Your trial credit will only work at this location.
+          </Text>
+        </View>
+      ) : null}
+
+      {showBranchPicker && chosenBranch ? (
+        <LocationSheet
+          open={branchSheetOpen}
+          title="Where will you play?"
+          options={branches}
+          selectedId={chosenBranch.id}
+          onSelect={setTrialBranchId}
+          onClose={() => setBranchSheetOpen(false)}
+        />
+      ) : null}
 
       {/* What they're requesting */}
       <Card variant="inverse">

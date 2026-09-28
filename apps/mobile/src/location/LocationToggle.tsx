@@ -1,11 +1,12 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { radius, space } from '@tpa/theme';
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
 import { Text } from '../ui';
 import { useLocation } from './LocationProvider';
+import { LocationSheet } from './LocationSheet';
 
 /**
  * Which branch the app is showing, and how to change it.
@@ -58,26 +59,6 @@ export function LocationToggle() {
           borderColor: color.border.subtle,
           backgroundColor: color.bg.surface,
         },
-        backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: color.scrim },
-        sheet: {
-          backgroundColor: color.bg.surface,
-          borderTopLeftRadius: radius.lg,
-          borderTopRightRadius: radius.lg,
-          paddingTop: space.lg,
-          paddingBottom: space.xxl,
-          paddingHorizontal: space.lg,
-          gap: space.xs,
-        },
-        sheetTitle: { marginBottom: space.xs },
-        row: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingVertical: space.md,
-          borderBottomWidth: 1,
-          borderBottomColor: color.border.subtle,
-        },
-        rowText: { flex: 1, gap: 2 },
       }),
     [color],
   );
@@ -99,43 +80,14 @@ export function LocationToggle() {
         <Ionicons name="chevron-down" size={14} color={color.text.muted} />
       </Pressable>
 
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setOpen(false)} accessibilityLabel="Close">
-          {/* Stops a tap inside the sheet from closing it. */}
-          <Pressable style={styles.sheet} onPress={() => {}}>
-            <Text variant="h2" style={styles.sheetTitle}>
-              Choose a location
-            </Text>
-            {options.map((l) => {
-              const isCurrent = l.id === selected.id;
-              return (
-                <Pressable
-                  key={l.id}
-                  style={styles.row}
-                  onPress={() => {
-                    select(l.id);
-                    setOpen(false);
-                  }}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isCurrent }}
-                >
-                  <View style={styles.rowText}>
-                    <Text variant="body" weight={isCurrent ? 'semibold' : 'regular'}>
-                      {l.name}
-                    </Text>
-                    <Text variant="caption" tone="secondary">
-                      {l.hoursText}
-                    </Text>
-                  </View>
-                  {isCurrent ? (
-                    <Ionicons name="checkmark" size={20} color={color.accent.default} />
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <LocationSheet
+        open={open}
+        title="Choose a location"
+        options={options}
+        selectedId={selected.id}
+        onSelect={select}
+        onClose={() => setOpen(false)}
+      />
     </View>
   );
 }
