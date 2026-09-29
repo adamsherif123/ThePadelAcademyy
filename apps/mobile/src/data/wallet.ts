@@ -81,6 +81,29 @@ export function batchesAtLocation(
   return batches.filter((b) => b.locationId === locationId);
 }
 
+/**
+ * The distinct branches where the player has credits they can actually spend.
+ *
+ * The question "is this player's wallet split across branches at all" — which is
+ * the only condition under which a per-branch breakdown tells them anything. A
+ * player with everything in one place does not need to be told which place on a
+ * screen that already shows one number, and one standing at a branch where they
+ * hold nothing is better served by the empty state than by "0 usable here".
+ *
+ * Usable, not merely owned: a spent or expired batch is history, and history at
+ * a second branch does not make a wallet split.
+ */
+export function locationsWithCredits(
+  batches: readonly CreditBatch[],
+  now: IsoInstant,
+): LocationId[] {
+  const ids = new Set<LocationId>();
+  for (const b of activeBatches([...batches], now)) {
+    if (b.locationId !== null) ids.add(b.locationId);
+  }
+  return [...ids];
+}
+
 export function totalReadyToBook(batches: CreditBatch[], now: IsoInstant): number {
   return Object.values(balanceByType(batches, now)).reduce((sum, n) => sum + n, 0);
 }

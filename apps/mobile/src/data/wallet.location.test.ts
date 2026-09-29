@@ -1,7 +1,7 @@
 import type { CreditBatch, IsoInstant, LocationId, TrainingType } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
-import { balanceByType, batchesAtLocation, totalReadyToBook } from './wallet';
+import { balanceByType, batchesAtLocation, locationsWithCredits, totalReadyToBook } from './wallet';
 
 const NOW = '2026-08-23T12:00:00.000Z' as IsoInstant;
 const ORO = 'loc_oro' as LocationId;
@@ -109,5 +109,38 @@ describe('batchesAtLocation — credits are location-locked, so the wallet must 
     const onlyQa = [b('cb_2', 'group', 5, QA)];
     expect(totalReadyToBook(onlyQa, NOW)).toBe(5);
     expect(totalReadyToBook(batchesAtLocation(onlyQa, ORO), NOW)).toBe(0);
+  });
+
+  // Home shows "N usable at <branch>" only for a wallet that is genuinely split.
+  // `elsewhere > 0` was the wrong test: it is also true for a player whose
+  // credits are ALL at the other branch, and "0 usable here" tells them nothing
+  // the empty card below is not already saying better.
+  describe('locationsWithCredits — is this wallet split at all', () => {
+    it('counts the branches holding spendable credits', () => {
+      expect(locationsWithCredits(BATCHES, NOW).sort()).toEqual([ORO, QA].sort());
+    });
+
+    it('is one branch when everything sits in one place', () => {
+      expect(locationsWithCredits([b('cb_1', 'group', 4, ORO)], NOW)).toEqual([ORO]);
+    });
+
+    // The case the change is for: nothing here, everything there. One branch, so
+    // no breakdown line — the empty card says where the credits are instead.
+    it('is still one branch when that place is not the one being browsed', () => {
+      expect(locationsWithCredits([b('cb_2', 'group', 5, QA)], NOW)).toEqual([QA]);
+    });
+
+    it('ignores a spent batch — history at a second branch is not a split wallet', () => {
+      const spentAtQa = { ...b('cb_spent', 'group', 5, QA), quantityRemaining: 0 } as CreditBatch;
+      expect(locationsWithCredits([b('cb_1', 'group', 4, ORO), spentAtQa], NOW)).toEqual([ORO]);
+    });
+
+    it('is empty for a player with nothing', () => {
+      expect(locationsWithCredits([], NOW)).toEqual([]);
+    });
+
+    it('does not double-count two batches at the same branch', () => {
+      expect(locationsWithCredits([b('cb_1', 'group', 4, ORO), b('cb_3', 'individual', 2, ORO)], NOW)).toEqual([ORO]);
+    });
   });
 });

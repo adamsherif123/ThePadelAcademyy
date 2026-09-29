@@ -22,7 +22,7 @@ import { LocationToggle } from '../../location/LocationToggle';
 import { placeFor } from '../../location/slotLocation';
 import { queryKeys } from '../../lib/queryClient';
 import { nextSession, sessionCountdown } from '../../data/schedule';
-import { batchesAtLocation, soonestExpiringBatch, totalReadyToBook } from '../../data/wallet';
+import { batchesAtLocation, locationsWithCredits, soonestExpiringBatch, totalReadyToBook } from '../../data/wallet';
 import { NewsButton } from '../../notifications/NewsButton';
 import { NotificationBell } from '../../notifications/NotificationBell';
 import { useSession } from '../../session/SessionProvider';
@@ -145,9 +145,14 @@ export default function HomeScreen() {
   const total = totalReadyToBook(batches.data ?? [], now);
   // How many of those actually work at the branch being browsed. The headline
   // must not be read as "you can book 14 sessions here" when 3 of them are an
-  // hour's drive away, so wherever these differ the card says so.
+  // hour's drive away, so a split wallet says so.
   const here = totalReadyToBook(locBatches, now);
   const elsewhere = total - here;
+  // A wallet is SPLIT only if spendable credits sit at more than one branch.
+  // Not `elsewhere > 0`: that is also true for a player whose credits are all at
+  // one OTHER branch, and telling them "0 usable here" is both useless and a
+  // duplicate of the empty card directly below.
+  const splitAcrossBranches = locationsWithCredits(batches.data ?? [], now).length > 1;
   // The expiry nudge stays branch-scoped: it is a prompt to USE a credit, and a
   // credit expiring at a branch you are not at is not something to act on here.
   const expiring = soonestExpiringBatch(locBatches, now);
@@ -180,9 +185,10 @@ export default function HomeScreen() {
         eyebrow="Your credits"
         action={{ label: 'Wallet', trailingIcon: 'arrow-forward', onPress: () => router.push('/wallet') }}
       >
-        {/* Only when they differ. With everything at one branch this is the
-            headline restated, and a card that repeats itself reads as noise. */}
-        {elsewhere > 0 && selected ? (
+        {/* Only for a wallet that is actually split. With everything in one
+            place this is the headline restated, and a card that repeats itself
+            reads as noise. */}
+        {splitAcrossBranches && selected ? (
           <Text variant="caption" tone="inverse">
             {`${here} usable at ${selected.name}`}
           </Text>
