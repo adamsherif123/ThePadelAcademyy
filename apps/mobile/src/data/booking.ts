@@ -269,8 +269,12 @@ export function slotAvailability(
     case 'credit_wrong_location':
       return { kind: 'wrong_location', locationId: res.locationId ?? null };
     case 'no_usable_credit': {
+      // Scoped to THIS SLOT'S BRANCH. It used to scan every branch, so a player
+      // with a lapsed batch at the other one was told "your credits have
+      // expired" about credits that were never spendable here — an explanation
+      // for a wallet they do not have.
       const lapsed = batches
-        .filter((b) => b.trainingType === chosenType)
+        .filter((b) => b.trainingType === chosenType && b.locationId === slot.locationId)
         .some((b) => b.quantityRemaining > 0 && creditExpiryState(b.expiresAt, now) === 'expired');
       return { kind: lapsed ? 'credits_expired' : 'no_credit' };
     }
@@ -315,9 +319,29 @@ function openBlockAvailability(
     const top = offered[0]!;
     return { kind: 'bookable', creditBatchId: top.creditBatchId, trainingType: top.trainingType };
   }
+
+  // Before concluding "no credits": is ANY type blocked only by the branch?
+  // A typed slot got this answer from canBookSlot directly, but an open block
+  // reaches here through bookableTypesFor, which reports only that no type is
+  // bookable and not why. So a player holding perfectly good credits at the
+  // other branch was told they had none — or, worse, that theirs had expired.
+  // canBookSlot already draws the distinction; this asks it again and listens.
+  for (const t of TRAINING_TYPES) {
+    const v = canBookSlot(slot, player, batches, now, t);
+    if (!v.ok && v.reason === 'credit_wrong_location') {
+      return { kind: 'wrong_location', locationId: v.locationId ?? null };
+    }
+  }
+
+  // And the same branch scoping as the typed path: a batch that lapsed
+  // somewhere else is not the reason this slot is unbookable.
   const lapsed = TRAINING_TYPES.some((t) =>
     batches.some(
-      (b) => b.trainingType === t && b.quantityRemaining > 0 && creditExpiryState(b.expiresAt, now) === 'expired',
+      (b) =>
+        b.trainingType === t &&
+        b.locationId === slot.locationId &&
+        b.quantityRemaining > 0 &&
+        creditExpiryState(b.expiresAt, now) === 'expired',
     ),
   );
   return { kind: lapsed ? 'credits_expired' : 'no_credit' };

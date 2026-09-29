@@ -94,8 +94,11 @@ function slotDisplay(
       return { state: 'unavailable', note: 'Credits expired', cta: 'Renew credits to book' };
     case 'no_credit':
       return { state: 'unavailable', note: 'No credits', cta: 'Add credits to book' };
-    // 065: they hold credits, just for another branch. Deliberately NO cta —
-    // buying more would not help; the fix is to switch branch, not to spend.
+    // 065: they hold credits, just for another branch. It now gets a cta. It
+    // used to be inert on the reasoning that "buying more would not help" —
+    // which is wrong: buying credits FOR THIS BRANCH is a perfectly good way
+    // out, and the prompt offers switching as the other. An inert card left the
+    // player with a two-word pill and nothing to do about it.
     //
     // The pill gets two words and the explanation gets the full-width row. It
     // used to be one 31-character `note`, which is a sentence in a pill: it held
@@ -109,6 +112,7 @@ function slotDisplay(
         reasonNote: creditLocationName
           ? `Your credits are at ${creditLocationName}. Switch location to use them.`
           : 'Your credits are for another location. Switch location to use them.',
+        cta: 'Get credits for this location',
       };
     case 'past':
       return { state: 'unavailable', note: 'Started' };
@@ -117,10 +121,13 @@ function slotDisplay(
   }
 }
 
-/** The credit-shortfall verdicts — the only unbookable kinds a tap can resolve
- *  (by buying credits), so the only ones that get a tappable prompt. */
-function isCreditShort(kind: SlotAvailability['kind']): kind is 'no_credit' | 'credits_expired' {
-  return kind === 'no_credit' || kind === 'credits_expired';
+/** The credit verdicts a tap can resolve — by buying credits for this branch,
+ *  or (for wrong_location) by switching to the branch that already has them.
+ *  These are the only unbookable kinds that get a tappable prompt. */
+function isCreditShort(
+  kind: SlotAvailability['kind'],
+): kind is 'no_credit' | 'credits_expired' | 'wrong_location' {
+  return kind === 'no_credit' || kind === 'credits_expired' || kind === 'wrong_location';
 }
 
 /** "Next session today at 6 PM" / "Next session Tue, 14 Jul at 6 PM" — the date
@@ -218,8 +225,10 @@ export default function BookScreen() {
   // A credit-short session is tappable now (Task 1): instead of a dead card, the
   // tap opens a kind prompt that routes to buy-credits. `reason` tailors the copy
   // (nothing on file vs. credits lapsed) — the prompt reads it, no re-derivation.
-  const onCreditShort = (slot: SessionSlot, reason: 'no_credit' | 'credits_expired') =>
-    router.push({ pathname: '/needs-credits', params: { slotId: slot.id, reason } });
+  const onCreditShort = (
+    slot: SessionSlot,
+    reason: 'no_credit' | 'credits_expired' | 'wrong_location',
+  ) => router.push({ pathname: '/needs-credits', params: { slotId: slot.id, reason } });
 
   return (
     <Screen scroll tabBar contentContainerStyle={styles.content} refreshControl={refreshControl}>
