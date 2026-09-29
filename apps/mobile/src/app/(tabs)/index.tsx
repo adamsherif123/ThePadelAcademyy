@@ -136,15 +136,20 @@ export default function HomeScreen() {
     );
   }
 
-  // Scoped to the branch on the toggle: "ready to book" has to mean "here".
-  // The wallet still shows every branch, grouped — that screen is the ledger.
+  // The headline is EVERY credit the player owns, across branches — "how many
+  // credits do I have" answered once, on the screen they open first. The wallet
+  // is the per-branch view now: its number, its pills and its list all describe
+  // the branch on the toggle.
   const locations = locationsQ.data ?? [];
   const locBatches = batchesAtLocation(batches.data ?? [], selectedId);
-  const total = totalReadyToBook(locBatches, now);
-  // What they hold at the OTHER branches. Only used to keep the empty state
-  // honest: "you have no credits yet" is false for a player who has some, just
-  // not here, and that is precisely the player this whole feature exists for.
-  const elsewhere = totalReadyToBook(batches.data ?? [], now) - total;
+  const total = totalReadyToBook(batches.data ?? [], now);
+  // How many of those actually work at the branch being browsed. The headline
+  // must not be read as "you can book 14 sessions here" when 3 of them are an
+  // hour's drive away, so wherever these differ the card says so.
+  const here = totalReadyToBook(locBatches, now);
+  const elsewhere = total - here;
+  // The expiry nudge stays branch-scoped: it is a prompt to USE a credit, and a
+  // credit expiring at a branch you are not at is not something to act on here.
   const expiring = soonestExpiringBatch(locBatches, now);
   const next = nextSession(bookings.data ?? [], slots.slots, coaches.data ?? [], now);
   // A5: only surface the trial while the player can still buy it (never used one) and one
@@ -175,6 +180,13 @@ export default function HomeScreen() {
         eyebrow="Your credits"
         action={{ label: 'Wallet', trailingIcon: 'arrow-forward', onPress: () => router.push('/wallet') }}
       >
+        {/* Only when they differ. With everything at one branch this is the
+            headline restated, and a card that repeats itself reads as noise. */}
+        {elsewhere > 0 && selected ? (
+          <Text variant="caption" tone="inverse">
+            {`${here} usable at ${selected.name}`}
+          </Text>
+        ) : null}
         {expiring && expiryText && !dismissed.has(expiring.id) ? (
           <InfoCard
             size="sm"
@@ -185,7 +197,11 @@ export default function HomeScreen() {
         ) : null}
       </CreditsSummaryCard>
 
-      {total === 0 ? (
+      {/* Gated on what works HERE, not on the headline. A player with 14 credits
+          at the other branch cannot book anything on this one, and offering them
+          "Book a Session" would send them to a screen where every card is
+          refused. */}
+      {here === 0 ? (
         <Card style={styles.emptyCredits}>
           <Text variant="body" weight="bold">
             {elsewhere > 0 && selected ? `No credits at ${selected.name}` : 'You have no credits yet'}

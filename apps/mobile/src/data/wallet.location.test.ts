@@ -86,4 +86,28 @@ describe('batchesAtLocation — credits are location-locked, so the wallet must 
   it('has nothing to say about "elsewhere" before a branch resolves', () => {
     expect(batchesAtLocation(BATCHES, null)).toEqual([]);
   });
+
+  // The two screens answer two different questions, and this is the contract
+  // between them. Home: "how many credits do I have" — every branch. Wallet:
+  // "what can I spend at the branch I am looking at" — one. They were the other
+  // way round, which put the aggregate on the screen that then listed one
+  // branch's batches underneath it.
+  it('Home counts every branch; the wallet counts one', () => {
+    const home = totalReadyToBook(BATCHES, NOW);
+    const walletAtOro = totalReadyToBook(batchesAtLocation(BATCHES, ORO), NOW);
+    const walletAtQa = totalReadyToBook(batchesAtLocation(BATCHES, QA), NOW);
+    expect(home).toBe(8);
+    expect(walletAtOro).toBe(1);
+    expect(walletAtQa).toBe(7);
+    // Every credit is countable at exactly one branch, so the wallets sum to Home.
+    expect(walletAtOro + walletAtQa).toBe(home);
+  });
+
+  // Home's "Book a Session" button is gated on this, not on the headline: 7
+  // credits at the other branch cannot book anything here.
+  it('the usable-here figure is what decides whether booking is offered', () => {
+    const onlyQa = [b('cb_2', 'group', 5, QA)];
+    expect(totalReadyToBook(onlyQa, NOW)).toBe(5);
+    expect(totalReadyToBook(batchesAtLocation(onlyQa, ORO), NOW)).toBe(0);
+  });
 });

@@ -94,24 +94,22 @@ export default function WalletScreen() {
 
   const batches = batchesQ.data ?? [];
   const locations = locationsQ.data ?? [];
-  // The navy card counts EVERYTHING the player owns, everywhere. It is the
-  // answer to "how many credits do I have", which is not a per-branch question —
-  // Home's card is the per-branch one, because Home is where you decide whether
-  // you can book here.
-  const total = totalReadyToBook(batches, now);
-  const balance = balanceByType(batches, now);
+  // The WHOLE screen is one branch: the headline, the pills and the list all
+  // count the same credits. A wallet whose number and whose contents describe
+  // different things is a wallet you have to reconcile by hand. Home carries the
+  // across-the-academy figure.
+  const here = batchesAtLocation(batches, selectedId);
+  const active = activeBatches(here, now);
+  const total = totalReadyToBook(here, now);
+  const balance = balanceByType(here, now);
 
-  // The LIST below is this branch only. A credit is spendable at exactly one
-  // branch (065), so a list mixing them is a list you have to filter by eye
-  // before it means anything.
-  const active = activeBatches(batchesAtLocation(batches, selectedId), now);
-  // What the same player holds at the other branches — the difference between
-  // the headline above and the list below, which has to be accounted for or the
-  // two numbers look like a bug.
+  // What the same player holds at the OTHER branches. Nothing on this screen
+  // counts it; it is named at the foot of the list so the difference from Home's
+  // number is accounted for rather than left as a discrepancy.
   // Zero until a branch has resolved: `batchesAtLocation` answers empty with no
   // branch, which would otherwise read as "all your credits are somewhere else"
   // for the instant before locations load.
-  const elsewhere = selectedId === null ? 0 : total - totalReadyToBook(active, now);
+  const elsewhere = selectedId === null ? 0 : totalReadyToBook(batches, now) - total;
 
   // Surface the player's latest OPEN credit request here (the wallet is where credits
   // appear, so "credits on the way / your last request was declined" belongs here — a
@@ -155,10 +153,10 @@ export default function WalletScreen() {
           />
         ) : null}
 
-        {/* Active batches at THIS branch. A spent or expired batch is history,
+        {/* Active batches at this branch. A spent or expired batch is history,
             not wallet contents, so it is not listed at all — `active` is
-            isBatchUsable (see data/wallet.ts), the same rule the headline counts
-            by, so a listed card can never contradict the number above it. */}
+            isBatchUsable (see data/wallet.ts), the same rule the headline and
+            pills count by, so nothing here can contradict the card above. */}
         {showEmpty ? (
           <Card style={styles.emptyCard}>
             <Text variant="body" weight="bold">
