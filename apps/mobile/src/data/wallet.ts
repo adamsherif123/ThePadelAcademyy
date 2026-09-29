@@ -1,5 +1,5 @@
-import { TRAINING_TYPES, creditExpiryState, isBatchUsable } from '@tpa/core';
-import type { CreditBatch, IsoInstant, TrainingType , LocationId } from '@tpa/types';
+import { TRAINING_TYPES, creditExpiryState, isBatchUsable, parseInstant } from '@tpa/core';
+import type { CreditBatch, CreditRequest, IsoInstant, LocationId, TrainingType } from '@tpa/types';
 
 /**
  * Wallet selectors — pure functions of a credit-batch list and `now`. The list is
@@ -92,4 +92,49 @@ export function soonestExpiringBatch(batches: CreditBatch[], now: IsoInstant): C
       (b) => isBatchUsable(b, b.trainingType, now) && creditExpiryState(b.expiresAt, now) === 'expiring_soon',
     ) ?? null
   );
+}
+
+// ── the credit-request notice on the wallet ──────────────────────────────────
+
+/**
+ * How long a DECLINED request keeps its notice on the wallet.
+ *
+ * A decline is news, and news goes stale. The card used to sit there until the
+ * player happened to submit another request — which, for a player who reads the
+ * reason and decides not to bother, is forever: a permanent red banner about
+ * something they already dealt with. A day is long enough that nobody misses the
+ * message and short enough that it stops being furniture.
+ */
+export const DECLINED_NOTICE_HOURS = 24;
+
+/**
+ * The credit request the wallet should tell the player about, if any.
+ *
+ * A PENDING request always wins: it is live, the player is waiting on it, and it
+ * has no expiry — it stays until the academy resolves it.
+ *
+ * Otherwise the most recent request, and only while a decline is still recent.
+ * Approved requests get no card at all; their credits are in the batches below,
+ * which is a better answer than a notice saying they arrived.
+ *
+ * `requests` is expected newest-first (fetchMyCreditRequests orders by
+ * created_at desc), which is why only the head is considered for the rejected
+ * case: an older decline behind a newer request is not the latest news.
+ */
+export function openCreditRequest(
+  requests: readonly CreditRequest[],
+  now: IsoInstant,
+): CreditRequest | undefined {
+  const pending = requests.find((r) => r.status === 'pending');
+  if (pending) return pending;
+
+  const latest = requests[0];
+  if (latest?.status !== 'rejected') return undefined;
+  // resolvedAt is NOT NULL for a rejected row (credit_requests_resolution_shape),
+  // so the fallback is defence only. createdAt is never later than resolution, so
+  // the worst it can do is retire the notice early — the safe direction for a
+  // message whose failure mode is overstaying.
+  const declinedAt = latest.resolvedAt ?? latest.createdAt;
+  const hours = (parseInstant(now).getTime() - parseInstant(declinedAt).getTime()) / 3_600_000;
+  return hours < DECLINED_NOTICE_HOURS ? latest : undefined;
 }

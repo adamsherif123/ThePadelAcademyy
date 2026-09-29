@@ -7,7 +7,7 @@ import { StyleSheet, View } from 'react-native';
 import { packageById } from '../data/catalog';
 import { useBatches,
   useLocations, useMyCreditRequests, usePackages, useTrialEligible } from '../data/queries';
-import { activeBatches, balanceByType, totalReadyToBook } from '../data/wallet';
+import { activeBatches, balanceByType, openCreditRequest, totalReadyToBook } from '../data/wallet';
 import { queryKeys } from '../lib/queryClient';
 
 import { useSession } from '../session/SessionProvider';
@@ -98,15 +98,13 @@ export default function WalletScreen() {
 
   // Surface the player's latest OPEN credit request here (the wallet is where credits
   // appear, so "credits on the way / your last request was declined" belongs here — a
-  // pending request isn't a purchase yet, so purchase-history isn't the place). Newest
-  // first: a pending one (awaiting confirmation) or, if the most recent was rejected, the
-  // reason + a way to try again. Approved requests need no card — the credits are already
-  // in the batches below.
+  // pending request isn't a purchase yet, so purchase-history isn't the place). A
+  // pending one stays until the academy resolves it; a decline stays for a day (see
+  // openCreditRequest). Approved requests need no card — the credits are already in
+  // the batches below.
   const requests = requestsQ.data ?? [];
   const packages = packagesQ.data ?? [];
-  const openRequest =
-    requests.find((r) => r.status === 'pending') ??
-    (requests[0]?.status === 'rejected' ? requests[0] : undefined);
+  const openRequest = openCreditRequest(requests, now);
 
   // Zero-credit empty state (A5: new players start empty). Nudge them at the once-per-player
   // trial while they're still eligible and one exists, otherwise the store. Suppressed when a
