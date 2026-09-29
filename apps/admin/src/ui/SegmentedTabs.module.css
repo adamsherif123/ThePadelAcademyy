@@ -20,13 +20,49 @@
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
 }
 
+/* Inactive tabs did nothing on hover, which on a desktop admin reads as a
+   label rather than a control. */
+.tab:hover:not([data-active='true']) {
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+}
+
+/* There was no focus style at all on a role="tab" button — keyboard users had
+   no idea where they were. Accent ring, matching how Select shows focus. */
+.tab:focus-visible {
+  outline: 2px solid var(--color-accent-default);
+  outline-offset: -1px;
+}
+
+/* Deliberately the SAME font-weight as an inactive tab. It used to go bold,
+   which changed the tab's width — so clicking between them shifted the whole
+   row sideways. The white pill, the shadow, the darker label and the accent
+   icon say "active" four times over; the weight was the one that cost
+   something. */
 .tab[data-active='true'] {
   background: var(--color-bg-surface);
   color: var(--color-text-primary);
-  font-weight: var(--font-weight-bold);
   box-shadow: var(--shadow-sm);
+}
+
+/* The active tab's ICON carries the accent, not its text. The label is already
+   doing the work with weight and contrast; tinting it too would make the pill
+   shout, and tinting nothing left the active state resting entirely on a
+   shadow you have to look for. */
+.tab[data-active='true'] svg {
+  color: var(--color-accent-default);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab {
+    transition: none;
+  }
 }
 
 @media (max-width: 768px) {

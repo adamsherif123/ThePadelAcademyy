@@ -8,6 +8,6 @@
   display: flex;
   align-items: flex-end;
   gap: var(--space-md);
-  margin-block-start: var(--space-lg);
+  margin-block: var(--space-lg);
   max-inline-size: 320px;
 }
