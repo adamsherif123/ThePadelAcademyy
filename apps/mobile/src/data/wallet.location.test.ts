@@ -66,4 +66,24 @@ describe('batchesAtLocation — credits are location-locked, so the wallet must 
     batchesAtLocation(BATCHES, QA);
     expect(BATCHES.map((x) => x.id)).toEqual(['cb_1', 'cb_2', 'cb_3']);
   });
+
+  // The wallet screen's contract, stated: ONE global number at the top, ONE
+  // branch's batches below, and a line accounting for the difference. If these
+  // three ever stop reconciling, the screen shows two numbers that disagree with
+  // no explanation — which is what it did before the list was scoped.
+  it('the headline, the list and the "elsewhere" line always reconcile', () => {
+    for (const branch of [ORO, QA]) {
+      const headline = totalReadyToBook(BATCHES, NOW);
+      const listed = totalReadyToBook(batchesAtLocation(BATCHES, branch), NOW);
+      const elsewhere = headline - listed;
+      expect(listed + elsewhere).toBe(headline);
+      expect(elsewhere).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  // The loading instant: no branch resolved yet, so the list is empty. The screen
+  // must not conclude from that that every credit is at another branch.
+  it('has nothing to say about "elsewhere" before a branch resolves', () => {
+    expect(batchesAtLocation(BATCHES, null)).toEqual([]);
+  });
 });

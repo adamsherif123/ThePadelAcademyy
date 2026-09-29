@@ -1,4 +1,4 @@
-import { CREDIT_EXPIRY_DAYS, formatInstantDate, groupBatchesByLocation, transferredFromName } from '@tpa/core';
+import { CREDIT_EXPIRY_DAYS, formatInstantDate, transferredFromName } from '@tpa/core';
 import { space } from '@tpa/theme';
 import type { CreditBatch, CreditRequest, Location, Package } from '@tpa/types';
 import { useRouter } from 'expo-router';
@@ -7,9 +7,10 @@ import { StyleSheet, View } from 'react-native';
 import { packageById } from '../data/catalog';
 import { useBatches,
   useLocations, useMyCreditRequests, usePackages, useTrialEligible } from '../data/queries';
-import { activeBatches, balanceByType, openCreditRequest, totalReadyToBook } from '../data/wallet';
+import { activeBatches, balanceByType, batchesAtLocation, openCreditRequest, totalReadyToBook } from '../data/wallet';
 import { queryKeys } from '../lib/queryClient';
 
+import { useLocation } from '../location/LocationProvider';
 import { useSession } from '../session/SessionProvider';
 import { useTheme } from '../theme/ThemeProvider';
 import {
@@ -69,6 +70,7 @@ function batchOrigin(
 export default function WalletScreen() {
   const router = useRouter();
   const { player, now } = useSession();
+  const { selected, selectedId } = useLocation();
   const refreshControl = useRefreshControl(WALLET_KEYS);
   const batchesQ = useBatches();
   const locationsQ = useLocations();
@@ -92,9 +94,24 @@ export default function WalletScreen() {
 
   const batches = batchesQ.data ?? [];
   const locations = locationsQ.data ?? [];
+  // The navy card counts EVERYTHING the player owns, everywhere. It is the
+  // answer to "how many credits do I have", which is not a per-branch question —
+  // Home's card is the per-branch one, because Home is where you decide whether
+  // you can book here.
   const total = totalReadyToBook(batches, now);
   const balance = balanceByType(batches, now);
-  const active = activeBatches(batches, now);
+
+  // The LIST below is this branch only. A credit is spendable at exactly one
+  // branch (065), so a list mixing them is a list you have to filter by eye
+  // before it means anything.
+  const active = activeBatches(batchesAtLocation(batches, selectedId), now);
+  // What the same player holds at the other branches — the difference between
+  // the headline above and the list below, which has to be accounted for or the
+  // two numbers look like a bug.
+  // Zero until a branch has resolved: `batchesAtLocation` answers empty with no
+  // branch, which would otherwise read as "all your credits are somewhere else"
+  // for the instant before locations load.
+  const elsewhere = selectedId === null ? 0 : total - totalReadyToBook(active, now);
 
   // Surface the player's latest OPEN credit request here (the wallet is where credits
   // appear, so "credits on the way / your last request was declined" belongs here — a
@@ -138,21 +155,29 @@ export default function WalletScreen() {
           />
         ) : null}
 
-        {/* Active batches ONLY — a spent or expired batch is history, not wallet
-            contents, so it is not listed at all. `active` is isBatchUsable (see
-            data/wallet.ts), the same rule the headline and pills above count by,
-            so the cards below can never disagree with them. */}
+        {/* Active batches at THIS branch. A spent or expired batch is history,
+            not wallet contents, so it is not listed at all — `active` is
+            isBatchUsable (see data/wallet.ts), the same rule the headline counts
+            by, so a listed card can never contradict the number above it. */}
         {showEmpty ? (
           <Card style={styles.emptyCard}>
             <Text variant="body" weight="bold">
-              {returning ? 'No active credits' : 'No credits yet'}
+              {elsewhere > 0
+                ? `No credits at ${selected?.name ?? 'this location'}`
+                : returning
+                  ? 'No active credits'
+                  : 'No credits yet'}
             </Text>
             <Text variant="caption" tone="secondary">
-              {returning
-                ? 'Your credits have all been used or expired — grab another package to get back on court.'
-                : canGetTrial
-                  ? 'Start with a one-time discounted trial session, then book your first class on court.'
-                  : 'Buy a credit package to book your first session — a credit is what reserves your spot.'}
+              {/* A player with credits at the other branch is not empty-handed,
+                  and this list being empty must not tell them they are. */}
+              {elsewhere > 0
+                ? `You have ${elsewhere} credit${elsewhere === 1 ? '' : 's'} at another location. Buy credits for here, or switch location on Home to use ${elsewhere === 1 ? 'it' : 'them'}.`
+                : returning
+                  ? 'Your credits have all been used or expired — grab another package to get back on court.'
+                  : canGetTrial
+                    ? 'Start with a one-time discounted trial session, then book your first class on court.'
+                    : 'Buy a credit package to book your first session — a credit is what reserves your spot.'}
             </Text>
             <Button
               label={!returning && canGetTrial ? 'Get your trial session' : 'Browse packages'}
@@ -160,20 +185,24 @@ export default function WalletScreen() {
             />
           </Card>
         ) : (
-          <>
-            {/* Grouped by branch, because a credit is only spendable where it was
-                bought (065) — a flat list of "4 left" cannot answer the only
-                question the wallet exists to answer. With one branch the heading
-                is still shown: it is the thing that makes the rule visible. */}
-            {groupBatchesByLocation(active, locations).map((group) => (
-              <View key={group.locationId} style={styles.walletGroup}>
-                <Text variant="label">{group.locationName}</Text>
-                {group.items.map((b) => (
-                  <BatchCard key={b.id} batch={b} now={now} allBatches={batches} locations={locations} />
-                ))}
-              </View>
+          <View style={styles.walletGroup}>
+            {/* The branch is the heading, not a group label, because there is only
+                one group now. It stays even with a single branch in the academy:
+                a credit is spendable at exactly one place, and that is worth
+                saying rather than leaving to be discovered at the booking. */}
+            <Text variant="label">{selected?.name ?? 'Your credits'}</Text>
+            {active.map((b) => (
+              <BatchCard key={b.id} batch={b} now={now} allBatches={batches} locations={locations} />
             ))}
-          </>
+            {/* The headline counts every branch and this list counts one, so the
+                difference has to be said out loud. Without it the two numbers
+                simply disagree and the player is left to work out why. */}
+            {elsewhere > 0 ? (
+              <Text variant="caption" tone="muted">
+                {`${elsewhere} more credit${elsewhere === 1 ? '' : 's'} at another location. Switch location on Home to see ${elsewhere === 1 ? 'it' : 'them'}.`}
+              </Text>
+            ) : null}
+          </View>
         )}
 
         <Text variant="caption" tone="muted" style={styles.footer}>
