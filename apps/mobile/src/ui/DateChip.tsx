@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
+import { dateChipVariant } from './dateChipVariant';
 import { Text } from './Text';
 
 const WEEKDAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
@@ -65,30 +66,29 @@ export function DateChip({
     [color],
   );
   const abbr = WEEKDAY_ABBR[weekday] ?? '';
+  const variant = dateChipVariant(selected, closed);
+  // Every colour below asks THIS, never `selected` — that is what keeps the text
+  // and the fill from disagreeing.
+  const onNavy = variant === 'selected';
 
   const content = (
-    <View
-      style={[
-        styles.base,
-        closed ? styles.closed : selected ? styles.selected : styles.open,
-      ]}
-    >
-      <Text variant="micro" tone={selected ? 'inverse' : 'muted'}>
+    <View style={[styles.base, styles[variant]]}>
+      <Text variant="micro" tone={onNavy ? 'inverse' : 'muted'}>
         {abbr}
       </Text>
-      <Text variant="h2" tone={selected ? 'inverse' : closed ? 'muted' : 'primary'}>
+      <Text variant="h2" tone={onNavy ? 'inverse' : variant === 'closed' ? 'muted' : 'primary'}>
         {String(dayNumber)}
       </Text>
-      {closed ? (
+      {variant === 'closed' ? (
         <Text variant="micro" tone="muted" numberOfLines={1}>
           Closed
         </Text>
       ) : spots > 0 ? (
-        <Text variant="micro" tone={selected ? 'inverse' : 'accent'} numberOfLines={1}>
+        <Text variant="micro" tone={onNavy ? 'inverse' : 'accent'} numberOfLines={1}>
           Open
         </Text>
       ) : (
-        <Text variant="micro" tone={selected ? 'inverse' : 'muted'} numberOfLines={1}>
+        <Text variant="micro" tone={onNavy ? 'inverse' : 'muted'} numberOfLines={1}>
           No slots
         </Text>
       )}
