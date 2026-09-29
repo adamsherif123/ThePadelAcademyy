@@ -13,6 +13,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { haptics } from '../lib/haptics';
 import { shadow } from '../theme/shadow';
 import { useTheme } from '../theme/ThemeProvider';
 import { Text } from '../ui';
@@ -89,6 +90,9 @@ export function LocationMenu({
   // waits for a fresh measure instead of flashing at the position the trigger
   // used to have, which matters because both triggers live in scroll views.
   const toggle = useCallback(() => {
+    // A selection tick, the same one pick-type uses: you have entered a chooser.
+    // On the way closed too — the control answered you either way.
+    haptics.light();
     setRect(null);
     setOpen((wasOpen) => !wasOpen);
   }, []);
@@ -173,6 +177,12 @@ export function LocationMenu({
                 key={l.id}
                 style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
                 onPress={() => {
+                  // Only when the branch actually CHANGES. Re-picking the one you
+                  // are already on changes nothing, and a buzz there would be the
+                  // phone telling you something happened when nothing did.
+                  // Firmer than the open tick because this one is consequential:
+                  // the feed, the wallet and every price on screen move with it.
+                  if (!isCurrent) haptics.medium();
                   onSelect(l.id);
                   setOpen(false);
                 }}
