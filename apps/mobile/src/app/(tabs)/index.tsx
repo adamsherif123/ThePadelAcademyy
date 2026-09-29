@@ -75,7 +75,14 @@ export default function HomeScreen() {
       // The type yields and the countdown never does: the countdown is the point
       // of the row, and a long type name must truncate rather than push it off.
       nextType: { flex: 1, letterSpacing: letterSpacing.label },
-      nextRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+      // Top-aligned, not centred: the avatar is taller than the two lines beside
+      // it, and centring left the date floating in the middle of the row instead
+      // of starting where the card's content starts.
+      nextRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.md },
+      // The chevron stays centred. It is the affordance for the WHOLE row, not
+      // for the first line of it, and pinned to the top it reads as a stray mark
+      // in the corner.
+      nextChevron: { alignSelf: 'center' },
       nextInfo: { flex: 1, gap: 2, minWidth: 0 },
       divider: { height: 1, backgroundColor: color.border.subtle, marginVertical: space.md },
       packageScroll: { gap: space.md, paddingVertical: space.xs },
@@ -278,7 +285,12 @@ export default function HomeScreen() {
                     .join(' · ')}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={color.text.muted} />
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={color.text.muted}
+                style={styles.nextChevron}
+              />
             </View>
           </Card>
         </View>
