@@ -53,27 +53,26 @@ release session. Production is at `20260928000071`: `065`–`071` went up on 202
 with the 1.4 release. Anything written after that waits on `multi-location` until the
 next one.
 
-**Never run any Supabase CLI write from `main`.** `main`'s `supabase/migrations` folder
-stops at `060`, while production's database has `061`–`064` applied. Nothing breaks from
-that gap on its own — `main` has no migration the remote is missing, so there is nothing
-to push — but the CLI does not treat it as a no-op. It refuses:
+Since the 1.4 release `main` carries the full migration history and is a truthful
+picture of prod's schema. That was not true before it: `main` stopped at `060` while
+production had `061`–`064` applied, and pointing the CLI at prod from `main` produced
+this —
 
 ```
-$ supabase db push --dry-run --linked        # from main
+$ supabase db push --dry-run --linked        # from main, before 1.4
 Remote migration versions not found in local migrations directory.
 ...try repairing the migration history table:
 supabase migration repair --status reverted 20260926000061 ... 20260926000065
 ```
 
-It fails safe — nothing is written — but **do not run the repair it suggests.** Against
-prod that would mark `061`–`064` as reverted in the migration history while the schema
-still has them, and the next real push would try to apply them again. The suggestion is
-correct for a branch that is genuinely behind; it is wrong for this one, which is behind
-*by design*.
+It failed safe, nothing was written. Recorded here because the shape recurs: **any time
+a branch's `migrations` folder is behind the remote, the CLI offers that repair, and
+against prod it is wrong.** It marks migrations as reverted while the schema still has
+them, so the next real push tries to apply them again. Only run it on a branch that is
+genuinely behind — never to make a deliberate gap go quiet.
 
-So: `main` is not a truthful picture of prod's schema, and must never be used to push,
-repair, or pull migration state. All migration work happens on `multi-location`, which
-has the full history.
+Migration work still happens on `multi-location`. `main` moves only in a release
+session, and only as a fast-forward, so the two cannot disagree about what prod has.
 
 Always `cat supabase/.temp/project-ref` before any Supabase CLI command.
 
