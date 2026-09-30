@@ -11,7 +11,9 @@ together.
 | `main` | exactly what production serves | Production Branch — a push here deploys the live admin | prod `sxnhkducveyvnzqcnzow` |
 | `multi-location` | the work line | pushes build a preview with **no Supabase config** — see below | none; you test locally |
 
-`main` sits at `a157a1d` — the admin as it was before any multi-location work.
+`main` sits at `f81595a` — the multi-location release, live since 2026-09-30. It sat at
+`a157a1d` (the admin as it was before any multi-location work) for the whole of that
+build.
 
 ## Where you actually test
 
@@ -46,12 +48,10 @@ independently. Coupling them to one branch is the fix.
 
 ## Migrations
 
-Migrations go to **dev only** (`supabase db push --linked` with the dev ref) until the
-release session. Production stays at `20260926000064`.
-
-`058`–`064` are already on production and are verified harmless to both the
-pre-location admin and the 1.2/1.3 mobile clients — they stay. `065` and anything after
-it wait on `multi-location`.
+Migrations go to **dev only** (`supabase db push --linked` with the dev ref) until a
+release session. Production is at `20260928000071`: `065`–`071` went up on 2026-09-30
+with the 1.4 release. Anything written after that waits on `multi-location` until the
+next one.
 
 **Never run any Supabase CLI write from `main`.** `main`'s `supabase/migrations` folder
 stops at `060`, while production's database has `061`–`064` applied. Nothing breaks from
@@ -77,6 +77,56 @@ has the full history.
 
 Always `cat supabase/.temp/project-ref` before any Supabase CLI command.
 
+## Grants on production are not what the local stack shows
+
+Production carries the old hosted-Supabase default privileges:
+
+```sql
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  GRANT ALL ON FUNCTIONS TO postgres, anon, authenticated, service_role;
+```
+
+The current local stack image does not set those for `postgres`. So **a new function
+created in `public` on production is executable by `anon` the moment it exists**, while
+the same function after a local `supabase db reset` is not. A grant check that passes
+locally proves nothing about production.
+
+Two rules follow:
+
+1. Every new function in `public` must `revoke all on function … from public, anon,
+   authenticated;` immediately after its `create`, and then grant only the role that
+   should hold it. `create or replace` keeps the existing function's ACL, so only
+   genuinely new functions need this — but a changed signature is a new function.
+2. Grants are verified **on production**, or on a database restored from a production
+   dump — never only on the local stack.
+
+`service_role` arrives through the same default and those revokes do not name it. That
+is accepted: `service_role` is the server-side key and already bypasses RLS. Name it in
+the revoke when a function must not be reachable even from the server side.
+
+`065`–`071` follow this, and it was checked on prod after the push: `anon` holds
+execute on none of the functions they introduced.
+
+## The `fill_default_location` triggers stay
+
+`062` put `session_slots_fill_location`, `availability_templates_fill_location` and
+`packages_fill_location` on those three tables; `064` made the function they call
+SECURITY DEFINER. They look like backfill scaffolding left behind. They are not.
+
+They are what lets a client that knows nothing about branches still write a row: an
+insert with no `location_id` gets the default branch instead of failing the NOT NULL.
+The pre-location admin depended on that, and the shipped 1.2 and 1.3 mobile apps still
+do — neither can ever be updated, because there is no OTA path. Drop the triggers and
+every one of those inserts starts failing.
+
+They may only go once nothing that omits `location_id` can still reach production, which
+means after 1.2 and 1.3 are out of use. Until then they are load-bearing. **Do not drop
+them.**
+
+**And do not edit `062` or `064` to say so** — they are applied migrations, and
+rewriting applied history is how the files and the schema stop agreeing. This note is
+the record.
+
 ## The refund feature, removed
 
 `067` and `068` built a refund queue: money a card gateway had captured that could
@@ -94,23 +144,27 @@ pre-`067` definitions byte-for-byte, drops `mark_purchase_refunded` and the two
 transfers (`067`), the transfer notification on `credits_granted` (`068`) and the
 `066` trial-checkout policy are untouched and asserted so.
 
-Note for the release session: `067` and `068` still have to be applied to
-production in order, and `071` then takes the refund parts back out. Nothing is
-edited retroactively — the columns exist for three migrations and then do not.
+That is how it went up on 2026-09-30: `067` and `068` applied in order, then `071`
+took the refund parts back out, all in the one push. Nothing was edited retroactively —
+the columns exist for three migrations and then do not.
 
 ## The release session
 
 One session, in this order:
 
-1. Merge `multi-location` → `main`.
-2. `supabase db push` the pending migrations to prod.
-3. Push `main`, which deploys the matching admin.
-4. Only then `eas build --profile production` for the mobile app.
+1. Bump `expo.version` in `apps/mobile/app.json`. The store refuses a build that reuses
+   a shipped version, and the bump has to ride the merge — done afterwards it puts a
+   commit on `multi-location` that `main` does not have, which is the exact drift this
+   file exists to prevent.
+2. Merge `multi-location` → `main`.
+3. `supabase db push` the pending migrations to prod.
+4. Push `main`, which deploys the matching admin.
+5. Only then `eas build --profile production` for the mobile app.
 
 Migrations first, then the admin, then the app. A client that expects a column must
 never reach production before the column does.
 
-Until that session: no `supabase db push` to prod, and no
+Outside a release session: no `supabase db push` to prod, and no
 `eas build --profile production`.
 
 ## Mobile

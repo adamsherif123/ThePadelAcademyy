@@ -10,7 +10,7 @@ import { CLIENT_HEADER_PATTERN, clientHeaderValue } from './clientHeader';
 const SERVER_PATTERN = /^mobile\/\d+\.\d+(\.\d+)?$/;
 
 describe('clientHeaderValue', () => {
-  it('matches the server pattern for the version app.json ships today', () => {
+  it('matches the server pattern for 1.3.1, the version before this release', () => {
     expect(clientHeaderValue('1.3.1')).toBe('mobile/1.3.1');
     expect(SERVER_PATTERN.test(clientHeaderValue('1.3.1')!)).toBe(true);
   });

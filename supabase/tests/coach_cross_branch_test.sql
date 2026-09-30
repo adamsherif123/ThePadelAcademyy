@@ -78,7 +78,7 @@ select is(
 -- ── WITH the header the app actually sends ──────────────────────────────────
 -- Identical to what apps/mobile/src/lib/supabase.ts puts on the client at
 -- construction: ONE client for players and coaches alike, so the coach build
--- cannot forget it. app.json's version is 1.3.1 today; any mobile/<semver>
+-- cannot forget it. app.json's version is 1.4 today; any mobile/<semver>
 -- satisfies the net's regex, which is the point — it says "this binary
 -- understands branches", not "this binary is new enough".
 select set_config('request.headers', '{"x-tpa-client":"mobile/1.4.0"}', true);
