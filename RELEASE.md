@@ -11,9 +11,9 @@ together.
 | `main` | exactly what production serves | Production Branch — a push here deploys the live admin | prod `sxnhkducveyvnzqcnzow` |
 | `multi-location` | the work line | pushes build a preview with **no Supabase config** — see below | none; you test locally |
 
-`main` sits at `f81595a` — the multi-location release, live since 2026-09-30. It sat at
-`a157a1d` (the admin as it was before any multi-location work) for the whole of that
-build.
+`main` sits at the multi-location release, live since 2026-09-30. It sat at `a157a1d`
+— the admin as it was before any multi-location work — for the whole of that build.
+Naming the current hash here only invites it to go stale; `git log main` is the truth.
 
 ## Where you actually test
 
