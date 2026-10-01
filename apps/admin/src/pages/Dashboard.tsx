@@ -22,7 +22,7 @@ import { useState } from 'react';
 
 import {
   atLocation,
-  activePlayerCount,
+  activePlayersAtLocation,
   creditsExpiringSoon,
   recentPurchases,
   revenueByType,
@@ -174,6 +174,10 @@ export function Dashboard() {
   const cNow = cairoCalendarDate(now);
   const monthName = MONTHS[cNow.month - 1] ?? '';
   // Filter the inputs once; every figure below is then about the same branch.
+  // Active players is the exception that proves it: it was the one card reaching
+  // past this block for `data.bookings`, so it counted bookings from every branch
+  // against this branch's credits. It now goes through activePlayersAtLocation,
+  // which filters both of its lists itself.
   // Revenue stays `succeeded AND paid` inside revenueThisMonth, so a refund-required
   // payment (068: status 'failed' + paid) can never be counted here regardless of branch.
   const purchases = atLocation(data.purchases, locationId);
@@ -222,7 +226,12 @@ export function Dashboard() {
           delta={rev.deltaPct}
           caption="vs last month"
         />
-        <StatCard eyebrow="Active players" icon={Users} value={String(activePlayerCount(batches, data.bookings, now))} caption="with credits or bookings" />
+        <StatCard
+          eyebrow="Active players"
+          icon={Users}
+          value={String(activePlayersAtLocation(data.batches, data.bookings, locationId, now))}
+          caption="with credits or bookings"
+        />
         <StatCard eyebrow="Sessions this week" icon={CalendarCheck} value={String(sessionsThisWeek(slots, now))} caption="booked, Sun–Wed" />
         <StatCard eyebrow="Slot fill rate" icon={Gauge} value={`${slotFillRate(slots, now)}%`} caption="capacity booked this week" />
       </div>

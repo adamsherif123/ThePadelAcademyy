@@ -8,12 +8,13 @@ import {
   mockPurchases,
   mockSlots,
 } from '@tpa/mocks';
-import type { IsoInstant, LocationId, PackageId, Piastres } from '@tpa/types';
+import type { Booking, CreditBatch, IsoInstant, LocationId, PackageId, Piastres } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
 import {
   atLocation,
   activePlayerCount,
+  activePlayersAtLocation,
   batchLiability,
   creditLiability,
   recentPurchases,
@@ -157,6 +158,67 @@ describe('activePlayerCount', () => {
     expect(activePlayerCount(mockCreditBatches, mockBookings, now)).toBe(active.size);
     expect(activePlayerCount(mockCreditBatches, mockBookings, now)).toBeGreaterThan(0);
     expect(activePlayerCount(mockCreditBatches, mockBookings, now)).toBeLessThanOrEqual(mockPlayers.length);
+  });
+});
+
+describe('activePlayersAtLocation', () => {
+  // Two branches, and four players who each exist at exactly one of them in
+  // exactly one way. Hand-built rather than from @tpa/mocks, because every mock
+  // row sits at MOCK_LOCATION_ID — a single-branch fixture cannot fail the bug
+  // this test exists for.
+  const ORO = 'loc_oro' as LocationId;
+  const S7A = 'loc_s7a' as LocationId;
+  const soon = '2026-12-01T00:00:00.000Z' as IsoInstant;
+
+  const batch = (playerId: string, locationId: LocationId): CreditBatch =>
+    ({
+      id: `cb_${playerId}`,
+      playerId,
+      locationId,
+      trainingType: 'duo',
+      quantityTotal: 4,
+      quantityRemaining: 4,
+      expiresAt: soon,
+      source: 'admin_grant',
+    }) as unknown as CreditBatch;
+
+  const booking = (playerId: string, locationId: LocationId): Booking =>
+    ({
+      id: `bk_${playerId}`,
+      playerId,
+      locationId,
+      slotId: `ss_${playerId}`,
+      status: 'booked',
+    }) as unknown as Booking;
+
+  const batches = [batch('p_credit_oro', ORO), batch('p_credit_s7a', S7A)];
+  const bookings = [booking('p_booked_oro', ORO), booking('p_booked_s7a', S7A)];
+
+  it('counts only the players active at the branch asked for', () => {
+    expect(activePlayersAtLocation(batches, bookings, ORO, MOCK_NOW)).toBe(2);
+    expect(activePlayersAtLocation(batches, bookings, S7A, MOCK_NOW)).toBe(2);
+  });
+
+  it('does not let a booking at the OTHER branch inflate this one', () => {
+    // The bug: bookings went in unfiltered, so each branch inherited every
+    // branch's bookers and read 3 instead of 2.
+    expect(activePlayerCount(atLocation(batches, ORO), bookings, MOCK_NOW)).toBe(3);
+    expect(activePlayersAtLocation(batches, bookings, ORO, MOCK_NOW)).toBe(2);
+  });
+
+  it("counts a player once when they are active at a branch in both ways", () => {
+    const both = [...batches, batch('p_booked_oro', ORO)];
+    expect(activePlayersAtLocation(both, bookings, ORO, MOCK_NOW)).toBe(2);
+  });
+
+  it("'all' spans every branch, and is a union rather than a sum", () => {
+    expect(activePlayersAtLocation(batches, bookings, 'all', MOCK_NOW)).toBe(4);
+  });
+
+  it('agrees with the unscoped count when every row is at one branch', () => {
+    expect(activePlayersAtLocation(mockCreditBatches, mockBookings, 'all', MOCK_NOW)).toBe(
+      activePlayerCount(mockCreditBatches, mockBookings, MOCK_NOW),
+    );
   });
 });
 

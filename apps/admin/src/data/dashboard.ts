@@ -9,6 +9,7 @@ import {
   type CairoDate,
 } from '@tpa/core';
 import type {
+  Booking,
   CreditBatch,
   IsoInstant,
   Package,
@@ -88,7 +89,12 @@ export function revenueThisMonth(purchases: Purchase[], now: IsoInstant): Revenu
 }
 
 // --- KPI 2: active players (usable credit OR a booked/attended session) ---
-export function activePlayerCount(batches: CreditBatch[], bookings: import('@tpa/types').Booking[], now: IsoInstant): number {
+/**
+ * Both lists must already be about the SAME branch. Call activePlayersAtLocation
+ * rather than this directly — see the note there for what went wrong when a call
+ * site filtered one of them and not the other.
+ */
+export function activePlayerCount(batches: CreditBatch[], bookings: Booking[], now: IsoInstant): number {
   const active = new Set<string>();
   const nowMs = ms(now);
   for (const b of batches) {
@@ -98,6 +104,28 @@ export function activePlayerCount(batches: CreditBatch[], bookings: import('@tpa
     if (bk.status === 'booked' || bk.status === 'attended') active.add(bk.playerId);
   }
   return active.size;
+}
+
+/**
+ * Active players at one branch — the two inputs filtered TOGETHER.
+ *
+ * The Dashboard narrowed `batches` by branch and passed `bookings` whole, so the
+ * card counted "has usable credit HERE, or has a booking ANYWHERE". The booking
+ * half was then a constant sitting inside every branch's figure: each branch read
+ * too high, and the only thing that moved between branches was the credit half.
+ *
+ * It takes the raw lists and does both filters itself, so there is no longer a
+ * version of this call where one argument is scoped and the other is not. That is
+ * the whole point of the signature — `activePlayerCount` is still exported and
+ * still correct, but nothing on a page should be choosing the two lists by hand.
+ */
+export function activePlayersAtLocation(
+  batches: CreditBatch[],
+  bookings: Booking[],
+  locationId: LocationId | 'all',
+  now: IsoInstant,
+): number {
+  return activePlayerCount(atLocation(batches, locationId), atLocation(bookings, locationId), now);
 }
 
 /** Published slots that start within `now`'s Cairo week. */
