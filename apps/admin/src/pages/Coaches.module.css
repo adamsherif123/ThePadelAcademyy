@@ -6,6 +6,34 @@
   margin-block-end: var(--space-xl);
 }
 
+/* The picker sits with the Add-coach button rather than above the grid: it reads
+   as a control on the page's data, and the head already owns that row. Wraps on a
+   narrow screen instead of crushing the select. */
+.headControls {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  flex-shrink: 0;
+}
+
+.headControls > :first-child {
+  min-width: 170px;
+}
+
+/* Hours for a newly-picked month are still in flight; what is on screen is the
+   month before it, so it is dimmed rather than read as the new one. */
+.statLoading {
+  opacity: 0.45;
+  transition: opacity 120ms ease-out;
+}
+
+.hoursNote {
+  margin: calc(var(--space-xl) * -1 + var(--space-sm)) 0 var(--space-lg);
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

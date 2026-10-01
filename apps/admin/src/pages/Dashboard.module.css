@@ -124,7 +124,33 @@
 }
 
 /* Same placement as Packages and Schedule: above the content it scopes. */
-.locationRow {
+/* Two filters side by side, wrapping to a column on a narrow screen rather than
+   squeezing both selects below a usable width. The old single-filter .locationRow
+   is gone — nothing else referenced it. */
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.filterRow > * {
+  flex: 1 1 200px;
   max-width: 280px;
-  margin-bottom: var(--space-lg);
+}
+
+/* While the newly-picked month is in flight the figures on screen are still the
+   previous month's (keepPreviousData), so they are dimmed and made inert rather
+   than presented as the month the label now names. aria-busy carries the same
+   fact to a screen reader. */
+.loadingMonth {
+  opacity: 0.45;
+  transition: opacity 120ms ease-out;
+  pointer-events: none;
+}
+
+.scopeNote {
+  margin: 0 0 var(--space-lg);
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
 }

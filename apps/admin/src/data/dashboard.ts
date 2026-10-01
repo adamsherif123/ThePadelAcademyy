@@ -69,6 +69,21 @@ const sumAmount = (purchases: readonly Purchase[]): Piastres =>
 const inRange = (i: IsoInstant, startMs: number, endMs: number): boolean =>
   ms(i) >= startMs && ms(i) < endMs;
 
+/**
+ * Narrow purchases to a half-open [start, end) window.
+ *
+ * The Dashboard fetches the selected month AND the one before it, because the
+ * revenue delta and the eight-week chart both reach back past the 1st. The figures
+ * that are about the month ALONE — the type split, the latest sales — have to say
+ * so, or they would quietly include the previous month that only came along for
+ * the other two.
+ */
+export function purchasesWithin(purchases: Purchase[], start: IsoInstant, end: IsoInstant): Purchase[] {
+  const a = ms(start);
+  const b = ms(end);
+  return purchases.filter((p) => inRange(p.createdAt, a, b));
+}
+
 // --- KPI 1: revenue this Cairo month vs last — COLLECTED only (succeeded AND paid) ---
 export interface RevenueMonth {
   current: Piastres;

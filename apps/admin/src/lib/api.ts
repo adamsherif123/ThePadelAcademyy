@@ -17,6 +17,7 @@ import type {
   CreditBatch,
   CreditRequest,
   Gender,
+  IsoInstant,
   Level,
   Location,
   LocationId,
@@ -88,8 +89,12 @@ export async function fetchLocations(): Promise<Location[]> {
  * which is the current month. Rolling to a new month is a moving WHERE clause,
  * not a reset — every past month stays computable from the same untouched rows.
  */
-export async function fetchCoachHours(): Promise<Record<CoachId, number>> {
-  const { data, error } = await supabase.rpc('coach_hours_coached');
+export async function fetchCoachHours(monthKey: string | null = null): Promise<Record<CoachId, number>> {
+  // 'YYYY-MM' → the 1st of it, which is the `date` the RPC date_trunc's anyway.
+  // null sends no argument at all, so the default path is byte-identical to what
+  // it has always been: the RPC's own "the month Cairo is in right now".
+  const args = monthKey === null ? undefined : { p_month: `${monthKey}-01` };
+  const { data, error } = await supabase.rpc('coach_hours_coached', args);
   if (error) throw new ApiError(`Failed to load coach hours: ${error.message}`, error.code, error);
   const out: Record<string, number> = {};
   for (const row of (data ?? []) as { coach_id: string; hours: number }[]) {
@@ -105,6 +110,48 @@ export const fetchSlots = (): Promise<SessionSlot[]> => selectAll('session_slots
 export const fetchCreditBatches = (): Promise<CreditBatch[]> => selectAll('credit_batches', rowToCreditBatch);
 export const fetchBookings = (): Promise<Booking[]> => selectAll('bookings', rowToBooking);
 export const fetchPurchases = (): Promise<Purchase[]> => selectAll('purchases', rowToPurchase);
+
+/**
+ * Purchases created inside a half-open [start, end) window.
+ *
+ * The Dashboard used to read every purchase the academy has ever taken and do its
+ * month arithmetic in the browser. That is fine at forty rows and is the wrong
+ * shape at forty thousand: the cost of looking at October grows with how long the
+ * academy has been open. This asks for the window it is about to display, and the
+ * months before it are fetched only if somebody picks one.
+ *
+ * Half-open, and the bound is `created_at` — the same field every revenue figure
+ * buckets on — so a purchase belongs to exactly one month's window and the two
+ * sides of a month boundary can never double-count it.
+ */
+export async function fetchPurchasesInRange(start: IsoInstant, end: IsoInstant): Promise<Purchase[]> {
+  const { data, error } = await supabase
+    .from('purchases')
+    .select('*')
+    .gte('created_at', start)
+    .lt('created_at', end);
+  if (error) throw new ApiError(`Failed to load purchases: ${error.message}`, error.code, error);
+  return (data ?? []).map(rowToPurchase);
+}
+
+/**
+ * When the academy's first purchase was, or null if there has never been one.
+ *
+ * One row, one column — this exists only to decide how far back the month picker
+ * should offer, and asking for the whole table to find a minimum would undo the
+ * point of the windowed read above. Null is a real answer (a new academy), and the
+ * picker then offers the current month alone.
+ */
+export async function fetchEarliestPurchaseInstant(): Promise<IsoInstant | null> {
+  const { data, error } = await supabase
+    .from('purchases')
+    .select('created_at')
+    .order('created_at', { ascending: true })
+    .limit(1);
+  if (error) throw new ApiError(`Failed to load purchase history: ${error.message}`, error.code, error);
+  const row = (data ?? [])[0] as { created_at?: string } | undefined;
+  return (row?.created_at as IsoInstant | undefined) ?? null;
+}
 export const fetchCreditRequests = (): Promise<CreditRequest[]> => selectAll('credit_requests', rowToCreditRequest);
 
 /**

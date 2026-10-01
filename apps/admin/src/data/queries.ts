@@ -4,6 +4,7 @@ import type {
   Coach,
   CoachId,
   CreditBatch,
+  IsoInstant,
   Location,
   LocationId,
   News,
@@ -40,6 +41,8 @@ import {
   fetchPackages,
   fetchPlayers,
   fetchPurchases,
+  fetchPurchasesInRange,
+  fetchEarliestPurchaseInstant,
   fetchSlots,
   fetchTemplates,
 } from '../lib/api';
@@ -63,6 +66,35 @@ export interface Resource<T> {
   refetch: () => void;
 }
 
+/**
+ * A Resource that also reports a background refetch.
+ *
+ * `keepPreviousData` is what stops a month change flashing a spinner — but it also
+ * means that for the moment between picking October and October arriving, the
+ * screen is showing September's numbers. Under a label that now says October. For
+ * a money figure that is not a cosmetic problem, so the pages that use it dim the
+ * figures while this is true rather than presenting the old month as the new one.
+ */
+export interface Refetchable<T> extends Resource<T> {
+  isFetching: boolean;
+}
+
+function toRefetchable<T>(q: {
+  data: T | undefined;
+  isPending: boolean;
+  isFetching: boolean;
+  isError: boolean;
+  refetch: () => unknown;
+}): Refetchable<T> {
+  return {
+    data: q.data,
+    isPending: q.isPending,
+    isFetching: q.isFetching,
+    isError: q.isError,
+    refetch: () => void q.refetch(),
+  };
+}
+
 function toResource<T>(q: {
   data: T | undefined;
   isPending: boolean;
@@ -74,11 +106,26 @@ function toResource<T>(q: {
 
 export const useCoaches = () => toResource(useQuery({ queryKey: queryKeys.coaches, queryFn: fetchCoaches }));
 export const useLocations = () => toResource(useQuery({ queryKey: queryKeys.locations, queryFn: fetchLocations }));
-/** Hours coached per coach for the CURRENT Cairo month — a separate lightweight
- *  query (the SQL aggregate), never folded into useAdminData's monolith.
- *  Coaches.tsx defaults a coach absent from the map to 0. */
-export const useCoachHours = (): Resource<Record<CoachId, number>> =>
-  toResource(useQuery({ queryKey: queryKeys.coachHours, queryFn: fetchCoachHours }));
+/**
+ * Hours coached per coach for one Cairo month — a separate lightweight query (the
+ * SQL aggregate), never folded into useAdminData's monolith. Coaches.tsx defaults
+ * a coach absent from the map to 0.
+ *
+ * `monthKey` null means the current month and sends no argument, which is the RPC's
+ * own default — so the page's default load is the same single request it always was.
+ * A past month is a different cache entry, fetched the first time it is asked for
+ * and then free to return to. The rows behind it never change (the month is over),
+ * which is what makes caching a past month safe in a way caching the current one
+ * would not be.
+ */
+export const useCoachHours = (monthKey: string | null = null): Refetchable<Record<CoachId, number>> =>
+  toRefetchable(
+    useQuery({
+      queryKey: [...queryKeys.coachHours, monthKey],
+      queryFn: () => fetchCoachHours(monthKey),
+      placeholderData: keepPreviousData,
+    }),
+  );
 export const usePlayers = () => toResource(useQuery({ queryKey: queryKeys.players, queryFn: fetchPlayers }));
 export const usePackages = () => toResource(useQuery({ queryKey: queryKeys.packages, queryFn: fetchPackages }));
 export const useTemplates = () => toResource(useQuery({ queryKey: queryKeys.templates, queryFn: fetchTemplates }));
@@ -86,6 +133,32 @@ export const useSlots = () => toResource(useQuery({ queryKey: queryKeys.slots, q
 export const useBatches = () => toResource(useQuery({ queryKey: queryKeys.batches, queryFn: fetchCreditBatches }));
 export const useBookings = () => toResource(useQuery({ queryKey: queryKeys.bookings, queryFn: fetchBookings }));
 export const usePurchases = () => toResource(useQuery({ queryKey: queryKeys.purchases, queryFn: fetchPurchases }));
+
+/**
+ * Purchases inside one [start, end) window — the Dashboard's read.
+ *
+ * The point of the window is that the months before it are never fetched unless
+ * somebody picks one. Each window is its own cache entry, so going back to a month
+ * you have already opened is instant and costs nothing; `keepPreviousData` keeps
+ * the month you were looking at on screen while the next one loads, so the KPIs
+ * change value rather than collapsing to a spinner and back.
+ */
+export const usePurchasesInRange = (start: IsoInstant, end: IsoInstant): Refetchable<Purchase[]> =>
+  toRefetchable(
+    useQuery({
+      queryKey: [...queryKeys.purchasesInRange, start, end],
+      queryFn: () => fetchPurchasesInRange(start, end),
+      placeholderData: keepPreviousData,
+    }),
+  );
+
+/**
+ * When the academy's first purchase was — one row, and the only thing that decides
+ * how far back the month picker offers. Null for an academy that has never sold
+ * anything, which the picker renders as "this month only".
+ */
+export const useEarliestPurchase = (): Resource<IsoInstant | null> =>
+  toResource(useQuery({ queryKey: queryKeys.earliestPurchase, queryFn: fetchEarliestPurchaseInstant }));
 export const useCreditRequests = () =>
   toResource(useQuery({ queryKey: queryKeys.creditRequests, queryFn: fetchCreditRequests }));
 export const useNews = (): Resource<News[]> =>

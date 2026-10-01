@@ -14,6 +14,7 @@ export function StatCard({
   value,
   delta,
   caption,
+  className,
 }: {
   eyebrow: string;
   icon: LucideIcon;
@@ -22,9 +23,12 @@ export function StatCard({
   /** Signed % change; null/undefined renders no chip. */
   delta?: number | null;
   caption: string;
+  /** Appended to the card's own class — for a caller that needs to mark the card's
+   *  state (the Dashboard dims it while a newly-picked month is still loading). */
+  className?: string;
 }) {
   return (
-    <div className={styles.card}>
+    <div className={[styles.card, className ?? ''].join(' ').trim()}>
       <div className={styles.top}>
         <span className={styles.eyebrow}>{eyebrow}</span>
         <span className={styles.icon} data-tone={iconTone}>

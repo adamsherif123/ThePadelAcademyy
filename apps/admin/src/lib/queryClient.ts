@@ -47,6 +47,12 @@ export const queryKeys = {
   creditRequestsPage: ['creditRequestsPage'] as const,
   creditRequestStatusCounts: ['creditRequestStatusCounts'] as const,
   purchases: ['purchases'] as const,
+  /** The Dashboard's windowed purchase read — a prefix, one cache entry per month
+   *  window, so picking a month you have already looked at costs nothing and
+   *  invalidating the prefix refetches whichever month is on screen. */
+  purchasesInRange: ['purchasesInRange'] as const,
+  /** One row: when the first purchase was, for how far back the month picker offers. */
+  earliestPurchase: ['earliestPurchase'] as const,
   creditRequests: ['creditRequests'] as const,
   news: ['news'] as const,
   coachHours: ['coachHours'] as const,
@@ -57,7 +63,7 @@ export const TOUCHED = {
   // cancel_session / remove_booking / admin_book_player affect bookings + seat counts + (refund) batches
   booking: [queryKeys.bookings, queryKeys.bookingsPage, queryKeys.bookingStatusCounts, queryKeys.slots, queryKeys.batches] as const,
   // grant_credits / record_cash_purchase mint credits (+ a purchase row)
-  money: [queryKeys.batches, queryKeys.purchases, queryKeys.playersPage] as const,
+  money: [queryKeys.batches, queryKeys.purchases, queryKeys.purchasesInRange, queryKeys.earliestPurchase, queryKeys.playersPage] as const,
   // transfer_credit_batch moves quantity between two batches of the same player:
   // the wallet and the players page both show those totals.
   transfer: [queryKeys.batches, queryKeys.playersPage] as const,
@@ -69,6 +75,8 @@ export const TOUCHED = {
   creditRequests: [
     queryKeys.batches,
     queryKeys.purchases,
+    queryKeys.purchasesInRange,
+    queryKeys.earliestPurchase,
     queryKeys.creditRequests,
     queryKeys.creditRequestsPage,
     queryKeys.creditRequestStatusCounts,
@@ -95,14 +103,18 @@ export const TOUCHED = {
   creditBatchDelete: [
     queryKeys.batches,
     queryKeys.purchases,
+    queryKeys.purchasesInRange,
+    queryKeys.earliestPurchase,
     queryKeys.creditRequests,
     queryKeys.creditRequestsPage,
     queryKeys.creditRequestStatusCounts,
     queryKeys.playersPage,
   ] as const,
   // set_purchase_paid flips whether a purchase counts as revenue. The Dashboard's
-  // revenue and PlayerDetailModal read the monolith `purchases`; the Credit Requests
-  // page reads the purchase EMBEDDED in its paginated rows — so both must refetch, or
-  // the toggle would appear to do nothing on one of the two screens.
-  purchasePaid: [queryKeys.purchases, queryKeys.creditRequestsPage] as const,
+  // revenue reads the WINDOWED purchases query and PlayerDetailModal reads the
+  // monolith; the Credit Requests page reads the purchase EMBEDDED in its paginated
+  // rows — so all three must refetch, or the toggle would appear to do nothing on
+  // one of the screens. purchasesInRange is a prefix, so whichever month window is
+  // currently cached is the one that refetches.
+  purchasePaid: [queryKeys.purchases, queryKeys.purchasesInRange, queryKeys.creditRequestsPage] as const,
 };

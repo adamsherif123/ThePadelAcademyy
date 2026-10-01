@@ -8,13 +8,14 @@ import {
   mockPurchases,
   mockSlots,
 } from '@tpa/mocks';
-import type { Booking, CreditBatch, IsoInstant, LocationId, PackageId, Piastres } from '@tpa/types';
+import type { Booking, CreditBatch, IsoInstant, LocationId, PackageId, Piastres, Purchase } from '@tpa/types';
 import { describe, expect, it } from 'vitest';
 
 import {
   atLocation,
   activePlayerCount,
   activePlayersAtLocation,
+  purchasesWithin,
   batchLiability,
   creditLiability,
   recentPurchases,
@@ -219,6 +220,90 @@ describe('activePlayersAtLocation', () => {
     expect(activePlayersAtLocation(mockCreditBatches, mockBookings, 'all', MOCK_NOW)).toBe(
       activePlayerCount(mockCreditBatches, mockBookings, MOCK_NOW),
     );
+  });
+});
+
+describe('purchasesWithin — the month-only slice of a two-month window', () => {
+  /**
+   * The Dashboard fetches the selected month AND the one before it, because the
+   * revenue delta and the trailing chart both need it. Everything that is about
+   * the month alone then has to cut the window back down, or August's sales appear
+   * under September's "what earns" donut and in September's latest-sales list —
+   * a figure that is wrong rather than missing, and attributed to a month the user
+   * explicitly asked about.
+   */
+  const SEP_START = '2026-09-01T00:00:00.000Z' as IsoInstant;
+  const OCT_START = '2026-10-01T00:00:00.000Z' as IsoInstant;
+  const NOV_START = '2026-11-01T00:00:00.000Z' as IsoInstant;
+
+  const buy = (id: string, createdAt: string): Purchase =>
+    ({
+      id,
+      createdAt: createdAt as IsoInstant,
+      status: 'succeeded',
+      paid: true,
+      amount: 1000,
+      locationId: 'loc_oro',
+      packageId: 'pkg_1',
+    }) as unknown as Purchase;
+
+  const window2 = [
+    buy('sep_early', '2026-09-02T10:00:00.000Z'),
+    buy('sep_late', '2026-09-28T10:00:00.000Z'),
+    buy('oct_one', '2026-10-05T10:00:00.000Z'),
+    buy('oct_two', '2026-10-20T10:00:00.000Z'),
+  ];
+
+  it('keeps only what falls inside the range', () => {
+    expect(purchasesWithin(window2, OCT_START, NOV_START).map((p) => p.id)).toEqual(['oct_one', 'oct_two']);
+    expect(purchasesWithin(window2, SEP_START, OCT_START).map((p) => p.id)).toEqual(['sep_early', 'sep_late']);
+  });
+
+  it('is half-open: the boundary instant belongs to the later month only', () => {
+    const onTheSeam = [buy('seam', '2026-10-01T00:00:00.000Z')];
+    expect(purchasesWithin(onTheSeam, SEP_START, OCT_START)).toHaveLength(0);
+    expect(purchasesWithin(onTheSeam, OCT_START, NOV_START)).toHaveLength(1);
+  });
+
+  it('partitions the window — every purchase lands in exactly one month', () => {
+    const sep = purchasesWithin(window2, SEP_START, OCT_START);
+    const oct = purchasesWithin(window2, OCT_START, NOV_START);
+    expect(sep.length + oct.length).toBe(window2.length);
+    expect(sep.filter((p) => oct.includes(p))).toHaveLength(0);
+  });
+});
+
+describe('the month aggregates, driven by a chosen month rather than now', () => {
+  // revenueThisMonth takes an INSTANT and derives "its" month from it, which is
+  // what lets the picker drive it without the function knowing a picker exists.
+  const buy = (id: string, createdAt: string, amount = 1000): Purchase =>
+    ({
+      id,
+      createdAt: createdAt as IsoInstant,
+      status: 'succeeded',
+      paid: true,
+      amount,
+      locationId: 'loc_oro',
+      packageId: 'pkg_1',
+    }) as unknown as Purchase;
+
+  const window2 = [
+    buy('aug', '2026-08-15T10:00:00.000Z', 500),
+    buy('sep_a', '2026-09-10T10:00:00.000Z', 1000),
+    buy('sep_b', '2026-09-20T10:00:00.000Z', 1000),
+  ];
+
+  it('reports the chosen month as current and the one before it as previous', () => {
+    const r = revenueThisMonth(window2, '2026-09-01T00:00:00.000Z' as IsoInstant);
+    expect(r.current).toBe(2000);
+    expect(r.previous).toBe(500);
+    expect(r.deltaPct).toBe(300);
+  });
+
+  it('gives the same answer from any instant inside the month', () => {
+    const first = revenueThisMonth(window2, '2026-09-01T00:00:00.000Z' as IsoInstant);
+    const middle = revenueThisMonth(window2, '2026-09-17T13:45:00.000Z' as IsoInstant);
+    expect(middle).toEqual(first);
   });
 });
 
