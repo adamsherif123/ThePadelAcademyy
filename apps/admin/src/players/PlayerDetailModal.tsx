@@ -34,7 +34,7 @@ import { grantCredits } from '../data/grant';
 import { locationNameById } from '../data/locations';
 import { activeLocations } from '../data/useSelectedLocation';
 import { canTransferBatch, transferCreditBatch, transferTargets, TRANSFER_ERROR } from '../data/transfer';
-import { groupBatchesByLocation, groupPackagesByLocation } from '../data/wallet';
+import { defaultCashLocation, groupBatchesByLocation, sellablePackagesAt } from '../data/wallet';
 import { setPlayerCoach } from '../data/playerCoach';
 import { sessionRetailValue, SELLABLE_TYPES } from '../data/packages';
 import {
@@ -615,11 +615,9 @@ function GrantView({ player, packages, locations, onBack, onClose }: { player: P
 }
 
 // ---- CASH ----
-const sellablePackages = (packages: Package[]): Package[] =>
-  packages
-    // A5: trial is sellable now — an admin can record a cash trial purchase (once per player).
-    .filter((p) => p.isActive)
-    .sort((a, b) => a.trainingType.localeCompare(b.trainingType) || a.sessionCount - b.sessionCount);
+// The sellable-and-sorted rule moved to wallet.ts's sellablePackagesAt, which
+// does the same filter and sort per branch. Trial stays sellable (A5): an admin
+// can record a cash trial purchase, once per player.
 
 function CashView({
   player,
@@ -636,13 +634,30 @@ function CashView({
   onBack: () => void;
   onClose: () => void;
 }) {
-  const packages = sellablePackages(allPkgs);
-  // Grouped by branch, because two branches may sell a bundle with the SAME name
-  // at different prices — a flat list would make those indistinguishable, and
-  // picking the wrong one mints credits at the wrong branch.
-  const pkgGroups = groupPackagesByLocation(packages, locations);
-  const [packageId, setPackageId] = useState<PackageId | ''>(pkgGroups[0]?.items[0]?.id ?? '');
-  const selected = packages.find((p) => p.id === packageId) ?? null;
+  // ── branch first, then that branch's catalogue ──
+  // A cash purchase cannot carry a branch of its own: record_cash_purchase takes
+  // no location, and 065's before-insert trigger overwrites purchases.location_id
+  // from the package — "whatever the client sent is discarded". So the branch IS
+  // the package's branch, and the only way to let an admin choose one is to pick
+  // the branch and narrow the packages to it.
+  //
+  // This used to be a single dropdown with the branches as <optgroup> labels. That
+  // technically allowed the choice and in practice hid it: an admin reading "Duo ·
+  // 1 Session" has no reason to scroll for a second group, a branch with no
+  // packages vanished from the list entirely with nothing said, and the sibling
+  // Grant-credits modal right next to it asks for a branch outright. Two money
+  // modals, two different answers to "which branch", is the actual defect.
+  const branches = activeLocations(locations);
+  const [locationId, setLocationId] = useState<LocationId | ''>(
+    defaultCashLocation(allPkgs, locations),
+  );
+  const branchPackages = sellablePackagesAt(allPkgs, locationId);
+  const [packageId, setPackageId] = useState<PackageId | ''>(branchPackages[0]?.id ?? '');
+  // Resolved against THIS BRANCH's packages, never the whole catalogue. A stale id
+  // left over from another branch therefore resolves to null — the save button
+  // disables and nothing is recorded — rather than quietly minting credits at the
+  // branch the admin just navigated away from.
+  const selected = branchPackages.find((p) => p.id === packageId) ?? null;
   const [amountEgp, setAmountEgp] = useState<number>(selected ? selected.price / 100 : 0);
   const [error, setError] = useState<string | null>(null);
 
@@ -657,8 +672,19 @@ function CashView({
 
   const pickPackage = (id: string) => {
     setPackageId(id as PackageId);
-    const pkg = packages.find((p) => p.id === id);
+    const pkg = branchPackages.find((p) => p.id === id);
     if (pkg) setAmountEgp(pkg.price / 100); // amount follows the picked package's list price
+  };
+
+  // Changing branch re-points the package and the amount together. Leaving the
+  // old package id in place would either resolve to null (a dead Record button)
+  // or, if both branches happen to sell the same id, to the wrong branch's price.
+  const pickLocation = (id: string) => {
+    setLocationId(id as LocationId);
+    const first = sellablePackagesAt(allPkgs, id as LocationId)[0] ?? null;
+    setPackageId(first?.id ?? '');
+    setAmountEgp(first ? first.price / 100 : 0);
+    setError(null);
   };
 
   const onSave = async () => {
@@ -690,16 +716,28 @@ function CashView({
       }
     >
       <div className={styles.form}>
+        {/* Full width and first, exactly like Grant credits': a credit is only
+            spendable at ONE branch (065), so which branch is as load-bearing as
+            which package — and it decides what the package list can even show. */}
+        <Select
+          label="Location"
+          value={locationId}
+          onChange={(e) => pickLocation(e.target.value)}
+          options={branches.map((l) => ({ value: l.id, label: l.name }))}
+          hint="These credits can only be used at this location."
+        />
+
         <div className={styles.grid}>
           <Select
             label="Package"
             value={packageId}
             onChange={(e) => pickPackage(e.target.value)}
-            groups={pkgGroups.map((g) => ({
-              label: g.locationName,
-              options: g.items.map((p) => ({ value: p.id, label: p.name })),
-            }))}
-            hint={selected ? `Credits will be usable at ${locationNameById(locations, selected.locationId)}.` : undefined}
+            options={branchPackages.map((p) => ({ value: p.id, label: p.name }))}
+            hint={
+              branchPackages.length === 0
+                ? `Nothing to sell at ${locationNameById(locations, locationId || null)} yet.`
+                : undefined
+            }
           />
           <Input
             label="Amount received (EGP)"
@@ -734,8 +772,18 @@ function CashView({
               you mark it paid.
             </span>
           </p>
+        ) : branchPackages.length === 0 ? (
+          // Said plainly, with the way out. The old grouped dropdown dropped a
+          // branch with no packages from the list altogether, so this state was
+          // invisible — it looked as though the branch could not be sold at,
+          // rather than that nobody had given it a price list yet.
+          <p className={styles.empty}>
+            {locationId === ''
+              ? 'No active branch to record a payment at.'
+              : `${locationNameById(locations, locationId)} has no active packages. Add one on the Packages page, then record the payment here.`}
+          </p>
         ) : (
-          <p className={styles.empty}>No sellable packages to record against.</p>
+          <p className={styles.empty}>Pick a package to record against.</p>
         )}
 
         {error ? (
