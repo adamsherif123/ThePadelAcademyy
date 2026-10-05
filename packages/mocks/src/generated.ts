@@ -122,7 +122,10 @@ const PURCHASE_STATUS: readonly (readonly [Purchase['status'], number])[] = [
   ['failed', 4],
 ];
 
-export const generatedPurchases: Purchase[] = [];
+// Seeds, not finished Purchases: wallet.ts derives paidAt/revenueAt for the
+// whole list in one place so the mocks cannot disagree with the database's own
+// coalesce(paid_at, created_at).
+export const generatedPurchases: Omit<Purchase, 'paidAt' | 'revenueAt'>[] = [];
 export const generatedBatches: CreditBatch[] = [];
 let purchaseSeq = 0;
 let batchSeq = 0;

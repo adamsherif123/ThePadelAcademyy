@@ -120,16 +120,21 @@ export const fetchPurchases = (): Promise<Purchase[]> => selectAll('purchases', 
  * academy has been open. This asks for the window it is about to display, and the
  * months before it are fetched only if somebody picks one.
  *
- * Half-open, and the bound is `created_at` — the same field every revenue figure
- * buckets on — so a purchase belongs to exactly one month's window and the two
- * sides of a month boundary can never double-count it.
+ * Half-open, and the bound is `revenue_at` — the generated column every revenue
+ * figure buckets on (072) — so a purchase belongs to exactly one month's window
+ * and the two sides of a month boundary can never double-count it.
+ *
+ * It MUST be revenue_at and not created_at. A request approved in August and
+ * finally paid in October is October's money; a window filtered on created_at
+ * would never fetch it, and October's revenue would be quietly short by exactly
+ * the sales that took longest to collect — the ones most worth seeing.
  */
 export async function fetchPurchasesInRange(start: IsoInstant, end: IsoInstant): Promise<Purchase[]> {
   const { data, error } = await supabase
     .from('purchases')
     .select('*')
-    .gte('created_at', start)
-    .lt('created_at', end);
+    .gte('revenue_at', start)
+    .lt('revenue_at', end);
   if (error) throw new ApiError(`Failed to load purchases: ${error.message}`, error.code, error);
   return (data ?? []).map(rowToPurchase);
 }
@@ -145,12 +150,12 @@ export async function fetchPurchasesInRange(start: IsoInstant, end: IsoInstant):
 export async function fetchEarliestPurchaseInstant(): Promise<IsoInstant | null> {
   const { data, error } = await supabase
     .from('purchases')
-    .select('created_at')
-    .order('created_at', { ascending: true })
+    .select('revenue_at')
+    .order('revenue_at', { ascending: true })
     .limit(1);
   if (error) throw new ApiError(`Failed to load purchase history: ${error.message}`, error.code, error);
-  const row = (data ?? [])[0] as { created_at?: string } | undefined;
-  return (row?.created_at as IsoInstant | undefined) ?? null;
+  const row = (data ?? [])[0] as { revenue_at?: string } | undefined;
+  return (row?.revenue_at as IsoInstant | undefined) ?? null;
 }
 export const fetchCreditRequests = (): Promise<CreditRequest[]> => selectAll('credit_requests', rowToCreditRequest);
 

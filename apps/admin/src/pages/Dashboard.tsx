@@ -23,6 +23,7 @@ import {
   atLocation,
   activePlayersAtLocation,
   creditsExpiringSoon,
+  isSameCairoDay,
   purchasesWithin,
   recentPurchases,
   revenueByType,
@@ -177,7 +178,17 @@ function PurchaseRow({
       <div className={styles.endCol}>
         <span className={styles.amount}>{formatPiastres(purchase.amount)}</span>
         {purchase.paid ? null : <span className={styles.unpaid}>Not paid</span>}
-        <span className={styles.sub}>{formatInstantDate(purchase.createdAt)}</span>
+        {/* The sale date, and the collection date too when they differ (072).
+            This panel is filed by the month the money arrived, so a 30 Sep sale
+            can legitimately appear under October — showing only "30 Sep" there
+            would read as a bug. Showing only the paid date would lose when it
+            was actually sold. */}
+        <span className={styles.sub}>
+          {formatInstantDate(purchase.createdAt)}
+          {purchase.paidAt && !isSameCairoDay(purchase.createdAt, purchase.paidAt)
+            ? ` · paid ${formatInstantDate(purchase.paidAt)}`
+            : ''}
+        </span>
       </div>
     </div>
   );

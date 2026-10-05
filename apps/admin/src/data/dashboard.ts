@@ -70,6 +70,20 @@ const inRange = (i: IsoInstant, startMs: number, endMs: number): boolean =>
   ms(i) >= startMs && ms(i) < endMs;
 
 /**
+ * Do two instants fall on the same Cairo calendar day?
+ *
+ * Used to decide whether a purchase's collection date is worth showing next to
+ * its sale date. Compared in Cairo, not UTC, because the admin reads these dates
+ * in Cairo and a sale at 11pm paid at 1am the "same night" is two UTC days but
+ * one working evening.
+ */
+export function isSameCairoDay(a: IsoInstant, b: IsoInstant): boolean {
+  const x = cairoCalendarDate(a);
+  const y = cairoCalendarDate(b);
+  return x.year === y.year && x.month === y.month && x.day === y.day;
+}
+
+/**
  * Narrow purchases to a half-open [start, end) window.
  *
  * The Dashboard fetches the selected month AND the one before it, because the
@@ -81,7 +95,7 @@ const inRange = (i: IsoInstant, startMs: number, endMs: number): boolean =>
 export function purchasesWithin(purchases: Purchase[], start: IsoInstant, end: IsoInstant): Purchase[] {
   const a = ms(start);
   const b = ms(end);
-  return purchases.filter((p) => inRange(p.createdAt, a, b));
+  return purchases.filter((p) => inRange(p.revenueAt, a, b));
 }
 
 // --- KPI 1: revenue this Cairo month vs last — COLLECTED only (succeeded AND paid) ---
@@ -97,8 +111,11 @@ export function revenueThisMonth(purchases: Purchase[], now: IsoInstant): Revenu
   const next = ms(cairoMidnight(addMonths({ year: cThis.year, month: cThis.month, day: 1 }, 1)));
   const prev = ms(cairoMidnight(addMonths({ year: cThis.year, month: cThis.month, day: 1 }, -1)));
   const paid = collected(purchases);
-  const current = sumAmount(paid.filter((p) => inRange(p.createdAt, start, next)));
-  const previous = sumAmount(paid.filter((p) => inRange(p.createdAt, prev, start)));
+  // revenueAt, not createdAt (072): a request approved on 30 September and paid
+  // on 1 October is October's money. Bucketing on the sale date credited a month
+  // that had already closed with cash the academy had not yet been given.
+  const current = sumAmount(paid.filter((p) => inRange(p.revenueAt, start, next)));
+  const previous = sumAmount(paid.filter((p) => inRange(p.revenueAt, prev, start)));
   const deltaPct = previous === 0 ? null : Math.round(((current - previous) / previous) * 100);
   return { current, previous, deltaPct };
 }
@@ -224,7 +241,7 @@ export function revenueOverTime(purchases: Purchase[], now: IsoInstant, weeks = 
   for (let w = weeks - 1; w >= 0; w -= 1) {
     const start = cairoMidnight(addCairoDays(base, -w * 7));
     const end = cairoMidnight(addCairoDays(base, -w * 7 + 7));
-    const revenue = sumAmount(paid.filter((p) => inRange(p.createdAt, ms(start), ms(end))));
+    const revenue = sumAmount(paid.filter((p) => inRange(p.revenueAt, ms(start), ms(end))));
     buckets.push({ label: formatDayMonth(start), weekStart: start, revenue });
   }
   return buckets;
@@ -252,9 +269,17 @@ export function creditsExpiringSoon(batches: CreditBatch[], now: IsoInstant, win
 }
 
 // --- Bottom card 3: recent succeeded purchases, newest first — paid or not (the row marks unpaid ones) ---
+/**
+ * The latest sales — succeeded, paid or not, newest first.
+ *
+ * Ordered by revenueAt so the list agrees with the panel it sits in: the
+ * Dashboard's money section is scoped to a month by revenueAt, and a feed
+ * ordered by a different date would put rows in an order the heading above it
+ * does not explain. For an unpaid sale the two are the same date anyway.
+ */
 export function recentPurchases(purchases: Purchase[], n = 4): Purchase[] {
   return succeeded(purchases)
     .slice()
-    .sort((a, b) => ms(b.createdAt) - ms(a.createdAt))
+    .sort((a, b) => ms(b.revenueAt) - ms(a.revenueAt))
     .slice(0, n);
 }

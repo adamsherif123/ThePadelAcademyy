@@ -96,6 +96,11 @@ export function rowToPurchase(r: Row): Purchase {
     gatewayOrderId: nstr(r.gateway_order_id),
     gatewayTransactionId: nstr(r.gateway_transaction_id),
     paid: r.paid === true,
+    paidAt: r.paid_at == null ? null : iso(r.paid_at),
+    // 072 generates revenue_at in the database. The fallback is for a row read
+    // through an older cached response that predates the column — it is the same
+    // expression the column itself uses, so the two cannot disagree.
+    revenueAt: r.revenue_at == null ? iso(r.created_at) : iso(r.revenue_at),
   };
 }
 

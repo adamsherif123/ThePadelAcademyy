@@ -36,6 +36,11 @@ export function buildCashPurchase(
     // Mirrors record_cash_purchase: the sale succeeds and its credits are granted,
     // but it counts as revenue only once the admin marks it paid.
     paid: false,
+    // Uncollected, so there is no collection date yet and revenue still dates
+    // from the sale. set_purchase_paid stamps paidAt when the admin ticks Paid,
+    // and the database recomputes revenueAt from it (072).
+    paidAt: null,
+    revenueAt: now,
   };
 }
 

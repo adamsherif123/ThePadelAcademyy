@@ -18,7 +18,7 @@ import { MOCK_NOW, daysFromNow, egp } from './now';
  * current player's wallet batches below; the pending/failed ones exercise those
  * UI states. `amount` mirrors the package price at purchase time.
  */
-const handPurchases: Purchase[] = [
+const handPurchases: PurchaseSeed[] = [
   { id: 'pu_omar_group8' as PurchaseId, playerId: 'pl_omar' as PlayerId, locationId: MOCK_LOCATION_ID, packageId: 'pk_group_8' as PackageId, status: 'succeeded', amount: egp(2800), createdAt: daysFromNow(-5), paymentMethod: 'paymob', gatewayOrderId: 'pmob_ord_1001', gatewayTransactionId: 'pmob_txn_5001', paid: true },
   // A CASH sale taken at the desk: succeeded, no gateway refs — exercises the cash
   // channel in purchase history and proves cash funds an ordinary purchased batch.
@@ -33,8 +33,27 @@ const handPurchases: Purchase[] = [
   { id: 'pu_omar_indiv4_failed' as PurchaseId, playerId: 'pl_omar' as PlayerId, locationId: MOCK_LOCATION_ID, packageId: 'pk_indiv_4' as PackageId, status: 'failed', amount: egp(3200), createdAt: daysFromNow(-1), paymentMethod: 'paymob', gatewayOrderId: 'pmob_ord_1006', gatewayTransactionId: 'pmob_txn_5006', paid: false },
 ];
 
+/**
+ * The two dates 072 gave a purchase, derived rather than written out on every
+ * row: a paid mock is treated as collected on the day it was sold, so
+ * `revenueAt` equals `createdAt` throughout and no existing expectation about
+ * which month a mock's revenue falls in moves.
+ *
+ * The interesting case — sold in one month, collected in the next — is not
+ * seeded here on purpose. It belongs to the tests that are about it, with dates
+ * chosen to make the month boundary explicit, rather than hidden inside shared
+ * fixtures that a dozen unrelated suites also count.
+ */
+type PurchaseSeed = Omit<Purchase, 'paidAt' | 'revenueAt'>;
+
+const withRevenueDates = (p: PurchaseSeed): Purchase => ({
+  ...p,
+  paidAt: p.paid ? p.createdAt : null,
+  revenueAt: p.createdAt,
+});
+
 /** Hand-tuned core purchases + academy-scale generated history (dashboard revenue). */
-export const mockPurchases: Purchase[] = [...handPurchases, ...generatedPurchases];
+export const mockPurchases: Purchase[] = [...handPurchases, ...generatedPurchases].map(withRevenueDates);
 
 /**
  * Signup-grant trial batches, built through @tpa/core's `buildSignupGrant` so the

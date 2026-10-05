@@ -152,6 +152,24 @@ export interface Purchase {
    * a gateway (Paymob) settlement is paid automatically.
    */
   paid: boolean;
+  /**
+   * When the academy confirmed it collected the money. Null while unpaid, and
+   * cleared again if `paid` is un-ticked. Stamped with the moment the admin
+   * pressed the button, never with the sale date.
+   */
+  paidAt: IsoInstant | null;
+  /**
+   * The date revenue is counted on: `paidAt` once collected, `createdAt` before
+   * that. Generated in the database, so no screen can disagree with another
+   * about which date it means.
+   *
+   * It exists because the two dates are genuinely different facts. A request
+   * approved on 30 September and paid on 1 October is September's SALE and
+   * October's REVENUE; `createdAt` answers "when did they buy it", this answers
+   * "which month was the academy paid". Player-facing purchase history wants the
+   * former; every revenue figure wants this one.
+   */
+  revenueAt: IsoInstant;
 }
 
 /**

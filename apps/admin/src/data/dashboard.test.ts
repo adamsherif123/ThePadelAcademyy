@@ -15,6 +15,7 @@ import {
   atLocation,
   activePlayerCount,
   activePlayersAtLocation,
+  isSameCairoDay,
   purchasesWithin,
   batchLiability,
   creditLiability,
@@ -236,10 +237,15 @@ describe('purchasesWithin — the month-only slice of a two-month window', () =>
   const OCT_START = '2026-10-01T00:00:00.000Z' as IsoInstant;
   const NOV_START = '2026-11-01T00:00:00.000Z' as IsoInstant;
 
-  const buy = (id: string, createdAt: string): Purchase =>
+  // paidAt defaults to the sale date, which is the common case and keeps every
+  // expectation below about months unchanged; the tests that are ABOUT a late
+  // payment pass it explicitly.
+  const buy = (id: string, createdAt: string, paidAt = createdAt): Purchase =>
     ({
       id,
       createdAt: createdAt as IsoInstant,
+      paidAt: paidAt as IsoInstant,
+      revenueAt: paidAt as IsoInstant,
       status: 'succeeded',
       paid: true,
       amount: 1000,
@@ -276,10 +282,12 @@ describe('purchasesWithin — the month-only slice of a two-month window', () =>
 describe('the month aggregates, driven by a chosen month rather than now', () => {
   // revenueThisMonth takes an INSTANT and derives "its" month from it, which is
   // what lets the picker drive it without the function knowing a picker exists.
-  const buy = (id: string, createdAt: string, amount = 1000): Purchase =>
+  const buy = (id: string, createdAt: string, amount = 1000, paidAt = createdAt): Purchase =>
     ({
       id,
       createdAt: createdAt as IsoInstant,
+      paidAt: paidAt as IsoInstant,
+      revenueAt: paidAt as IsoInstant,
       status: 'succeeded',
       paid: true,
       amount,
@@ -304,6 +312,100 @@ describe('the month aggregates, driven by a chosen month rather than now', () =>
     const first = revenueThisMonth(window2, '2026-09-01T00:00:00.000Z' as IsoInstant);
     const middle = revenueThisMonth(window2, '2026-09-17T13:45:00.000Z' as IsoInstant);
     expect(middle).toEqual(first);
+  });
+});
+
+describe('revenue is dated by COLLECTION, not by sale (072)', () => {
+  /**
+   * The scenario, exactly as it was asked for: a player requests credits on
+   * 30 September and pays on 1 October. That money is October's.
+   *
+   * These build the Purchase by hand rather than through @tpa/mocks, because
+   * every mock is paid on the day it was sold — which is the one case that
+   * cannot tell the two dates apart.
+   */
+  const sale = (id: string, createdAt: string, paidAt: string | null, amount = 60000): Purchase =>
+    ({
+      id,
+      createdAt: createdAt as IsoInstant,
+      paidAt: paidAt as IsoInstant | null,
+      // What the generated column computes: coalesce(paid_at, created_at).
+      revenueAt: (paidAt ?? createdAt) as IsoInstant,
+      status: 'succeeded',
+      paid: paidAt !== null,
+      amount,
+      locationId: 'loc_oro',
+      packageId: 'pkg_1',
+    }) as unknown as Purchase;
+
+  // Requested 30 Sep (Cairo), collected 1 Oct (Cairo). 21:00Z on the 30th is
+  // already past midnight in Cairo, so these two instants are unambiguously in
+  // different Cairo months.
+  const lateCollection = sale('late', '2026-09-30T09:00:00.000Z', '2026-10-01T09:00:00.000Z');
+  const sameDay = sale('sameday', '2026-09-15T09:00:00.000Z', '2026-09-15T09:00:00.000Z');
+  const uncollected = sale('open', '2026-09-20T09:00:00.000Z', null);
+  const all = [lateCollection, sameDay, uncollected];
+
+  const SEP = '2026-09-10T00:00:00.000Z' as IsoInstant;
+  const OCT = '2026-10-10T00:00:00.000Z' as IsoInstant;
+
+  it('puts a September sale paid in October into OCTOBER revenue', () => {
+    expect(revenueThisMonth(all, OCT).current).toBe(60000);
+  });
+
+  it('and takes it out of September, which it used to inflate', () => {
+    // Before 072 this read 120000 — the late collection plus the same-day one —
+    // and September closed claiming money the academy did not have yet.
+    expect(revenueThisMonth(all, SEP).current).toBe(60000);
+  });
+
+  it('counts it once, not in both months', () => {
+    const sep = revenueThisMonth(all, SEP).current;
+    const oct = revenueThisMonth(all, OCT).current;
+    expect(sep + oct).toBe(120000);
+  });
+
+  it("shows up as October's delta against September rather than a fall to zero", () => {
+    const oct = revenueThisMonth(all, OCT);
+    expect(oct.previous).toBe(60000);
+    expect(oct.deltaPct).toBe(0);
+  });
+
+  it('leaves an uncollected sale out of revenue entirely, in either month', () => {
+    const onlyOpen = [uncollected];
+    expect(revenueThisMonth(onlyOpen, SEP).current).toBe(0);
+    expect(revenueThisMonth(onlyOpen, OCT).current).toBe(0);
+  });
+
+  it('files the month slice by collection too, so the donut and the feed agree', () => {
+    const octStart = '2026-10-01T00:00:00.000Z' as IsoInstant;
+    const novStart = '2026-11-01T00:00:00.000Z' as IsoInstant;
+    expect(purchasesWithin(all, octStart, novStart).map((p) => p.id)).toEqual(['late']);
+  });
+
+  it('still shows an uncollected sale in the month it was SOLD', () => {
+    // revenue_at falls back to created_at while unpaid, which is what keeps the
+    // latest-sales feed honest about sales nobody has paid for yet.
+    const sepStart = '2026-09-01T00:00:00.000Z' as IsoInstant;
+    const octStart = '2026-10-01T00:00:00.000Z' as IsoInstant;
+    expect(purchasesWithin(all, sepStart, octStart).map((p) => p.id)).toEqual(['sameday', 'open']);
+  });
+
+  it('orders the latest-sales feed by collection date', () => {
+    expect(recentPurchases(all, 4).map((p) => p.id)).toEqual(['late', 'open', 'sameday']);
+  });
+});
+
+describe('isSameCairoDay', () => {
+  it('is true for two instants on one Cairo day', () => {
+    expect(isSameCairoDay('2026-10-01T06:00:00.000Z' as IsoInstant, '2026-10-01T15:00:00.000Z' as IsoInstant)).toBe(true);
+  });
+
+  it('is false across a Cairo midnight even when UTC still calls it one day', () => {
+    // 21:30Z on the 30th is already the 1st in Cairo. Comparing in UTC would
+    // call these the same day and the row would hide the collection date on
+    // exactly the overnight payments worth showing it for.
+    expect(isSameCairoDay('2026-09-30T18:00:00.000Z' as IsoInstant, '2026-09-30T22:30:00.000Z' as IsoInstant)).toBe(false);
   });
 });
 
