@@ -172,6 +172,36 @@ There is no over-the-air update path — `expo-updates` is not installed and not
 the repo runs `eas update`. A shipped build can only be changed by another store
 release, which is why the mobile app is the last step and never the first.
 
+## Android
+
+The `android` branch (cut from `main` at `072`) carries the first Android release:
+the platform-aware update gate, migration `073` (app_config's Android version
+fields), the Play photo-policy permission block, and the Android audit fixes. It
+merges into `main` in a release session like any other work.
+
+What that release session must do for Android, in the usual order:
+
+1. `supabase db push` — `073` goes to prod with everything else pending. Until it
+   does, an Android build on prod reads a column that does not exist; PostgREST
+   answers 400/42703 and the gate fails open (no block, no prompt). That is safe,
+   but it means **no Android build is force-updatable until `073` is on prod.**
+2. `supabase functions deploy send-push` to prod — it now names Android channel
+   `default` and FCM priority `high`.
+3. Merge `android` → `main`, push (deploys the admin; the admin is unaffected).
+4. Set the Android values on prod, out of band like the iOS ones:
+   `latest_android_version` = the versionName live on Play, and
+   `min_supported_android_version` = the oldest versionName that may still run
+   (leave NULL until there is a build worth forcing people onto).
+
+`google-services.json` is committed on purpose (public client config; EAS only
+uploads tracked files). The FCM V1 service-account key is the secret and lives in
+EAS credentials only — see `apps/mobile/NOTIFICATIONS_SETUP.md`.
+
+The first Android `.aab` (1.4, versionCode 4) was built on 2026-10-15 from
+`android` at `c3aee00`, outside a release session, by explicit request — so the
+first upload to Play's closed-testing track could happen by hand. It reads prod and
+fails open there as described above. It was not uploaded by any tool.
+
 EAS environment variables (server-side, not in this repo):
 
 | EAS environment | Supabase |
