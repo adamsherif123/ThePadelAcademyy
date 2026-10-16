@@ -63,6 +63,7 @@ import {
   rowToSlot,
   type AppConfig,
 } from './mappers';
+import { VERSION_COLUMNS, type StorePlatform } from './version';
 
 /** A device's OS, for the push token row. */
 export type Platform = 'ios' | 'android';
@@ -267,29 +268,29 @@ export async function fetchAppConfig(): Promise<AppConfig | null> {
 }
 
 /**
- * The minimum supported version, for the hard update gate — and NOTHING else.
+ * The minimum supported version on `platform`, for the hard update gate — and
+ * NOTHING else.
  *
  * Separate from fetchAppConfig for two reasons that both matter:
  *
- *  1. It must work SIGNED OUT. anon holds a COLUMN-level grant on exactly
- *     (latest_ios_version, min_supported_ios_version) (migration 058), so
- *     `select *` — which is what fetchAppConfig does — is a permission error for
- *     an anon caller. The columns are named here deliberately; widening this
- *     select would break the gate on the sign-in screen, which is the one place
- *     it most has to work.
+ *  1. It must work SIGNED OUT. anon holds COLUMN-level grants on exactly the
+ *     version fields (058 for iOS, 073 for Android), so `select *` — which is
+ *     what fetchAppConfig does — is a permission error for an anon caller. The
+ *     one column is named here deliberately; widening this select would break the
+ *     gate on the sign-in screen, which is the one place it most has to work.
  *  2. It returns the bare string rather than an AppConfig, because the gate must
  *     not depend on a shape whose other fields anon cannot read.
  *
  * Throws like every other reader here; the gate treats any throw as "unknown" and
- * lets the app through.
+ * lets the app through. That includes a backend that predates 073: PostgREST
+ * answers a select of a column that does not exist with 400 / 42703, so an
+ * Android build pointed at such a project is never blocked.
  */
-export async function fetchVersionFloor(): Promise<string | null> {
-  const { data, error } = await supabase
-    .from('app_config')
-    .select('min_supported_ios_version')
-    .maybeSingle();
+export async function fetchVersionFloor(platform: StorePlatform): Promise<string | null> {
+  const column = VERSION_COLUMNS[platform].min;
+  const { data, error } = await supabase.from('app_config').select(column).maybeSingle();
   if (error) throw new ApiError(`Failed to load the version floor: ${error.message}`, error);
-  const value = data?.min_supported_ios_version;
+  const value = (data as Record<string, unknown> | null)?.[column];
   return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 

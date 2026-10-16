@@ -232,13 +232,21 @@ export function rowToNewsSeen(r: Row): NewsSeen {
 /** app_config's single row — the client reads only the version fields. */
 export interface AppConfig {
   latestIosVersion: string;
-  /** Reserved for a future mandatory-update gate; nothing reads it yet. */
+  /** The hard gate reads this through fetchVersionFloor, not from here. */
   minSupportedIosVersion: string | null;
+  /**
+   * 073. Null until the academy sets it — and on any backend that predates 073,
+   * where `select *` simply has no such key. Either way: no Android prompt.
+   */
+  latestAndroidVersion: string | null;
+  minSupportedAndroidVersion: string | null;
 }
 
 export function rowToAppConfig(r: Row): AppConfig {
   return {
     latestIosVersion: str(r.latest_ios_version),
     minSupportedIosVersion: nstr(r.min_supported_ios_version),
+    latestAndroidVersion: nstr(r.latest_android_version),
+    minSupportedAndroidVersion: nstr(r.min_supported_android_version),
   };
 }

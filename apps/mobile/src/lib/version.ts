@@ -76,6 +76,89 @@ export function isBelowMinimum(installed: string | null | undefined, min: string
   return compareVersions(installed, min) === -1;
 }
 
+/** The two stores this app ships through. Anything else (web, an unknown OS) has no store. */
+export type StorePlatform = 'ios' | 'android';
+
+/**
+ * The store this platform installs from, or null when there is none.
+ *
+ * `platform` is a plain string (Platform.OS) so this stays importable under the
+ * node test environment, like everything else in this file. Null is the fail-open
+ * answer: a platform with no store has no version to compare and nowhere to send
+ * anyone, so neither the gate nor the prompt may act on it.
+ */
+export function storePlatform(platform: string): StorePlatform | null {
+  return platform === 'ios' || platform === 'android' ? platform : null;
+}
+
+/**
+ * The app_config columns each platform reads. Named, never derived, because anon
+ * holds COLUMN grants on exactly these four (058, 073): a select that names any
+ * other column — or `*` — is a permission error on the signed-out gate read.
+ */
+export const VERSION_COLUMNS = {
+  ios: { latest: 'latest_ios_version', min: 'min_supported_ios_version' },
+  android: { latest: 'latest_android_version', min: 'min_supported_android_version' },
+} as const satisfies Record<StorePlatform, { latest: string; min: string }>;
+
+/** The version fields of app_config, as the client maps them (mappers.ts AppConfig). */
+export interface StoreVersions {
+  latestIosVersion: string | null;
+  latestAndroidVersion: string | null;
+}
+
+/**
+ * The "latest live in the store" version THIS platform compares against, or null.
+ *
+ * Android reads its own field, never the iOS one: the stores release on their own
+ * clocks, and an Android user told to install a version Play is still reviewing
+ * would tap "Update now" and find nothing. Null (no row, offline, a backend that
+ * predates 073, or no store at all) means no prompt.
+ */
+export function latestVersionFor(
+  config: StoreVersions | null | undefined,
+  platform: string,
+): string | null {
+  if (!config) return null;
+  const store = storePlatform(platform);
+  if (store === 'ios') return config.latestIosVersion || null;
+  if (store === 'android') return config.latestAndroidVersion || null;
+  return null;
+}
+
+/**
+ * The Play Store package — expo.android.package in app.json, which is permanent
+ * once the Play Console app exists. version.test.ts reads app.json and fails if
+ * the two ever disagree, so a rename cannot leave the gate opening someone else's
+ * listing.
+ */
+export const ANDROID_PACKAGE = 'com.thepadelacademy.app';
+
+/** The App Store page. The numeric id is the App Store app id, not the bundle id. */
+export const APP_STORE_URL = 'https://apps.apple.com/app/id6793803171';
+/** Opens the App Store app directly; the gate falls back to https when nothing handles it. */
+export const APP_STORE_DEEP_LINK = 'itms-apps://apps.apple.com/app/id6793803171';
+/** Opens the Play Store app directly. */
+export const PLAY_STORE_DEEP_LINK = `market://details?id=${ANDROID_PACKAGE}`;
+/** The Play listing in a browser — for a device with no Play Store app to take market://. */
+export const PLAY_STORE_URL = `https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE}`;
+
+/**
+ * The store URLs an "Update now" button tries, in order, until one opens.
+ *
+ * `surface` exists to keep iOS exactly as it shipped: the hard gate tries the
+ * itms-apps deep link and then https, while the soft prompt has only ever opened
+ * the https page. Android tries market:// (straight into the Play Store app) and
+ * then the https listing, on both surfaces. An empty list — no store on this
+ * platform — makes the button a no-op rather than a crash.
+ */
+export function storeUrls(platform: string, surface: 'gate' | 'prompt'): string[] {
+  const store = storePlatform(platform);
+  if (store === 'ios') return surface === 'gate' ? [APP_STORE_DEEP_LINK, APP_STORE_URL] : [APP_STORE_URL];
+  if (store === 'android') return [PLAY_STORE_DEEP_LINK, PLAY_STORE_URL];
+  return [];
+}
+
 /**
  * The hard gate's whole decision, as a pure function: should THIS build, on THIS
  * platform, against THIS floor, be locked out?
@@ -87,15 +170,16 @@ export function isBelowMinimum(installed: string | null | undefined, min: string
  * matrix is covered exhaustively — leaving the component with only what genuinely
  * needs a runtime: the fetch, its timeout, and the AppState subscription.
  *
- * `platform` is passed in rather than read from react-native so this file stays
- * importable under the node test environment.
+ * `floor` must be THIS platform's floor (fetchVersionFloor reads the column
+ * VERSION_COLUMNS names for it). `platform` is passed in rather than read from
+ * react-native so this file stays importable under the node test environment.
  */
 export function shouldHardBlock(
   platform: string,
   installed: string | null | undefined,
   floor: string | null | undefined,
 ): boolean {
-  // Only iOS ships this app, and the floor is an iOS version string.
-  if (platform !== 'ios') return false;
+  // Only the two store platforms have a floor; anything else is never blocked.
+  if (storePlatform(platform) === null) return false;
   return isBelowMinimum(installed, floor);
 }

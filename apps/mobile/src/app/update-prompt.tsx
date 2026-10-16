@@ -1,13 +1,11 @@
 import { space } from '@tpa/theme';
 import { useRouter } from 'expo-router';
-import { Linking, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { useSession } from '../session/SessionProvider';
 import { Button, InfoCard, Screen, ScreenHeader, Text } from '../ui';
+import { openStore as openStoreListing } from '../update/openStore';
 import { markDismissedToday } from '../update/updatePrompt';
-
-/** The app's App Store page. The numeric id is the App Store app id, not the bundle id. */
-const APP_STORE_URL = 'https://apps.apple.com/app/id6793803171';
 
 /**
  * The soft "please update" nudge. Presented modally (see _layout) and built from
@@ -30,9 +28,10 @@ export default function UpdatePromptScreen() {
 
   const openStore = () => {
     void markDismissedToday(now);
-    // Rejects when nothing can handle the URL (a simulator with no App Store).
-    // Swallowed: a nudge must never crash, and "Later" is still right there.
-    void Linking.openURL(APP_STORE_URL).catch(() => {});
+    // iOS: the App Store https page, as it always was. Android: the Play Store app,
+    // then the https listing. Failures are swallowed — a nudge must never crash,
+    // and "Later" is still right there.
+    void openStoreListing('prompt');
     router.back();
   };
 

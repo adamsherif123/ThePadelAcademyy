@@ -1,10 +1,10 @@
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import { useAppConfig, useUnseenNews } from '../data/queries';
-import { isOutdated } from '../lib/version';
+import { isOutdated, latestVersionFor } from '../lib/version';
 import { useSession } from '../session/SessionProvider';
 import { cairoDayKey, readDismissedOn } from './updatePrompt';
 
@@ -18,6 +18,8 @@ import { cairoDayKey, readDismissedOn } from './updatePrompt';
  *   • unseen news pending — the news pop-up wins (see precedence note below).
  *   • no config data      — offline or the fetch failed. A launch with no
  *                           connectivity shows nothing, no error, no retry loop.
+ *   • no version for this store — Android reads its own field (073); null, or a
+ *                           backend that predates 073, means no prompt.
  *   • version unreadable  — can't prove they're behind, so don't claim it.
  *   • not actually behind — isOutdated is false for equal AND newer (TestFlight).
  *   • dismissed today     — the once-a-day rule, keyed on the Cairo day.
@@ -31,7 +33,7 @@ import { cairoDayKey, readDismissedOn } from './updatePrompt';
  *
  * ── the installed version ──
  * Constants.expoConfig.version is the app.json `version` baked in at build time,
- * which IS CFBundleShortVersionString for this project. That holds because there
+ * which IS CFBundleShortVersionString on iOS and versionName on Android. That holds because there
  * is no expo-updates/OTA here — if OTA is ever added, an update could carry a
  * manifest version that differs from the installed binary, and this should move to
  * expo-application's nativeApplicationVersion.
@@ -60,8 +62,10 @@ export function UpdatePromptBridge(): null {
     if (status !== 'ready') return;
     if (dismissedOn === undefined) return; // storage not read yet
     if (unseenQ.data && unseenQ.data.length > 0) return; // news pop-up wins
-    const latest = configQ.data?.latestIosVersion;
-    if (!latest) return; // offline / no config row / fetch failed
+    // This platform's own store version: iOS reads latest_ios_version exactly as
+    // before; Android reads latest_android_version (073), null until it is set.
+    const latest = latestVersionFor(configQ.data, Platform.OS);
+    if (!latest) return; // offline / no config row / fetch failed / not set for this store
     const installed = Constants.expoConfig?.version;
     if (!isOutdated(installed, latest)) return;
     if (dismissedOn === cairoDayKey(now)) return; // already answered today
