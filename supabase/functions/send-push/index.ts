@@ -60,10 +60,19 @@ Deno.serve(async (req) => {
   if (!tokens || tokens.length === 0) return json(200, { ok: true, sent: 0, reason: 'no_tokens' });
 
   // One Expo message per token.
+  //
+  // channelId / priority are Android's (iOS ignores channelId, and Expo maps every
+  // priority but 'normal' to APNs 10 — what iOS already got by default). The app
+  // creates channel 'default' at HIGH importance (push.ts); naming it here means the
+  // notification lands there rather than in expo-notifications' fallback channel,
+  // and 'high' is FCM high priority, so Doze doesn't hold a "session confirmed"
+  // until the phone next wakes.
   const messages = tokens.map((t) => ({
     to: t.expo_push_token,
     title: claimed.title,
     body: claimed.body,
+    channelId: 'default',
+    priority: 'high',
     data: { notificationId: claimed.id, type: claimed.type, slotId: claimed.slot_id, newsId: claimed.news_id },
   }));
 

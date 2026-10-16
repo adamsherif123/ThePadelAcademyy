@@ -26,10 +26,19 @@ import { interFonts } from '../theme/fonts';
 import { ThemeProvider, useTheme } from '../theme/ThemeProvider';
 import { Button, InfoCard, Screen, Text } from '../ui';
 
-/** Status bar icons flip with the resolved scheme — dark icons on light, light icons on dark. */
+/**
+ * Status bar icons flip with the resolved scheme — dark icons on light, light icons on
+ * dark — EXCEPT on the navy auth screens (NavyScreen: sign-in, password, trial-grant,
+ * not-a-player), which are navy in both schemes and need light icons always. Without
+ * that, light mode drew dark icons on navy: the clock and battery vanished, and on
+ * Android (edge-to-edge, transparent status bar) there is no bar colour to rescue them.
+ * profile-setup is the one (auth) screen on the light canvas.
+ */
 function ThemedStatusBar() {
   const { scheme } = useTheme();
-  return <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />;
+  const segments = useSegments();
+  const onNavy = segments[0] === '(auth)' && segments[1] !== 'profile-setup';
+  return <StatusBar style={onNavy || scheme === 'dark' ? 'light' : 'dark'} />;
 }
 
 SplashScreen.preventAutoHideAsync();
@@ -70,7 +79,13 @@ function useAuthGuard() {
 
   useEffect(() => {
     const target = nextRoute(status, segments[0], segments[1], isCoach);
-    if (target) router.replace(target as never);
+    if (!target) return;
+    // Signed out from deep inside the app (account deleted, session expired): clear
+    // the stack first. replace() only swaps the top screen, so sign-in would otherwise
+    // sit on top of the signed-in screens — and back (Android's button, iOS's swipe)
+    // would reveal a tab bar with no player behind it.
+    if (status === 'signed_out' && router.canDismiss()) router.dismissAll();
+    router.replace(target as never);
   }, [status, segments, router, isCoach]);
 }
 

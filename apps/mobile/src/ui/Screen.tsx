@@ -1,6 +1,8 @@
 import { space } from '@tpa/theme';
 import type { ReactElement, ReactNode } from 'react';
 import {
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   View,
@@ -65,8 +67,8 @@ export function Screen({
       // is the iOS built-in (RN ≥0.70): it insets the content by the keyboard height AND
       // scrolls the focused input into view — so a low input (sign-in) or the last field of
       // a long form (profile-setup) lifts clear, without reflowing the layout (branding
-      // doesn't jump). No-op when no keyboard is up. Android is covered by the window's
-      // adjustResize soft-input mode (app.json android.softwareKeyboardLayoutMode).
+      // doesn't jump). No-op when no keyboard is up. Android: see the
+      // KeyboardAvoidingView at the bottom of this component.
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets
       refreshControl={refreshControl}
@@ -85,7 +87,7 @@ export function Screen({
     </View>
   );
 
-  return (
+  const screen = (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]} edges={edges}>
       {body}
       {footer ? (
@@ -103,6 +105,20 @@ export function Screen({
         </View>
       ) : null}
     </SafeAreaView>
+  );
+
+  // Android only. SDK 56 is always edge-to-edge, and edge-to-edge turns off the
+  // window resize that softwareKeyboardLayoutMode: 'resize' (adjustResize) used to do:
+  // the keyboard now draws OVER the window, covering low inputs (sign-in, profile-setup's
+  // last fields, delete-account's confirm box) and every sticky footer. Padding the
+  // screen by the keyboard's height puts that resize back, footer included, and
+  // automaticallyAdjustKeyboardInsets above has no Android effect to double up with.
+  // iOS keeps exactly the tree it shipped with.
+  if (Platform.OS !== 'android') return screen;
+  return (
+    <KeyboardAvoidingView style={styles.flex} behavior="padding">
+      {screen}
+    </KeyboardAvoidingView>
   );
 }
 

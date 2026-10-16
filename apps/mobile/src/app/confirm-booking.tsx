@@ -36,6 +36,7 @@ import {
   Text,
   TRAINING_META,
   batchLabel,
+  useHardwareBack,
 } from '../ui';
 import type { BookReason } from '../lib/api';
 import { captureException } from '../lib/reporting';
@@ -82,6 +83,9 @@ export default function ConfirmBookingScreen() {
   const coachesQ = useCoaches();
   const gate = combine(slotsQ, batchesQ, bookingsQ, coachesQ);
   const bookMutation = useBookSlot();
+  // Android back can't pop this screen while the booking is in flight — the
+  // replace to booked-success that follows would land on the wrong screen.
+  useHardwareBack(bookMutation.isPending);
   const [error, setError] = useState<string | null>(null);
   // credit_wrong_location is the one refusal with somewhere to GO, so it is held
   // as structure rather than a sentence: the screen offers the two things that

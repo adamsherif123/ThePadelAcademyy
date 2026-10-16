@@ -22,6 +22,7 @@ export { EmptyState } from './EmptyState';
 export { IconRow } from './IconRow';
 export { InfoCard, type InfoCardVariant } from './InfoCard';
 export { Input, type InputProps } from './Input';
+export { useHardwareBack } from './useHardwareBack';
 export { useRefreshControl } from './useRefreshControl';
 export { LinkRow } from './LinkRow';
 export { LoadMore } from './LoadMore';

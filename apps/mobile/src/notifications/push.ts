@@ -80,9 +80,13 @@ export async function setupForegroundHandler(): Promise<void> {
 
 async function ensureAndroidChannel(N: typeof import('expo-notifications')): Promise<void> {
   if (Platform.OS !== 'android') return;
+  // HIGH so a background push pops up as a heads-up banner (DEFAULT only drops it in
+  // the shade). Android lets an app LOWER a channel's importance later but never
+  // raise it, so this had to be right before the first Android install.
+  // send-push names this channel id on every message.
   await N.setNotificationChannelAsync('default', {
     name: 'Default',
-    importance: N.AndroidImportance.DEFAULT,
+    importance: N.AndroidImportance.HIGH,
     lightColor: color.accent.default,
   });
 }

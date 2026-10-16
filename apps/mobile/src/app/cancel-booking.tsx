@@ -22,6 +22,7 @@ import {
   ScreenHeader,
   Text,
   trainingMetaFor,
+  useHardwareBack,
 } from '../ui';
 
 /**
@@ -49,6 +50,9 @@ export default function CancelBookingScreen() {
   const slotsQ = useSlotsByIds(bookedSlotId ? [bookedSlotId] : []);
   const gate = combine(slotsQ, batchesQ, bookingsQ, coachesQ);
   const cancelMutation = useCancelBooking();
+  // Android back can't pop this modal mid-cancel: the router.back() that follows
+  // success would then pop the screen underneath as well.
+  useHardwareBack(cancelMutation.isPending);
   const [error, setError] = useState<string | null>(null);
   if (!player) return null;
 

@@ -113,7 +113,15 @@ export default function TrialOfferScreen() {
               }
             />
           ) : (
-            <Button label="Browse packages" onPress={() => router.replace('/buy-credits')} />
+            <Button
+              label="Browse packages"
+              // The tabs first, then the packages on top: a bare replace left buy-credits
+              // as the ONLY screen, so its back did nothing (and Android's closed the app).
+              onPress={() => {
+                router.replace('/(tabs)');
+                router.push('/buy-credits');
+              }}
+            />
           )}
           <Button label="Maybe later" variant="ghost" onPress={() => router.replace('/(tabs)')} />
         </View>

@@ -8,7 +8,7 @@ import { haptics } from '../../lib/haptics';
 import { PRIVACY_POLICY_URL } from '../../lib/legal';
 import { useSession } from '../../session/SessionProvider';
 import { useTheme } from '../../theme/ThemeProvider';
-import { Button, InfoCard, Input, ProfileFields, Screen, ScreenHeader, Text } from '../../ui';
+import { Button, InfoCard, Input, ProfileFields, Screen, ScreenHeader, Text, useHardwareBack } from '../../ui';
 
 const MIN_PASSWORD = 8;
 
@@ -172,6 +172,10 @@ export default function ProfileSetupScreen() {
     void signOut();
     router.replace('/(auth)/sign-in');
   };
+  // Android's hardware back takes the same exit. A plain pop would skip the sign-out,
+  // and the guard would bounce the orphan session straight back here (or, with
+  // nothing beneath, close the app and reopen on this screen next launch).
+  useHardwareBack(true, onBack);
 
   return (
     <Screen scroll contentContainerStyle={styles.content}>
