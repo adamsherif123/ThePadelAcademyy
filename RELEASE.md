@@ -49,9 +49,10 @@ independently. Coupling them to one branch is the fix.
 ## Migrations
 
 Migrations go to **dev only** (`supabase db push --linked` with the dev ref) until a
-release session. Production is at `20260928000071`: `065`–`071` went up on 2026-09-30
-with the 1.4 release. Anything written after that waits on `multi-location` until the
-next one.
+release session. Production is at `20261015000073`: `065`–`071` went up on 2026-09-30
+with the 1.4 release, `072` on 2026-10-05, and `073` on 2026-10-16 ahead of the first
+Android build (see [Android](#android)). Anything written after that waits on
+`multi-location` until the next one.
 
 Since the 1.4 release `main` carries the full migration history and is a truthful
 picture of prod's schema. That was not true before it: `main` stopped at `060` while
@@ -174,33 +175,40 @@ release, which is why the mobile app is the last step and never the first.
 
 ## Android
 
-The `android` branch (cut from `main` at `072`) carries the first Android release:
-the platform-aware update gate, migration `073` (app_config's Android version
-fields), the Play photo-policy permission block, and the Android audit fixes. It
-merges into `main` in a release session like any other work.
+The first Android release went to `main` on 2026-10-16 in a release session: the
+platform-aware update gate, migration `073` (app_config's Android version fields),
+the Play photo-policy permission block, `allowBackup` off, and the Android audit
+fixes. The order was the usual one — `073` to prod, then `send-push` to prod, then
+`android` fast-forwarded into `main` (the admin bundle was unchanged), then the
+production `.aab`.
 
-What that release session must do for Android, in the usual order:
+**Android builds are gateable.** `073` is on prod, so every Android build — from the
+very first one a tester installs — reads `min_supported_android_version` and can be
+forced to update. No Android binary repeats iOS 1.2/1.3.
 
-1. `supabase db push` — `073` goes to prod with everything else pending. Until it
-   does, an Android build on prod reads a column that does not exist; PostgREST
-   answers 400/42703 and the gate fails open (no block, no prompt). That is safe,
-   but it means **no Android build is force-updatable until `073` is on prod.**
-2. `supabase functions deploy send-push` to prod — it now names Android channel
-   `default` and FCM priority `high`.
-3. Merge `android` → `main`, push (deploys the admin; the admin is unaffected).
-4. Set the Android values on prod, out of band like the iOS ones:
-   `latest_android_version` = the versionName live on Play, and
-   `min_supported_android_version` = the oldest versionName that may still run
-   (leave NULL until there is a build worth forcing people onto).
+Both Android values ship NULL on prod (no prompt, no floor). They are set out of
+band, like the iOS ones:
+
+- `latest_android_version` — set it to the versionName live on Google Play **once
+  the first Play release is actually live** (closed testing does not count: a
+  prompt pointing at a listing the user cannot install from is a dead end). Bump it
+  after each later Play release goes live.
+- `min_supported_android_version` — set it **only to force an update**, to the
+  oldest versionName that may still run. Every build below it is locked out on
+  launch and on foreground. Leave it NULL otherwise.
+
+`send-push` names Android channel `default` and FCM priority `high` (iOS delivery is
+unchanged: Expo already sent APNs priority 10, and iOS ignores `channelId`). The app
+creates that channel at HIGH importance before it ever registers a token.
 
 `google-services.json` is committed on purpose (public client config; EAS only
 uploads tracked files). The FCM V1 service-account key is the secret and lives in
 EAS credentials only — see `apps/mobile/NOTIFICATIONS_SETUP.md`.
 
-The first Android `.aab` (1.4, versionCode 4) was built on 2026-10-15 from
-`android` at `c3aee00`, outside a release session, by explicit request — so the
-first upload to Play's closed-testing track could happen by hand. It reads prod and
-fails open there as described above. It was not uploaded by any tool.
+Play requires the first upload by hand. The 1.4 / versionCode 4 `.aab` from
+2026-10-15 was never uploaded and is superseded — it predates `allowBackup` off. The
+first `.aab` to upload is 1.4 / versionCode 5, built from `main` immediately after
+this merge.
 
 EAS environment variables (server-side, not in this repo):
 
