@@ -6,7 +6,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { defaultTrialBranch, packageById, trialBranches, trialPackageAt } from '../data/catalog';
 import { useLocations, useMyCreditRequests, usePackages } from '../data/queries';
@@ -200,10 +200,17 @@ export default function RequestCreditsScreen() {
   const onAddProof = async () => {
     if (uploading) return;
     setUploadNote(null);
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      setUploadNote('Allow photo access to attach a screenshot — or submit without one.');
-      return;
+    // Android needs no permission here: launchImageLibraryAsync opens the system
+    // photo picker, which hands back only the one image chosen. The storage/media
+    // permissions are BLOCKED in app.json (Play's Photo and Video Permissions
+    // policy), so asking would be refused outright on Android 12 and below and the
+    // screenshot could never be attached there. iOS keeps the prompt it shipped with.
+    if (Platform.OS === 'ios') {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        setUploadNote('Allow photo access to attach a screenshot — or submit without one.');
+        return;
+      }
     }
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7 });
     if (res.canceled || !res.assets?.[0]) return;
