@@ -16,6 +16,7 @@
     "android": {
       "package": "com.thepadelacademy.app",
       "softwareKeyboardLayoutMode": "resize",
+      "allowBackup": false,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#040c71",
