@@ -1,7 +1,7 @@
-import { formatCompactEgp, formatPiastres } from '@tpa/core';
 import type { Piastres } from '@tpa/types';
 
 import styles from './Donut.module.css';
+import { RevenueAmount } from './RevenueAmount';
 
 export interface DonutSegment {
   key: string;
@@ -19,8 +19,19 @@ export interface DonutSegment {
  * figures + percentages collided with the card edge. Stacking the legend below
  * gives every row the card's full width, so it can't overflow at realistic
  * amounts — verified at 999,999 EGP values.
+ *
+ * `masked` hides the amounts (the hole and each legend row) and keeps the arcs and
+ * percentages: the split between training types, not how much any of it was.
  */
-export function Donut({ segments, total }: { segments: readonly DonutSegment[]; total: Piastres }) {
+export function Donut({
+  segments,
+  total,
+  masked = false,
+}: {
+  segments: readonly DonutSegment[];
+  total: Piastres;
+  masked?: boolean;
+}) {
   const size = 168;
   const stroke = 22;
   const r = (size - stroke) / 2;
@@ -60,7 +71,9 @@ export function Donut({ segments, total }: { segments: readonly DonutSegment[]; 
         </svg>
         <div className={styles.center}>
           <span className={styles.centerLabel}>Total</span>
-          <span className={styles.centerValue}>{formatCompactEgp(total)}</span>
+          <span className={styles.centerValue}>
+            <RevenueAmount amount={total} revealed={!masked} compact />
+          </span>
         </div>
       </div>
 
@@ -69,7 +82,9 @@ export function Donut({ segments, total }: { segments: readonly DonutSegment[]; 
           <li key={s.key} className={styles.legendRow}>
             <span className={styles.dot} style={{ background: s.color }} />
             <span className={styles.legendLabel}>{s.label}</span>
-            <span className={styles.legendValue}>{formatPiastres(s.value)}</span>
+            <span className={styles.legendValue}>
+              <RevenueAmount amount={s.value} revealed={!masked} />
+            </span>
             <span className={styles.legendPct}>{Math.round(((s.value as number) / totalN) * 100)}%</span>
           </li>
         ))}

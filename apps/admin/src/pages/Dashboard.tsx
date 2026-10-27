@@ -70,10 +70,13 @@ import {
   LoadingView,
   PageHeader,
   Panel,
+  RevenueAmount,
+  RevenueToggle,
   Select,
   StatCard,
   TRAINING_LABEL,
   TypePill,
+  useRevenueReveal,
   type DonutSegment,
 } from '../ui';
 import styles from './Dashboard.module.css';
@@ -212,6 +215,13 @@ function PurchaseRow({
  * different question from the one this card answers, and silently repurposing the
  * card to answer it would be worse than leaving it alone. A line under the filters
  * says so whenever a past month is selected.
+ *
+ * ── revenue is masked until asked for ──
+ * The owners open this in front of other people. The revenue card, the line
+ * chart's axis and the donut's amounts render masked until the one Show button
+ * beside the filters is pressed (data/revenueMask). Shapes and percentages stay:
+ * they say how the money moved, not how much it was. Recent purchases are single
+ * sales, not totals, and stay visible.
  */
 export function Dashboard() {
   const { now } = useSession();
@@ -228,6 +238,8 @@ export function Dashboard() {
   // null means "whatever month it is now", so the default survives midnight on the
   // 1st without the page holding a stale month it was mounted in.
   const [picked, setPicked] = useState<string | null>(null);
+  // Above the loading gate, like every other hook here.
+  const [revealed, setRevealed] = useRevenueReveal();
   const selectedMonth = (picked === null ? null : parseMonthKey(picked)) ?? cairoMonthOf(now);
 
   // The window, not the month: the delta needs the previous month and the trailing
@@ -312,6 +324,7 @@ export function Dashboard() {
           onChange={(e) => setPicked(e.target.value)}
           options={monthOptions(months)}
         />
+        <RevenueToggle className={styles.revealToggle} revealed={revealed} onChange={setRevealed} />
       </div>
 
       {/* Only when it can mislead. On the current month every card agrees about
@@ -329,7 +342,7 @@ export function Dashboard() {
           eyebrow={`Revenue · ${monthLabel(selectedMonth)}`}
           icon={DollarSign}
           iconTone="accent"
-          value={formatPiastres(rev.current)}
+          value={<RevenueAmount amount={rev.current} revealed={revealed} />}
           delta={rev.deltaPct}
           caption="vs last month"
         />
@@ -345,10 +358,10 @@ export function Dashboard() {
 
       <div className={[styles.charts, monthLoading ? styles.loadingMonth : ''].join(' ').trim()} aria-busy={monthLoading}>
         <Panel eyebrow={showingPastMonth ? `8 weeks to ${monthLabel(selectedMonth)}` : 'Last 8 weeks'} title="Revenue over time">
-          <LineChart data={line} />
+          <LineChart data={line} masked={!revealed} />
         </Panel>
         <Panel eyebrow={`What earns · ${monthLabel(selectedMonth)}`} title="Revenue by training type">
-          <Donut segments={donutSegments} total={rbt.total} />
+          <Donut segments={donutSegments} total={rbt.total} masked={!revealed} />
         </Panel>
       </div>
 

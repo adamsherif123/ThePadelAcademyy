@@ -139,6 +139,14 @@
   max-width: 280px;
 }
 
+/* The revenue Show/Hide button: pushed to the far end of the filter row, its own
+   width, and level with the selects (which carry a label above them). */
+.filterRow > .revealToggle {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  margin-inline-start: auto;
+}
+
 /* While the newly-picked month is in flight the figures on screen are still the
    previous month's (keepPreviousData), so they are dimmed and made inert rather
    than presented as the month the label now names. aria-busy carries the same

@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import styles from './StatCard.module.css';
 
@@ -19,7 +20,8 @@ export function StatCard({
   eyebrow: string;
   icon: LucideIcon;
   iconTone?: 'accent' | 'muted';
-  value: string;
+  /** Usually a string; a node when the figure can be masked (RevenueAmount). */
+  value: ReactNode;
   /** Signed % change; null/undefined renders no chip. */
   delta?: number | null;
   caption: string;

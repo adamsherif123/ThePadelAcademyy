@@ -1,6 +1,6 @@
-import { formatCompactEgp } from '@tpa/core';
 import type { Piastres } from '@tpa/types';
 
+import { revenueCompact } from '../data/revenueMask';
 import styles from './LineChart.module.css';
 
 export interface LinePoint {
@@ -22,8 +22,21 @@ function niceStep(v: number): number {
  * stop-color reference var(--*)), so it themes with the rest of the admin and
  * never hardcodes a palette. Values are integer piastres; ticks render compact
  * EGP via @tpa/core.
+ *
+ * `masked` replaces the y-axis amounts with a fixed mask and keeps the line. With
+ * no scale the shape says "up" or "down" and nothing about how much — and the
+ * numbers are gone from the DOM, which a CSS blur would leave readable to copy,
+ * devtools and screen readers.
  */
-export function LineChart({ data, height = 240 }: { data: readonly LinePoint[]; height?: number }) {
+export function LineChart({
+  data,
+  height = 240,
+  masked = false,
+}: {
+  data: readonly LinePoint[];
+  height?: number;
+  masked?: boolean;
+}) {
   const W = 720;
   const H = height;
   const padL = 48;
@@ -57,7 +70,7 @@ export function LineChart({ data, height = 240 }: { data: readonly LinePoint[]; 
         <g key={t}>
           <line x1={padL} x2={W - padR} y1={y(t)} y2={y(t)} className={styles.grid} />
           <text x={padL - 8} y={y(t)} className={styles.axisLabel} textAnchor="end" dominantBaseline="middle">
-            {formatCompactEgp(t as Piastres)}
+            {revenueCompact(t as Piastres, !masked)}
           </text>
         </g>
       ))}
