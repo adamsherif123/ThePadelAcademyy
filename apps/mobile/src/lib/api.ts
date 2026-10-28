@@ -125,9 +125,10 @@ export const fetchTemplates = (): Promise<AvailabilityTemplate[]> =>
 export const fetchPackages = (): Promise<Package[]> => selectAll('packages', rowToPackage);
 
 /**
- * The branches this client may see. RLS already hides non-default ones from a
- * pre-1.4 client, so a legacy build gets exactly one row back and the toggle
- * never appears — the header does the work, not a flag in the app.
+ * Every branch, active or not. NOT filtered by the x-tpa-client header: the
+ * `locations` policy is `using (true)` for any signed-in user (061). Pre-1.4
+ * builds never read this table, so there was nothing to hide; the header filter
+ * lives on session_slots, packages and availability_templates (063).
  *
  * Authenticated-only: `locations` grants SELECT to `authenticated`, not `anon`.
  * Every screen that reads it is behind the session gate (see LocationProvider).

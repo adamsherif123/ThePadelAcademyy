@@ -184,9 +184,13 @@ export function useSlotsForBookings(
   };
 }
 
-/** Active branches. Authenticated-only — see LocationProvider. */
-export const useLocations = () =>
-  toResource(useQuery({ queryKey: queryKeys.locations, queryFn: fetchLocations }));
+/**
+ * Active branches. Authenticated-only — see LocationProvider. `enabled` exists for
+ * LocationProvider, which mounts above the navigator and so outlives every sign-in
+ * and sign-out (the note there says why that matters). Screens leave it on.
+ */
+export const useLocations = ({ enabled = true }: { enabled?: boolean } = {}) =>
+  toResource(useQuery({ queryKey: queryKeys.locations, queryFn: fetchLocations, enabled }));
 
 export const useTemplates = () =>
   toResource(useQuery({ queryKey: queryKeys.templates, queryFn: fetchTemplates }));

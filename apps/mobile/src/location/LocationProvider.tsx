@@ -2,6 +2,7 @@ import type { Location, LocationId } from '@tpa/types';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { useLocations } from '../data/queries';
+import { useSession } from '../session/SessionProvider';
 import {
   readSelectedLocation,
   resolveSelectedLocation,
@@ -43,7 +44,22 @@ const LocationContext = createContext<LocationState | null>(null);
  * degrades to the default instead of opening on an empty screen.
  */
 export function LocationProvider({ children }: { children: ReactNode }) {
-  const locationsQ = useLocations();
+  // Tied to the session, deliberately. This provider mounts once, above the
+  // navigator, and lives through every sign-in and sign-out. Unkeyed, its
+  // locations query fired at launch even when signed out — anon cannot read
+  // `locations`, so it failed — and then SessionProvider's queryClient.clear()
+  // (which runs on the launch-time null session too) removed that query from the
+  // cache. Nothing re-rendered this provider afterwards, so its observer could
+  // stay attached to the removed query forever: after sign-in every screen
+  // fetched the branches into a NEW query this provider never saw, and the app
+  // ran with zero locations — no toggle, no selected branch, packages and credits
+  // filtered by a null branch — until the process was killed.
+  //
+  // Reading the session makes this provider re-render on every auth change, and
+  // a re-render re-binds the observer to whatever `locations` query the cache
+  // holds now. `enabled` keeps the doomed anon request from being made at all.
+  const { isAuthed } = useSession();
+  const locationsQ = useLocations({ enabled: isAuthed });
   const [stored, setStored] = useState<LocationId | null | undefined>(undefined);
 
   useEffect(() => {
